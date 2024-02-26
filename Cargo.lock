@@ -3,11 +3,11 @@
 version = 3
 
 [[package]]
-name = "libarch"
+name = "libseis"
 version = "0.1.0"
 
 [[package]]
-name = "libarch-macros"
+name = "libseis-macros"
 version = "0.1.0"
 
 [[package]]
