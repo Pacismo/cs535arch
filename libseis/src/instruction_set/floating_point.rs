@@ -24,18 +24,18 @@ impl BinaryOp {
 impl Decode for BinaryOp {
     fn decode(word: Word) -> super::error::DecodeResult<Self> {
         Ok(Self(
-            (word & Self::REG_MASK[0]) >> Self::REG_SHIFT[0],
-            (word & Self::REG_MASK[1]) >> Self::REG_SHIFT[1],
-            (word & Self::REG_MASK[2]) >> Self::REG_SHIFT[2],
+            ((word & Self::REG_MASK[0]) >> Self::REG_SHIFT[0]) as Register,
+            ((word & Self::REG_MASK[1]) >> Self::REG_SHIFT[1]) as Register,
+            ((word & Self::REG_MASK[2]) >> Self::REG_SHIFT[2]) as Register,
         ))
     }
 }
 
 impl Encode for BinaryOp {
     fn encode(self) -> Word {
-        (self.0 << Self::REG_SHIFT[0])
-            | (self.1 << Self::REG_SHIFT[1])
-            | (self.2 << Self::REG_SHIFT[2])
+        ((self.0 as Word) << Self::REG_SHIFT[0])
+            | ((self.1 as Word) << Self::REG_SHIFT[1])
+            | ((self.2 as Word) << Self::REG_SHIFT[2])
     }
 }
 
@@ -59,15 +59,15 @@ impl UnaryOp {
 impl Decode for UnaryOp {
     fn decode(word: Word) -> super::error::DecodeResult<Self> {
         Ok(Self(
-            (word & Self::REG_MASK[0]) >> Self::REG_SHIFT[0],
-            (word & Self::REG_MASK[1]) >> Self::REG_SHIFT[1],
+            ((word & Self::REG_MASK[0]) >> Self::REG_SHIFT[0]) as Register,
+            ((word & Self::REG_MASK[1]) >> Self::REG_SHIFT[1]) as Register,
         ))
     }
 }
 
 impl Encode for UnaryOp {
     fn encode(self) -> Word {
-        (self.0 << Self::REG_SHIFT[0]) | (self.1 << Self::REG_SHIFT[1])
+        ((self.0 as Word) << Self::REG_SHIFT[0]) | ((self.1 as Word) << Self::REG_SHIFT[1])
     }
 }
 
@@ -91,21 +91,46 @@ impl CompOp {
 impl Decode for CompOp {
     fn decode(word: Word) -> super::error::DecodeResult<Self> {
         Ok(Self(
-            (word & Self::REG_MASK[0]) >> Self::REG_SHIFT[0],
-            (word & Self::REG_MASK[1]) >> Self::REG_SHIFT[1],
+            ((word & Self::REG_MASK[0]) >> Self::REG_SHIFT[0]) as Register,
+            ((word & Self::REG_MASK[1]) >> Self::REG_SHIFT[1]) as Register,
         ))
     }
 }
 
 impl Encode for CompOp {
     fn encode(self) -> Word {
-        (self.0 << Self::REG_SHIFT[0]) | (self.1 << Self::REG_SHIFT[1])
+        ((self.0 as Word) << Self::REG_SHIFT[0]) | ((self.1 as Word) << Self::REG_SHIFT[1])
     }
 }
 
 impl Display for CompOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "V{:X}, V{:X}", self.0, self.1)
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct CheckOp(pub Register);
+
+impl CheckOp {
+    const REG_MASK: Word = 0b0000_0000_0000_0000_0000_0000_0000_1111;
+}
+
+impl Decode for CheckOp {
+    fn decode(word: Word) -> super::error::DecodeResult<Self> {
+        Ok(Self((word & Self::REG_MASK) as Register))
+    }
+}
+
+impl Encode for CheckOp {
+    fn encode(self) -> Word {
+        self.0 as Word
+    }
+}
+
+impl Display for CheckOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "V{:x}", self.0)
     }
 }
 
@@ -132,7 +157,7 @@ pub enum FloatingPointOp {
     /// Float-to-integer
     Ftoi(UnaryOp),
     /// Floating-point check
-    Fchk(BinaryOp),
+    Fchk(CheckOp),
 }
 
 impl FloatingPointOp {

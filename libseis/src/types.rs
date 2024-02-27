@@ -7,4 +7,4 @@ pub type Long = u32;
 /// The width of an instruction (an alias for a [`Long`])
 pub type Word = Long;
 /// Represents a register index.
-pub type Register = Word;
+pub type Register = Byte;

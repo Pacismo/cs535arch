@@ -46,7 +46,7 @@ impl Decode for Jump {
 
         match mode {
             Self::REGISTER => Ok(Self::Register(
-                (word & Self::REGISTER_MASK) >> Self::REGISTER_SHIFT,
+                ((word & Self::REGISTER_MASK) >> Self::REGISTER_SHIFT) as Register,
             )),
             Self::FORWARD => Ok(Self::Forward(word & Self::RELATIVE_MASK)),
             Self::REVERSE => Ok(Self::Reverse(word & Self::RELATIVE_MASK)),
@@ -59,7 +59,9 @@ impl Encode for Jump {
     fn encode(self) -> Word {
         use Jump::*;
         match self {
-            Register(reg) => (Self::REGISTER << Self::SHIFT) | reg << Self::REGISTER_SHIFT,
+            Register(reg) => {
+                (Self::REGISTER << Self::SHIFT) | (reg as Word) << Self::REGISTER_SHIFT
+            }
             Forward(off) => (Self::FORWARD << Self::SHIFT) | off,
             Reverse(off) => (Self::REVERSE << Self::SHIFT) | off,
         }

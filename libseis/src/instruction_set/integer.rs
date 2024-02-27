@@ -12,7 +12,7 @@ pub enum BinaryOp {
     /// Source register, 13-bit immediate parameter, and destination register
     Immediate(Register, Word, Register),
     /// Source and parameter registers and destination register
-    Register(Register, Register, Register),
+    Registers(Register, Register, Register),
 }
 
 impl BinaryOp {
@@ -44,10 +44,14 @@ impl Decode for BinaryOp {
 
         if (word & Self::IMM_FLAG_MASK) == Self::IMM_FLAG_MASK {
             let param = (word & Self::REG_PARAM_MASK) >> Self::PARAM_SHIFT;
-            Ok(Immediate(src, param, dest))
+            Ok(Immediate(src as Register, param, dest as Register))
         } else {
             let param = (word & Self::IMM_CONST_MASK) >> Self::PARAM_SHIFT;
-            Ok(Register(src, param, dest))
+            Ok(Registers(
+                src as Register,
+                param as Register,
+                dest as Register,
+            ))
         }
     }
 }
@@ -59,14 +63,14 @@ impl Encode for BinaryOp {
         match self {
             Immediate(src, opt, dst) => {
                 Self::IMM_CONST_MASK
-                    | (src << Self::SRC_REG_SHIFT)
+                    | ((src as Word) << Self::SRC_REG_SHIFT)
                     | (opt << Self::PARAM_SHIFT)
-                    | (dst << Self::DST_REG_SHIFT)
+                    | ((dst as Word) << Self::DST_REG_SHIFT)
             }
-            Register(src, opt, dst) => {
-                (src << Self::SRC_REG_SHIFT)
-                    | (opt << Self::PARAM_SHIFT)
-                    | (dst << Self::DST_REG_SHIFT)
+            Registers(src, opt, dst) => {
+                ((src as Word) << Self::SRC_REG_SHIFT)
+                    | ((opt as Word) << Self::PARAM_SHIFT)
+                    | ((dst as Word) << Self::DST_REG_SHIFT)
             }
         }
     }
@@ -78,7 +82,7 @@ impl Display for BinaryOp {
 
         match self {
             Immediate(src, opt, dst) => write!(f, "V{src:X}, #{opt} => V{dst:X}"),
-            Register(src, opt, dst) => write!(f, "V{src:X}, V{opt:X} => V{dst:X}"),
+            Registers(src, opt, dst) => write!(f, "V{src:X}, V{opt:X} => V{dst:X}"),
         }
     }
 }
@@ -103,13 +107,13 @@ impl Decode for UnaryOp {
         let src = (word & Self::SRC_REG_MASK) >> Self::SRC_REG_SHIFT;
         let dst = (word & Self::DST_REG_MASK) >> Self::DST_REG_SHIFT;
 
-        Ok(Self(src, dst))
+        Ok(Self(src as Register, dst as Register))
     }
 }
 
 impl Encode for UnaryOp {
     fn encode(self) -> Word {
-        (self.0 << Self::SRC_REG_MASK) | (self.1 << Self::DST_REG_MASK)
+        ((self.0 as Word) << Self::SRC_REG_MASK) | ((self.1 as Word) << Self::DST_REG_MASK)
     }
 }
 
@@ -122,7 +126,7 @@ impl Display for UnaryOp {
 /// Comparison operation (explicitly different from [`UnaryOp`])
 #[derive(Debug, Clone, Copy)]
 pub enum CompOp {
-    Register(Register, Register),
+    Registers(Register, Register),
     Immediate(Register, Word),
 }
 
@@ -151,12 +155,12 @@ impl Decode for CompOp {
             let left = (word & Self::LEFT_REG_MASK) >> Self::LEFT_REG_SHIFT;
             let right = (word & Self::RIGHT_REG_MASK) >> Self::RIGHT_PARAM_SHIFT;
 
-            Ok(Register(left, right))
+            Ok(Registers(left as Register, right as Register))
         } else {
             let left = (word & Self::LEFT_REG_MASK) >> Self::LEFT_REG_SHIFT;
             let right = (word & Self::RIGHT_IMM_MASK) >> Self::RIGHT_PARAM_SHIFT;
 
-            Ok(Immediate(left, right))
+            Ok(Immediate(left as Register, right))
         }
     }
 }
@@ -166,11 +170,12 @@ impl Encode for CompOp {
         use CompOp::*;
 
         match self {
-            Register(left, right) => {
-                (left << Self::LEFT_REG_SHIFT) | (right << Self::RIGHT_PARAM_SHIFT)
+            Registers(left, right) => {
+                ((left as Word) << Self::LEFT_REG_SHIFT)
+                    | ((right as Word) << Self::RIGHT_PARAM_SHIFT)
             }
             Immediate(left, right) => {
-                (left << Self::LEFT_REG_MASK) | (right << Self::RIGHT_PARAM_SHIFT)
+                ((left as Word) << Self::LEFT_REG_MASK) | (right << Self::RIGHT_PARAM_SHIFT)
             }
         }
     }
@@ -181,7 +186,7 @@ impl Display for CompOp {
         use CompOp::*;
 
         match self {
-            Register(left, right) => write!(f, "V{left:X}, V{right:X}"),
+            Registers(left, right) => write!(f, "V{left:X}, V{right:X}"),
             Immediate(left, right) => write!(f, "V{left:X}, #{right}"),
         }
     }
