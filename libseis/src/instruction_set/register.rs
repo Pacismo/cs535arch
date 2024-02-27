@@ -2,34 +2,9 @@ use super::{Decode, Encode};
 use crate::{
     instruction_set::{decode, error::DecodeError},
     registers::{BP, LP, SP, V},
-    types::{Register, Word},
+    types::{Register, Short, Word},
 };
 use std::fmt::{Display, Write};
-
-#[derive(Debug, Clone, Copy)]
-pub struct ZerOp(pub Register);
-
-impl ZerOp {
-    // TODO: fill
-}
-
-impl Decode for ZerOp {
-    fn decode(word: Word) -> super::error::DecodeResult<Self> {
-        todo!()
-    }
-}
-
-impl Encode for ZerOp {
-    fn encode(self) -> Word {
-        todo!()
-    }
-}
-
-impl Display for ZerOp {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
-    }
-}
 
 #[derive(Debug, Clone, Copy)]
 pub struct ImmOp(pub Word, pub Register);
@@ -82,10 +57,18 @@ impl Display for RegOp {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct MemOp(pub Register, pub Word);
+pub enum MemOp {
+    ZeroPage(Word, Register),
+    Indirect(Register, Register),
+    IndexedIndirect(Register, Short, Register),
+}
 
 impl MemOp {
-    // TODO: fill
+    /// A flag signifying to use a 16-bit zero-page address
+    const ZPG_MASK: Word = 0b0000_0001_0000_0000_0000_0000_0000_0000;
+    const ZPG_ADDR: Word = 0b0000_0000_1111_1111_1111_1111_0000_0000;
+    const ZPG_SHIFT: Word = 8;
+    const DST_REG_MASK: Word = 0b0000_0000_0000_0000_0000_0000_0000_1111;
 }
 
 impl Decode for MemOp {
@@ -225,8 +208,8 @@ pub enum RegisterOp {
     Push(StackOp),
     Pop(StackOp),
     Lol(ImmOp),
+    Llz(ImmOp),
     Loh(ImmOp),
-    Sez(ZerOp),
 }
 
 impl RegisterOp {
@@ -243,8 +226,8 @@ impl RegisterOp {
     const SLR: Word = 0b0111;
     const TFR: Word = 0b1000;
     const LOL: Word = 0b1001;
-    const LOH: Word = 0b1010;
-    const SEZ: Word = 0b1011;
+    const LLZ: Word = 0b1010;
+    const LOH: Word = 0b1011;
 }
 
 impl Decode for RegisterOp {
@@ -263,8 +246,8 @@ impl Decode for RegisterOp {
             Self::SLR => Ok(Slr(decode(word)?)),
             Self::TFR => Ok(Tfr(decode(word)?)),
             Self::LOL => Ok(Lol(decode(word)?)),
+            Self::LLZ => Ok(Llz(decode(word)?)),
             Self::LOH => Ok(Loh(decode(word)?)),
-            Self::SEZ => Ok(Sez(decode(word)?)),
             _ => Err(DecodeError::InvalidRegisterOp(reg_op)),
         }
     }
