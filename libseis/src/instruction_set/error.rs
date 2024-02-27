@@ -10,6 +10,7 @@ pub enum DecodeError {
 
     InvalidIntegerOp(Word),
     InvalidFloatingPointOp(Word),
+    InvalidRegisterOp(Word),
 }
 
 impl Error for DecodeError {}
@@ -19,16 +20,18 @@ impl Display for DecodeError {
         use DecodeError::*;
 
         match self {
-            &InvalidOpType(word) => write!(f, "Could not decode optype {word:x}"),
+            &InvalidOpType(word) => write!(f, "Could not decode optype {word:#x}"),
 
-            &InvalidControlOp(word) => write!(f, "Could not decode control op type {word:x}"),
-            &InvalidJumpType(word) => write!(f, "Could not decode jump type {word:x}"),
+            &InvalidControlOp(word) => write!(f, "Could not decode control op type {word:#x}"),
+            &InvalidJumpType(word) => write!(f, "Could not decode jump type {word:#x}"),
 
-            &InvalidIntegerOp(word) => write!(f, "Could not decode integer op type {word:x}"),
+            &InvalidIntegerOp(word) => write!(f, "Could not decode integer op type {word:#x}"),
 
             &InvalidFloatingPointOp(word) => {
-                write!(f, "Could not decode floating-point op type {word:x}")
+                write!(f, "Could not decode floating-point op type {word:#x}")
             }
+
+            &InvalidRegisterOp(word) => write!(f, "Could not decode register op type {word:#x}"),
         }
     }
 }
