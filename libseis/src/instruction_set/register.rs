@@ -2,7 +2,7 @@ use super::{Decode, Encode};
 use crate::{
     instruction_set::{decode, error::DecodeError},
     registers::{BP, LP, SP, V},
-    types::{Register, Short, Word},
+    types::{Byte, Register, Short, Word},
 };
 use std::fmt::{Display, Write};
 
@@ -58,17 +58,46 @@ impl Display for RegOp {
 
 #[derive(Debug, Clone, Copy)]
 pub enum MemOp {
-    ZeroPage(Word, Register),
-    Indirect(Register, Register),
-    IndexedIndirect(Register, Short, Register),
+    ZeroPage {
+        address: Word,
+        destination: Register,
+    },
+    Indirect {
+        address: Register,
+        destination: Register,
+    },
+    ImmIndexedIndirect {
+        address: Register,
+        offset: Short,
+        destination: Register,
+    },
+    RegIndexedIndirect {
+        address: Register,
+        index: Register,
+        destination: Register,
+    },
+    OffIndexedIndirect {
+        address: Register,
+        index: Register,
+        offset: Register,
+        destination: Register,
+    },
 }
 
 impl MemOp {
+    const DST_REG_MASK: Word = 0b0000_0000_0000_0000_0000_0000_0000_1111;
+
     /// A flag signifying to use a 16-bit zero-page address
     const ZPG_MASK: Word = 0b0000_0001_0000_0000_0000_0000_0000_0000;
-    const ZPG_ADDR: Word = 0b0000_0000_1111_1111_1111_1111_0000_0000;
-    const ZPG_SHIFT: Word = 8;
-    const DST_REG_MASK: Word = 0b0000_0000_0000_0000_0000_0000_0000_1111;
+    const ZPG_ADDR: Word = 0b0000_0000_0000_1111_1111_1111_1111_0000;
+    const ZPG_SHIFT: Word = 4;
+
+    const ADDR_MODE_MASK: Word = 0b0000_1100_0000_0000_0000_0000_0000_0000;
+    const ADDR_MODE_SHIFT: Word = 26;
+    const INDIRECT_MODE: Word = 0b00;
+    const IMM_INDEXED_MODE: Word = 0b01;
+    const REG_INDEXED_MODE: Word = 0b10;
+    const OFF_INDEXED_MODE: Word = 0b11;
 }
 
 impl Decode for MemOp {
@@ -96,30 +125,8 @@ impl StackOp {
     const MASK: Word = 0b0000_0000_1111_1111_1111_0000_0000_0000;
     const SHIFT: Word = 12;
 
-    const V: [Word; 16] = [
-        1 << V[0x0],
-        1 << V[0x1],
-        1 << V[0x2],
-        1 << V[0x3],
-        1 << V[0x4],
-        1 << V[0x5],
-        1 << V[0x6],
-        1 << V[0x7],
-        1 << V[0x8],
-        1 << V[0x9],
-        1 << V[0xA],
-        1 << V[0xB],
-        1 << V[0xC],
-        1 << V[0xD],
-        1 << V[0xE],
-        1 << V[0xF],
-    ];
-    const SP: Word = 1 << SP;
-    const BP: Word = 1 << BP;
-    const LP: Word = 1 << LP;
-
     pub fn has_register(self, reg_id: Register) -> bool {
-        self.0 & (1 << reg_id) != 0
+        self.0 & (1 << reg_id as Word) != 0
     }
 
     pub fn registers(self) -> Vec<Register> {
@@ -152,7 +159,7 @@ impl Decode for StackOp {
 
 impl Encode for StackOp {
     fn encode(self) -> Word {
-        (self.0 as Word) << Self::SHIFT
+        self.0 << Self::SHIFT
     }
 }
 
@@ -160,7 +167,7 @@ impl Display for StackOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut string = "".to_owned();
 
-        for v in V.into_iter().filter(|b| self.0 & b != 0) {
+        for v in V.into_iter().filter(|&b| self.has_register(b)) {
             if string.is_empty() {
                 write!(string, "V{v:X}")?;
             } else {
