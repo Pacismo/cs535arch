@@ -22,22 +22,22 @@ pub enum Jump {
 
 impl Jump {
     /// Mask to extract Jump-mode bits
-    pub const MASK: Word = 0b0000_0001_1000_0000_0000_0000_0000_0000;
+    const MASK: Word = 0b0000_0001_1000_0000_0000_0000_0000_0000;
     /// Amount to shift Jump-mode bits
-    pub const SHIFT: Word = 23;
+    const SHIFT: Word = 23;
     /// Mask to extract relative address bits
-    pub const RELATIVE_MASK: Word = 0b0000_0000_0111_1111_1111_1111_1111_1111;
+    const RELATIVE_MASK: Word = 0b0000_0000_0111_1111_1111_1111_1111_1111;
     /// Mask to extract register bits
-    pub const REGISTER_MASK: Word = 0b0000_0000_0111_1000_0000_0000_0000_0000;
+    const REGISTER_MASK: Word = 0b0000_0000_0111_1000_0000_0000_0000_0000;
     /// Amount to shift register bits
-    pub const REGISTER_SHIFT: Word = 19;
+    const REGISTER_SHIFT: Word = 19;
 
     /// Register-mode bits
-    pub const REGISTER: Word = 0b00;
+    const REGISTER: Word = 0b00;
     /// Forward-mode bits
-    pub const FORWARD: Word = 0b10;
+    const FORWARD: Word = 0b10;
     /// Reverse-mode bits
-    pub const REVERSE: Word = 0b11;
+    const REVERSE: Word = 0b11;
 }
 
 impl Decode for Jump {
@@ -107,55 +107,55 @@ pub enum ControlOp {
 
 impl ControlOp {
     /// Mask to extract the control-op bits
-    pub const MASK: Word = 0b0001_1110_0000_0000_0000_0000_0000_0000;
+    const MASK: Word = 0b0001_1110_0000_0000_0000_0000_0000_0000;
     /// Amount to shift the control-op bits
-    pub const SHIFT: Word = 25;
+    const SHIFT: Word = 25;
 
     /// HALT bits
     ///
     /// [`ControlOp::Halt`]
-    pub const HALT: Word = 0b0000;
+    const HALT: Word = 0b0000;
     /// NOP bits
     ///
     /// [`ControlOp::Nop`]
-    pub const NOP: Word = 0b0001;
+    const NOP: Word = 0b0001;
     /// JMP bits
     ///
     /// [`ControlOp::Jmp`]
-    pub const JMP: Word = 0b0010;
+    const JMP: Word = 0b0010;
     /// JSR bits
     ///
     /// [`ControlOp::Jsr`]
-    pub const JSR: Word = 0b0011;
+    const JSR: Word = 0b0011;
     /// RET bits
     ///
     /// [`ControlOp::Ret`]
-    pub const RET: Word = 0b0100;
+    const RET: Word = 0b0100;
 
     /// JEQ bits
     ///
     /// [`ControlOp::Jeq`]
-    pub const JEQ: Word = 0b1000;
+    const JEQ: Word = 0b1000;
     /// JNE bits
     ///
     /// [`ControlOp::Jne`]
-    pub const JNE: Word = 0b1100;
+    const JNE: Word = 0b1100;
     /// JGT bits
     ///
     /// [`ControlOp::Jgt`]
-    pub const JGT: Word = 0b1101;
+    const JGT: Word = 0b1101;
     /// JLT bits
     ///
     /// [`ControlOp::Jlt`]
-    pub const JLT: Word = 0b1110;
+    const JLT: Word = 0b1110;
     /// JGE bits
     ///
     /// [`ControlOp::Jge`]
-    pub const JGE: Word = 0b1001;
+    const JGE: Word = 0b1001;
     /// JLE bits
     ///
     /// [`ControlOp::Jle`]
-    pub const JLE: Word = 0b1010;
+    const JLE: Word = 0b1010;
 }
 
 impl Decode for ControlOp {

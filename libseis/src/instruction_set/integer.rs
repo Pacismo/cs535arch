@@ -17,23 +17,23 @@ pub enum BinaryOp {
 
 impl BinaryOp {
     /// Immediate value provided if set
-    pub const IMM_FLAG_MASK: Word = 0b0000_0000_1000_0000_0000_0000_0000_0000;
+    const IMM_FLAG_MASK: Word = 0b0000_0000_1000_0000_0000_0000_0000_0000;
 
     /// Source register mask
-    pub const SRC_REG_MASK: Word = 0b0000_0000_0000_0000_0000_0000_1111_0000;
+    const SRC_REG_MASK: Word = 0b0000_0000_0000_0000_0000_0000_1111_0000;
     /// Source register shift
-    pub const SRC_REG_SHIFT: Word = 4;
+    const SRC_REG_SHIFT: Word = 4;
     /// Destination register mask
-    pub const DST_REG_MASK: Word = 0b0000_0000_0000_0000_0000_0000_0000_1111;
+    const DST_REG_MASK: Word = 0b0000_0000_0000_0000_0000_0000_0000_1111;
     /// Destination register shift
-    pub const DST_REG_SHIFT: Word = 0;
+    const DST_REG_SHIFT: Word = 0;
 
     /// Immediate parameter mask
-    pub const IMM_CONST_MASK: Word = 0b0000_0000_0111_1111_1111_1111_0000_0000;
+    const IMM_CONST_MASK: Word = 0b0000_0000_0111_1111_1111_1111_0000_0000;
     /// Register parameter mask
-    pub const REG_PARAM_MASK: Word = 0b0000_0000_0000_0000_0000_1111_0000_0000;
+    const REG_PARAM_MASK: Word = 0b0000_0000_0000_0000_0000_1111_0000_0000;
     /// Parameter shift
-    pub const PARAM_SHIFT: Word = 8;
+    const PARAM_SHIFT: Word = 8;
 }
 
 impl Decode for BinaryOp {

@@ -47,18 +47,18 @@ pub enum Instruction {
 
 impl Instruction {
     /// Mask to extract op-type bits
-    pub const MASK: Word = 0b1110_0000_0000_0000_0000_0000_0000_0000;
+    const MASK: Word = 0b1110_0000_0000_0000_0000_0000_0000_0000;
     /// Amount to shift op-type bits
-    pub const SHIFT: Word = 29;
+    const SHIFT: Word = 29;
 
     /// Control bits
-    pub const CONTROL: Word = 0b000;
+    const CONTROL: Word = 0b000;
     /// Integer bits
-    pub const INTEGER: Word = 0b001;
+    const INTEGER: Word = 0b001;
     /// Floating-point bits
-    pub const FLOATING_POINT: Word = 0b010;
+    const FLOATING_POINT: Word = 0b010;
     /// Register bits
-    pub const REGISTER: Word = 0b011;
+    const REGISTER: Word = 0b011;
 }
 
 impl Decode for Instruction {
@@ -100,5 +100,19 @@ impl Display for Instruction {
             FloatingPoint(fp) => write!(f, "{fp}"),
             Register(_) => todo!(),
         }
+    }
+}
+
+impl TryFrom<Word> for Instruction {
+    type Error = DecodeError;
+
+    fn try_from(value: Word) -> DecodeResult<Self> {
+        decode(value)
+    }
+}
+
+impl From<Instruction> for Word {
+    fn from(value: Instruction) -> Self {
+        encode(value)
     }
 }
