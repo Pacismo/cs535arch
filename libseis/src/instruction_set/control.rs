@@ -6,7 +6,7 @@ use super::{
 };
 use crate::{
     instruction_set::decode,
-    types::{Register, Word},
+    types::{self, Register, SWord, Word},
 };
 
 /// Jump operands
@@ -14,43 +14,38 @@ use crate::{
 pub enum Jump {
     /// Jumps to a location pointed to by a register
     Register(Register),
-    /// Jumps to a location pointed to by PC + IMM
-    Forward(Word),
-    /// Jumps to a location pointed to by PC - IMM
-    Reverse(Word),
+    /// Jumps to a location pointed to by PC + IMM (sign extended)
+    Relative(SWord),
 }
 
 impl Jump {
     /// Mask to extract Jump-mode bits
-    const MASK: Word = 0b0000_0001_1000_0000_0000_0000_0000_0000;
-    /// Amount to shift Jump-mode bits
-    const SHIFT: Word = 23;
+    const REL_MODE_MASK: Word = 0b0000_0001_0000_0000_0000_0000_0000_0000;
     /// Mask to extract relative address bits
-    const RELATIVE_MASK: Word = 0b0000_0000_0111_1111_1111_1111_1111_1111;
+    const RELATIVE_MASK: Word = 0b0000_0000_1111_1111_1111_1111_1111_1111;
+    /// Sign bit (signify negative)
+    const SIGN_BIT: Word = 0b0000_0000_1000_0000_0000_0000_0000_0000;
     /// Mask to extract register bits
-    const REGISTER_MASK: Word = 0b0000_0000_0111_1000_0000_0000_0000_0000;
+    const REGISTER_MASK: Word = 0b0000_0000_1111_0000_0000_0000_0000_0000;
     /// Amount to shift register bits
-    const REGISTER_SHIFT: Word = 19;
-
-    /// Register-mode bits
-    const REGISTER: Word = 0b00;
-    /// Forward-mode bits
-    const FORWARD: Word = 0b10;
-    /// Reverse-mode bits
-    const REVERSE: Word = 0b11;
+    const REGISTER_SHIFT: Word = 20;
 }
 
 impl Decode for Jump {
     fn decode(word: Word) -> DecodeResult<Self> {
-        let mode = (word & Self::MASK) >> Self::SHIFT;
+        use Jump::*;
 
-        match mode {
-            Self::REGISTER => Ok(Self::Register(
-                ((word & Self::REGISTER_MASK) >> Self::REGISTER_SHIFT) as Register,
-            )),
-            Self::FORWARD => Ok(Self::Forward(word & Self::RELATIVE_MASK)),
-            Self::REVERSE => Ok(Self::Reverse(word & Self::RELATIVE_MASK)),
-            _ => Err(DecodeError::InvalidJumpType(mode)),
+        if word & Self::REL_MODE_MASK == 0 {
+            Ok(Register(
+                ((word & Self::REGISTER_MASK) >> Self::REGISTER_SHIFT) as types::Register,
+            ))
+        } else {
+            let amount = word & Self::RELATIVE_MASK;
+            if amount & Self::SIGN_BIT == 0 {
+                Ok(Relative((amount as SWord) << 2))
+            } else {
+                Ok(Relative(((!Self::RELATIVE_MASK | amount) as SWord) << 2))
+            }
         }
     }
 }
@@ -59,11 +54,8 @@ impl Encode for Jump {
     fn encode(self) -> Word {
         use Jump::*;
         match self {
-            Register(reg) => {
-                (Self::REGISTER << Self::SHIFT) | (reg as Word) << Self::REGISTER_SHIFT
-            }
-            Forward(off) => (Self::FORWARD << Self::SHIFT) | off,
-            Reverse(off) => (Self::REVERSE << Self::SHIFT) | off,
+            Register(reg) => (reg as Word) << Self::REGISTER_SHIFT,
+            Relative(off) => Self::REL_MODE_MASK | (off >> 2) as Word & Self::RELATIVE_MASK,
         }
     }
 }
@@ -74,36 +66,105 @@ impl Display for Jump {
 
         match self {
             Register(reg) => write!(f, "V{reg:X}"),
-            Forward(off) => write!(f, "+{off}"),
-            Reverse(off) => write!(f, "-{off}"),
+            Relative(off) => write!(f, "{:+}", off >> 2),
         }
     }
 }
 
 /// Flow control operations
+///
+/// All relative jumps are in terms of words rather than bytes
+///
+/// Absolute addresses ignore the least significant 2 bits
 #[derive(Debug, Clone, Copy)]
 pub enum ControlOp {
     /// Stops the processor
+    ///
+    /// ```seis
+    /// HALT ; Stop the processor
+    /// ```
     Halt,
     /// Does nothing
+    ///
+    /// ```seis
+    /// NOP ; No operation
+    /// ```
     Nop,
     /// Sets the PC to the link register
+    ///
+    /// ```seis
+    /// RET ; Return from subroutine (jump to LR)
+    /// ```
     Ret,
     /// Unconditional jump
+    ///
+    /// ```seis
+    /// JMP Vx     ; Absolute jump
+    /// JMP N      ; Relative jump
+    /// JMP .label ; Expands to N
+    /// ```
     Jmp(Jump),
     /// Jump to subroutine
+    ///
+    /// ```seis
+    /// JSR Vx     ; Jump to subroutine (absolute)
+    /// JSR N      ; Jump to subroutine (relative)
+    /// JSR .label ; Expands to Vx with load or N
+    /// ```
     Jsr(Jump),
     /// Jump if equal (ZF = 1)
+    ///
+    /// ```seis
+    /// < MUST FOLLOW A CMP >
+    /// JEQ Vx
+    /// JEQ N
+    /// JEQ .label ; Expands to N
+    /// ```
     Jeq(Jump),
     /// Jump if not equal (ZF = 0)
+    ///
+    /// ```seis
+    /// < MUST FOLLOW A CMP >
+    /// JNE Vx
+    /// JNE N
+    /// JNE .label ; Expands to N
+    /// ```
     Jne(Jump),
     /// Jump if greater than (ZF = 0 & OF = 1)
+    ///
+    /// ```seis
+    /// < MUST FOLLOW A CMP >
+    /// JGT Vx
+    /// JGT N
+    /// JGT .label ; Expands to N
+    /// ```
     Jgt(Jump),
     /// Jump if less than (ZF = 0 & OF = 0)
+    ///
+    /// ```seis
+    /// < MUST FOLLOW A CMP >
+    /// JLT Vx
+    /// JLT N
+    /// JLT .label ; Expands to N
+    /// ```
     Jlt(Jump),
     /// Jump if greater than or equal to (OF = 1 | ZF = 1)
+    ///
+    /// ```seis
+    /// < MUST FOLLOW A CMP >
+    /// JGE Vx
+    /// JGE N
+    /// JGE .label ; Expands to N
+    /// ```
     Jge(Jump),
     /// Jump if less than or equal to (OF = 0 | ZF = 1)
+    ///
+    /// ```seis
+    /// < MUST FOLLOW A CMP >
+    /// JLE Vx
+    /// JLE N
+    /// JLE .label ; Expands to N
+    /// ```
     Jle(Jump),
 }
 
