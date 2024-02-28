@@ -6,11 +6,14 @@ pub enum DecodeError {
     InvalidOpType(Word),
 
     InvalidControlOp(Word),
-    InvalidJumpType(Word),
 
     InvalidIntegerOp(Word),
     InvalidFloatingPointOp(Word),
+
     InvalidRegisterOp(Word),
+    InvalidAddressingMode(Word),
+    InvalidPushOp(Word),
+    InvalidPopOp(Word),
 }
 
 impl Error for DecodeError {}
@@ -23,7 +26,6 @@ impl Display for DecodeError {
             &InvalidOpType(word) => write!(f, "Could not decode optype {word:#x}"),
 
             &InvalidControlOp(word) => write!(f, "Could not decode control op type {word:#x}"),
-            &InvalidJumpType(word) => write!(f, "Could not decode jump type {word:#x}"),
 
             &InvalidIntegerOp(word) => write!(f, "Could not decode integer op type {word:#x}"),
 
@@ -32,6 +34,9 @@ impl Display for DecodeError {
             }
 
             &InvalidRegisterOp(word) => write!(f, "Could not decode register op type {word:#x}"),
+            &InvalidAddressingMode(word) => write!(f, "Could not decode addressing mode {word:#x}"),
+            &InvalidPushOp(word) => write!(f, "Could not decode push op type {word:#x}"),
+            &InvalidPopOp(word) => write!(f, "Could not decode pop op type {word:#x}"),
         }
     }
 }
