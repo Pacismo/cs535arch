@@ -113,11 +113,11 @@ impl Encode for SignExtentOp {
 impl Display for SignExtentOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let width = if self.0 == 0 {
-            "Byte"
+            "byte"
         } else if self.0 == 1 {
-            "Short"
+            "short"
         } else if self.0 == 2 {
-            "Long"
+            "word"
         } else {
             "<INVALID>"
         };
@@ -261,9 +261,9 @@ pub enum IntegerOp {
     /// Sign-extend
     Sxt(SignExtentOp),
     /// Logical-shift left
-    Lsl(BinaryOp),
+    Bsl(BinaryOp),
     /// Logical-shift right
-    Lsr(BinaryOp),
+    Bsr(BinaryOp),
     /// Arithmetic shift right
     Asr(BinaryOp),
     /// Rotate left
@@ -323,38 +323,38 @@ impl IntegerOp {
     /// Sign-extend byte bits
     ///
     /// [`IntegerOp::Sxt`]
-    const SXT: Word = 0b0_1100;
+    const SXT: Word = 0b0_1010;
 
     /// Logical-shift left bits
     ///
-    /// [`IntegerOp::Lsl`]
-    const LSL: Word = 0b1_0000;
+    /// [`IntegerOp::Bsl`]
+    const BSL: Word = 0b0_1011;
     /// Logical-shift right bits
     ///
-    /// [`IntegerOp::Lsr`]
-    const LSR: Word = 0b1_0001;
+    /// [`IntegerOp::Bsr`]
+    const BSR: Word = 0b0_1100;
     /// Arithmetic-shift right bits
     ///
     /// [`IntegerOp::Asr`]
-    const ASR: Word = 0b1_0010;
+    const ASR: Word = 0b0_1101;
 
     /// Rotate left bits
     ///
     /// [`IntegerOp::Rol`]
-    const ROL: Word = 0b1_0100;
+    const ROL: Word = 0b0_1110;
     /// Rotate right bits
     ///
     /// [`IntegerOp::Ror`]
-    const ROR: Word = 0b1_0101;
+    const ROR: Word = 0b0_1111;
 
     /// Compare bits
     ///
     /// [`IntegerOp::Cmp`]
-    const CMP: Word = 0b1_1110;
+    const CMP: Word = 0b1_0000;
     /// Test bits
     ///
     /// [`IntegerOp::Tst`]
-    const TST: Word = 0b1_1111;
+    const TST: Word = 0b1_0001;
 }
 
 impl Decode for IntegerOp {
@@ -374,8 +374,8 @@ impl Decode for IntegerOp {
             Self::XOR => Ok(Xor(decode(word)?)),
             Self::NOT => Ok(Not(decode(word)?)),
             Self::SXT => Ok(Sxt(decode(word)?)),
-            Self::LSL => Ok(Lsl(decode(word)?)),
-            Self::LSR => Ok(Lsr(decode(word)?)),
+            Self::BSL => Ok(Bsl(decode(word)?)),
+            Self::BSR => Ok(Bsr(decode(word)?)),
             Self::ASR => Ok(Asr(decode(word)?)),
             Self::ROL => Ok(Rol(decode(word)?)),
             Self::ROR => Ok(Ror(decode(word)?)),
@@ -404,8 +404,8 @@ impl Encode for IntegerOp {
             Xor(b) => (Self::XOR << Self::SHIFT) | b.encode(),
             Not(u) => (Self::NOT << Self::SHIFT) | u.encode(),
             Sxt(s) => (Self::SXT << Self::SHIFT) | s.encode(),
-            Lsl(b) => (Self::LSL << Self::SHIFT) | b.encode(),
-            Lsr(b) => (Self::LSR << Self::SHIFT) | b.encode(),
+            Bsl(b) => (Self::BSL << Self::SHIFT) | b.encode(),
+            Bsr(b) => (Self::BSR << Self::SHIFT) | b.encode(),
             Asr(b) => (Self::ASR << Self::SHIFT) | b.encode(),
             Rol(b) => (Self::ROL << Self::SHIFT) | b.encode(),
             Ror(b) => (Self::ROR << Self::SHIFT) | b.encode(),
@@ -431,8 +431,8 @@ impl Display for IntegerOp {
             Xor(b) => write!(f, "XOR {b}"),
             Not(o) => write!(f, "NOT {o}"),
             Sxt(s) => write!(f, "SXT {s}"),
-            Lsl(b) => write!(f, "LSL {b}"),
-            Lsr(b) => write!(f, "LSR {b}"),
+            Bsl(b) => write!(f, "LSL {b}"),
+            Bsr(b) => write!(f, "LSR {b}"),
             Asr(b) => write!(f, "ASR {b}"),
             Rol(b) => write!(f, "ROL {b}"),
             Ror(b) => write!(f, "ROR {b}"),
