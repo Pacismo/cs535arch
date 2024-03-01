@@ -77,7 +77,6 @@ impl Decode for Instruction {
 }
 
 impl Encode for Instruction {
-    /// Encodes to a word
     fn encode(self) -> Word {
         use Instruction::*;
 

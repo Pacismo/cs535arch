@@ -1,10 +1,9 @@
-use std::fmt::Display;
-
 use super::{error::DecodeResult, Decode, Encode};
 use crate::{
     instruction_set::{decode, error::DecodeError},
     types::{Register, Word},
 };
+use std::fmt::Display;
 
 /// Binary operation (two parameters)
 #[derive(Debug, Clone, Copy)]
@@ -84,6 +83,46 @@ impl Display for BinaryOp {
             Immediate(src, opt, dst) => write!(f, "V{src:X}, #{opt} => V{dst:X}"),
             Registers(src, opt, dst) => write!(f, "V{src:X}, V{opt:X} => V{dst:X}"),
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct SignExtentOp(pub Word, pub Register);
+
+impl SignExtentOp {
+    const TGT_REG_MASK: Word = 0b0000_0000_0000_0000_0000_0000_0000_1111;
+    const SXT_BIT_MASK: Word = 0b0000_0000_0000_0000_0000_0000_0011_0000;
+    const SXT_BIT_SHIFT: Word = 4;
+}
+
+impl Decode for SignExtentOp {
+    fn decode(word: Word) -> DecodeResult<Self> {
+        Ok(Self(
+            (word & Self::SXT_BIT_MASK) >> Self::SXT_BIT_SHIFT,
+            (word & Self::TGT_REG_MASK) as Register,
+        ))
+    }
+}
+
+impl Encode for SignExtentOp {
+    fn encode(self) -> Word {
+        (self.0 << Self::SXT_BIT_SHIFT) | (self.1 as Word)
+    }
+}
+
+impl Display for SignExtentOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let width = if self.0 == 0 {
+            "Byte"
+        } else if self.0 == 1 {
+            "Short"
+        } else if self.0 == 2 {
+            "Long"
+        } else {
+            "<INVALID>"
+        };
+
+        write!(f, "{} V{:X}", width, self.1)
     }
 }
 
@@ -219,10 +258,8 @@ pub enum IntegerOp {
     Xor(BinaryOp),
     /// Bitwise not
     Not(UnaryOp),
-    /// Sign-extend byte
-    Seb(UnaryOp),
-    /// Sign-extend short
-    Ses(UnaryOp),
+    /// Sign-extend
+    Sxt(SignExtentOp),
     /// Logical-shift left
     Lsl(BinaryOp),
     /// Logical-shift right
@@ -285,12 +322,8 @@ impl IntegerOp {
 
     /// Sign-extend byte bits
     ///
-    /// [`IntegerOp::Seb`]
-    const SEB: Word = 0b0_1100;
-    /// Sign-extend short bits
-    ///
-    /// [`IntegerOp::Ses`]
-    const SES: Word = 0b0_1101;
+    /// [`IntegerOp::Sxt`]
+    const SXT: Word = 0b0_1100;
 
     /// Logical-shift left bits
     ///
@@ -340,8 +373,7 @@ impl Decode for IntegerOp {
             Self::IOR => Ok(Ior(decode(word)?)),
             Self::XOR => Ok(Xor(decode(word)?)),
             Self::NOT => Ok(Not(decode(word)?)),
-            Self::SEB => Ok(Seb(decode(word)?)),
-            Self::SES => Ok(Ses(decode(word)?)),
+            Self::SXT => Ok(Sxt(decode(word)?)),
             Self::LSL => Ok(Lsl(decode(word)?)),
             Self::LSR => Ok(Lsr(decode(word)?)),
             Self::ASR => Ok(Asr(decode(word)?)),
@@ -371,8 +403,7 @@ impl Encode for IntegerOp {
             Ior(b) => (Self::IOR << Self::SHIFT) | b.encode(),
             Xor(b) => (Self::XOR << Self::SHIFT) | b.encode(),
             Not(u) => (Self::NOT << Self::SHIFT) | u.encode(),
-            Seb(u) => (Self::SEB << Self::SHIFT) | u.encode(),
-            Ses(u) => (Self::SES << Self::SHIFT) | u.encode(),
+            Sxt(s) => (Self::SXT << Self::SHIFT) | s.encode(),
             Lsl(b) => (Self::LSL << Self::SHIFT) | b.encode(),
             Lsr(b) => (Self::LSR << Self::SHIFT) | b.encode(),
             Asr(b) => (Self::ASR << Self::SHIFT) | b.encode(),
@@ -399,8 +430,7 @@ impl Display for IntegerOp {
             Ior(b) => write!(f, "IOR {b}"),
             Xor(b) => write!(f, "XOR {b}"),
             Not(o) => write!(f, "NOT {o}"),
-            Seb(o) => write!(f, "SEB {o}"),
-            Ses(o) => write!(f, "SES {o}"),
+            Sxt(s) => write!(f, "SXT {s}"),
             Lsl(b) => write!(f, "LSL {b}"),
             Lsr(b) => write!(f, "LSR {b}"),
             Asr(b) => write!(f, "ASR {b}"),

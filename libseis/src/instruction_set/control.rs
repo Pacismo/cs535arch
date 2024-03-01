@@ -1,5 +1,3 @@
-use std::fmt::Display;
-
 use super::{
     error::{DecodeError, DecodeResult},
     Decode, Encode,
@@ -8,6 +6,7 @@ use crate::{
     instruction_set::decode,
     types::{self, Register, SWord, Word},
 };
+use std::fmt::Display;
 
 /// Jump operands
 #[derive(Debug, Clone, Copy)]

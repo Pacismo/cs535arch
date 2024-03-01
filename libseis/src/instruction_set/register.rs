@@ -1,7 +1,7 @@
 use super::{error::DecodeResult, Decode, Encode};
 use crate::{
     instruction_set::{decode, error::DecodeError},
-    registers::{BP, LP, SP, V},
+    registers::{self, BP, LP, SP, V},
     types::{Byte, Register, Short, Word},
 };
 use std::fmt::{Display, Write};
@@ -91,94 +91,203 @@ impl Display for RegisterFlags {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct ImmOp(pub Word, pub Register);
+pub enum ImmOp {
+    Immediate {
+        zero: bool,
+        shift: Byte,
+        immediate: Short,
+        destination: Register,
+    },
+    ZeroPageTranslate {
+        address: Short,
+        destination: Register,
+    },
+}
 
 impl ImmOp {
-    // TODO: fill
+    const ZPG_TRANSLATE: Word = 0b0000_0000_1000_0000_0000_0000_0000_0000;
+    const ZERO_FLAG: Word = 0b0000_0000_0100_0000_0000_0000_0000_0000;
+    const DEST_REG_MASK: Word = 0b0000_0000_0000_0000_0000_0000_0000_1111;
+    const IMM_MASK: Word = 0b0000_0000_0000_1111_1111_1111_1111_0000;
+    const IMM_SHIFT: Word = 4;
+    const IMM_BSHIFT_MASK: Word = 0b0000_0000_0011_0000_0000_0000_0000_0000;
+    const IMM_BSHIFT_SHIFT: Word = 20;
 }
 
 impl Decode for ImmOp {
     fn decode(word: Word) -> DecodeResult<Self> {
-        todo!()
+        use ImmOp::*;
+
+        if word & Self::ZPG_TRANSLATE == 0 {
+            let zero = (word & Self::ZERO_FLAG) == 0;
+            let destination = (word & Self::DEST_REG_MASK) as Register;
+            let immediate = ((word & Self::IMM_MASK) >> Self::IMM_SHIFT) as Short;
+            let shift = ((word & Self::IMM_BSHIFT_MASK) >> Self::IMM_BSHIFT_SHIFT) as Byte;
+
+            Ok(Immediate {
+                zero,
+                shift,
+                immediate,
+                destination,
+            })
+        } else {
+            let address = ((word & Self::IMM_MASK) >> Self::IMM_SHIFT) as Short;
+            let destination = (word & Self::DEST_REG_MASK) as Register;
+
+            Ok(ZeroPageTranslate {
+                address,
+                destination,
+            })
+        }
     }
 }
 
 impl Encode for ImmOp {
     fn encode(self) -> Word {
-        todo!()
+        use ImmOp::*;
+
+        match self {
+            Immediate {
+                zero,
+                shift,
+                immediate,
+                destination,
+            } => {
+                let zero = if zero { Self::ZERO_FLAG } else { 0 };
+                let destination = destination as Word;
+                let immediate = (immediate as Word) << Self::IMM_SHIFT;
+                let shift = (shift as Word) << Self::IMM_BSHIFT_SHIFT;
+
+                zero | destination | immediate | shift
+            }
+            ZeroPageTranslate {
+                address,
+                destination,
+            } => {
+                let address = (address as Word) << Self::IMM_SHIFT;
+                let destination = destination as Word;
+
+                address | destination
+            }
+        }
     }
 }
 
 impl Display for ImmOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        use ImmOp::*;
+
+        match self {
+            Immediate {
+                zero,
+                shift,
+                immediate,
+                destination,
+            } => {
+                if *shift == 0 {
+                    if *zero {
+                        write!(f, "#{immediate} => V{destination:X}")
+                    } else {
+                        write!(f, "#{immediate} =| V{destination:X}")
+                    }
+                } else {
+                    if *zero {
+                        write!(f, "#{immediate} << {shift} => V{destination:X}")
+                    } else {
+                        write!(f, "#{immediate} << {shift} =| V{destination:X}")
+                    }
+                }
+            }
+            ZeroPageTranslate {
+                address,
+                destination,
+            } => {
+                write!(f, "&{address} => V{destination:X}")
+            }
+        }
     }
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct RegOp(pub Register, pub Register);
+pub struct RegOp {
+    pub source: Register,
+    pub destination: Register,
+}
 
 impl RegOp {
-    // TODO: fill
+    const SRC_REGISTER_MASK: Word = 0b0000_0000_0000_0000_1111_1111_0000_0000;
+    const DST_REGISTER_MASK: Word = 0b0000_0000_0000_0000_0000_0000_1111_1111;
 }
 
 impl Decode for RegOp {
     fn decode(word: Word) -> DecodeResult<Self> {
-        todo!()
+        let source = ((word & Self::SRC_REGISTER_MASK) >> 8) as Register;
+        let destination = (word & Self::DST_REGISTER_MASK) as Register;
+
+        if (source as usize) < registers::COUNT && (destination as usize) < registers::COUNT {
+            Ok(Self {
+                source,
+                destination,
+            })
+        } else {
+            Err(DecodeError::InvalidRegister(source, destination))
+        }
     }
 }
 
 impl Encode for RegOp {
     fn encode(self) -> Word {
-        todo!()
+        ((self.source as Word) << 8) | (self.destination as Word)
     }
 }
 
 impl Display for RegOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        write!(
+            f,
+            "{} => {}",
+            registers::get_name(self.source).ok_or(std::fmt::Error)?,
+            registers::get_name(self.destination).ok_or(std::fmt::Error)?
+        )
     }
 }
 
+/// Represents addressing modes.
+/// Includes translation for the zero-page.
 #[derive(Debug, Clone, Copy)]
 pub enum MemOp {
-    /// Read from an address with the zero-page ID in the upper bytes
+    /// Address with the zero-page ID in the upper bytes
     ZeroPage {
         address: Short,
         destination: Register,
     },
-    /// Create an address with the zero-page ID in the upper bytes
-    ZeroPageTranslate {
-        address: Short,
-        destination: Register,
-    },
+    /// Data from an address
     Indirect {
         address: Register,
         destination: Register,
     },
+    /// Data from an address at an offset (times the width of the read)
     OffsetIndirect {
         address: Register,
         offset: Short,
         destination: Register,
     },
+    /// Data from an address at an index (times the width of the read)
     IndexedIndirect {
         address: Register,
         index: Register,
         destination: Register,
     },
+    /// Data from the stack, offset (multiplied by the width of the read) from the stack pointer
     StackOffset {
         offset: Short,
         destination: Register,
     },
 }
 
-/// TODO: decode
 impl MemOp {
     const DST_REG_MASK: Word = 0b0000_0000_0000_0000_0000_0000_0000_1111;
 
-    /// A flag signifying to translate a 16-bit zero-page address into an absolute address
-    /// The zero page can exist anywhere
-    const ZPG_TRANSLATE: Word = 0b0000_0001_0000_0000_0000_0000_0000_0000;
     const ZPG_ADDR_MASK: Word = 0b0000_0000_0000_1111_1111_1111_1111_0000;
     const ZPG_ADDR_SHIFT: Word = 4;
 
@@ -225,21 +334,10 @@ impl Decode for MemOp {
                 offset: ((word & Self::OFFSET_MASK) >> Self::OFFSET_SHIFT) as Short,
                 destination,
             }),
-            Self::ZERO_PAGE_MODE => {
-                let address = ((word & Self::ZPG_ADDR_MASK) >> Self::ZPG_ADDR_SHIFT) as Short;
-
-                if word & Self::ZPG_TRANSLATE == 0 {
-                    Ok(ZeroPage {
-                        address,
-                        destination,
-                    })
-                } else {
-                    Ok(ZeroPageTranslate {
-                        address,
-                        destination,
-                    })
-                }
-            }
+            Self::ZERO_PAGE_MODE => Ok(ZeroPage {
+                address: ((word & Self::ZPG_ADDR_MASK) >> Self::ZPG_ADDR_SHIFT) as Short,
+                destination,
+            }),
             _ => Err(DecodeError::InvalidAddressingMode(addr_mode)),
         }
     }
@@ -255,15 +353,6 @@ impl Encode for MemOp {
                 destination,
             } => {
                 (Self::ZERO_PAGE_MODE << Self::ADDR_MODE_SHIFT)
-                    | ((address as Word) << Self::ZPG_ADDR_SHIFT)
-                    | (destination as Word)
-            }
-            ZeroPageTranslate {
-                address,
-                destination,
-            } => {
-                (Self::ZERO_PAGE_MODE << Self::ADDR_MODE_SHIFT)
-                    | Self::ZPG_TRANSLATE
                     | ((address as Word) << Self::ZPG_ADDR_SHIFT)
                     | (destination as Word)
             }
@@ -316,10 +405,6 @@ impl Display for MemOp {
                 address,
                 destination,
             } => write!(f, "@{address:#x} => V{destination:X}"),
-            ZeroPageTranslate {
-                address,
-                destination,
-            } => write!(f, "&{address:#x} => V{destination:X}"),
             Indirect {
                 address,
                 destination,
@@ -489,9 +574,7 @@ pub enum RegisterOp {
     Tfr(RegOp),
     Push(PushOp),
     Pop(PopOp),
-    Lol(ImmOp),
-    Llz(ImmOp),
-    Loh(ImmOp),
+    Ldr(ImmOp),
 }
 
 impl RegisterOp {
@@ -501,15 +584,13 @@ impl RegisterOp {
     const PUSH: Word = 0b0000;
     const POP: Word = 0b0001;
     const LBR: Word = 0b0010;
-    const LSR: Word = 0b0011;
-    const LLR: Word = 0b0100;
-    const SBR: Word = 0b0101;
-    const SSR: Word = 0b0110;
+    const SBR: Word = 0b0011;
+    const LSR: Word = 0b0100;
+    const SSR: Word = 0b0101;
+    const LLR: Word = 0b0110;
     const SLR: Word = 0b0111;
     const TFR: Word = 0b1000;
-    const LLZ: Word = 0b1001;
-    const LOL: Word = 0b1010;
-    const LOH: Word = 0b1011;
+    const LDR: Word = 0b1001;
 }
 
 impl Decode for RegisterOp {
@@ -521,16 +602,52 @@ impl Decode for RegisterOp {
             Self::PUSH => Ok(Push(decode(word)?)),
             Self::POP => Ok(Pop(decode(word)?)),
             Self::LBR => Ok(Lbr(decode(word)?)),
-            Self::LSR => Ok(Lsr(decode(word)?)),
-            Self::LLR => Ok(Llr(decode(word)?)),
             Self::SBR => Ok(Sbr(decode(word)?)),
+            Self::LSR => Ok(Lsr(decode(word)?)),
             Self::SSR => Ok(Ssr(decode(word)?)),
+            Self::LLR => Ok(Llr(decode(word)?)),
             Self::SLR => Ok(Slr(decode(word)?)),
             Self::TFR => Ok(Tfr(decode(word)?)),
-            Self::LOL => Ok(Lol(decode(word)?)),
-            Self::LLZ => Ok(Llz(decode(word)?)),
-            Self::LOH => Ok(Loh(decode(word)?)),
+            Self::LDR => Ok(Ldr(decode(word)?)),
             _ => Err(DecodeError::InvalidRegisterOp(reg_op)),
+        }
+    }
+}
+
+impl Encode for RegisterOp {
+    fn encode(self) -> Word {
+        use RegisterOp::*;
+
+        match self {
+            Lbr(m) => m.encode(),
+            Lsr(m) => m.encode(),
+            Llr(m) => m.encode(),
+            Sbr(m) => m.encode(),
+            Ssr(m) => m.encode(),
+            Slr(m) => m.encode(),
+            Tfr(r) => r.encode(),
+            Push(p) => p.encode(),
+            Pop(p) => p.encode(),
+            Ldr(i) => i.encode(),
+        }
+    }
+}
+
+impl Display for RegisterOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use RegisterOp::*;
+
+        match self {
+            Lbr(m) => write!(f, "LBR {m}"),
+            Lsr(m) => write!(f, "LSR {m}"),
+            Llr(m) => write!(f, "LLR {m}"),
+            Sbr(m) => write!(f, "SBR {m}"),
+            Ssr(m) => write!(f, "SSR {m}"),
+            Slr(m) => write!(f, "SLR {m}"),
+            Tfr(r) => write!(f, "TFR {r}"),
+            Push(p) => write!(f, "PUSH {p}"),
+            Pop(p) => write!(f, "POP {p}"),
+            Ldr(i) => write!(f, "LDR {i}"),
         }
     }
 }

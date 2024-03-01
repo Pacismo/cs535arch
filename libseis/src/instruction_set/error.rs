@@ -1,4 +1,7 @@
-use crate::types::Word;
+use crate::{
+    registers,
+    types::{Register, Word},
+};
 use std::{error::Error, fmt::Display};
 
 #[derive(Debug, Clone)]
@@ -14,6 +17,7 @@ pub enum DecodeError {
     InvalidAddressingMode(Word),
     InvalidPushOp(Word),
     InvalidPopOp(Word),
+    InvalidRegister(Register, Register),
 }
 
 impl Error for DecodeError {}
@@ -37,6 +41,16 @@ impl Display for DecodeError {
             &InvalidAddressingMode(word) => write!(f, "Could not decode addressing mode {word:#x}"),
             &InvalidPushOp(word) => write!(f, "Could not decode push op type {word:#x}"),
             &InvalidPopOp(word) => write!(f, "Could not decode pop op type {word:#x}"),
+
+            &InvalidRegister(src, dst) => {
+                if (src as usize) >= registers::COUNT && (dst as usize) >= registers::COUNT {
+                    write!(f, "Invalid registers: src={src}, dst={dst}")
+                } else if (dst as usize) >= registers::COUNT {
+                    write!(f, "Invalid register: dst={dst}")
+                } else {
+                    write!(f, "Invalid register: src={src}")
+                }
+            }
         }
     }
 }
