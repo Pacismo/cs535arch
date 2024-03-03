@@ -192,9 +192,9 @@ impl Display for ImmOp {
                     }
                 } else {
                     if *zero {
-                        write!(f, "#{immediate} << {shift} => V{destination:X}")
+                        write!(f, "#{immediate} => V{destination:X}.{shift}")
                     } else {
-                        write!(f, "#{immediate} << {shift} =| V{destination:X}")
+                        write!(f, "#{immediate} =| V{destination:X}.{shift}")
                     }
                 }
             }

@@ -152,7 +152,7 @@ impl Decode for UnaryOp {
 
 impl Encode for UnaryOp {
     fn encode(self) -> Word {
-        ((self.0 as Word) << Self::SRC_REG_MASK) | ((self.1 as Word) << Self::DST_REG_MASK)
+        ((self.0 as Word) << Self::SRC_REG_SHIFT) | ((self.1 as Word) << Self::DST_REG_MASK)
     }
 }
 
