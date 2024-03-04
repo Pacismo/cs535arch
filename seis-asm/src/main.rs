@@ -1,15 +1,21 @@
-use clap::Parser;
-use std::error::Error;
-
 mod cli;
+mod linker;
 mod parse;
+use clap::Parser;
+use parse::tokenize;
 
-fn main() -> Result<(), Box<dyn Error>> {
+use crate::linker::link_symbols;
+
+fn main() {
     let cli = cli::Command::parse();
 
-    let tokens = parse::tokenize(&cli.files[0]).map_err(|e| e.to_string())?;
+    let tokens = match tokenize(&cli.files[0]) {
+        Ok(value) => value,
+        Err(e) => panic!("{e}"),
+    };
 
-    println!("{tokens:?}");
+    // TOKENS!
+    println!("{tokens:#?}");
 
-    Ok(())
+    let linked = link_symbols(tokens);
 }
