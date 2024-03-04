@@ -70,7 +70,7 @@ impl Decode for Instruction {
             Self::CONTROL => Ok(Control(decode(word)?)),
             Self::INTEGER => Ok(Integer(decode(word)?)),
             Self::FLOATING_POINT => Ok(FloatingPoint(decode(word)?)),
-            Self::REGISTER => todo!(),
+            Self::REGISTER => Ok(Register(decode(word)?)),
             _ => Err(DecodeError::InvalidOpType(op_type)),
         }
     }
@@ -84,7 +84,7 @@ impl Encode for Instruction {
             Control(c) => (Self::CONTROL << Self::SHIFT) | c.encode(),
             Integer(i) => (Self::INTEGER << Self::SHIFT) | i.encode(),
             FloatingPoint(f) => (Self::FLOATING_POINT << Self::SHIFT) | f.encode(),
-            Register(_) => todo!(),
+            Register(r) => (Self::REGISTER << Self::SHIFT) | r.encode(),
         }
     }
 }
@@ -97,7 +97,7 @@ impl Display for Instruction {
             Control(c) => write!(f, "{c}"),
             Integer(i) => write!(f, "{i}"),
             FloatingPoint(fp) => write!(f, "{fp}"),
-            Register(_) => todo!(),
+            Register(r) => write!(f, "{r}"),
         }
     }
 }
