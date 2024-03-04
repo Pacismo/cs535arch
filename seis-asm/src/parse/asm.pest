@@ -189,11 +189,11 @@ pop  = ${ ^"POP" ~ WHITESPACE+ ~ (regstack | uinteger) }
 regstack = ${ "{" ~ WHITESPACE* ~ reg ~ WHITESPACE* ~ ("," ~ WHITESPACE* ~ reg)* ~ WHITESPACE* ~ "}" }
 
 lbr = @{ ^"LBR" ~ WHITESPACE+ ~ loadsrc ~ WHITESPACE* ~ assign ~ WHITESPACE* ~ vareg }
-sbr = @{ ^"SBR" ~ WHITESPACE+ ~ loadsrc ~ WHITESPACE* ~ assign ~ WHITESPACE* ~ vareg }
+sbr = @{ ^"SBR" ~ WHITESPACE+ ~ vareg ~ WHITESPACE* ~ assign ~ WHITESPACE* ~ loadsrc }
 lsr = @{ ^"LSR" ~ WHITESPACE+ ~ loadsrc ~ WHITESPACE* ~ assign ~ WHITESPACE* ~ vareg }
-ssr = @{ ^"SSR" ~ WHITESPACE+ ~ loadsrc ~ WHITESPACE* ~ assign ~ WHITESPACE* ~ vareg }
+ssr = @{ ^"SSR" ~ WHITESPACE+ ~ vareg ~ WHITESPACE* ~ assign ~ WHITESPACE* ~ loadsrc }
 llr = @{ ^"LLR" ~ WHITESPACE+ ~ loadsrc ~ WHITESPACE* ~ assign ~ WHITESPACE* ~ vareg }
-slr = @{ ^"SLR" ~ WHITESPACE+ ~ loadsrc ~ WHITESPACE* ~ assign ~ WHITESPACE* ~ vareg }
+slr = @{ ^"SLR" ~ WHITESPACE+ ~ vareg ~ WHITESPACE* ~ assign ~ WHITESPACE* ~ loadsrc }
 
 loadsrc   = @{ zpgaddr | vareg | offsetind | indexind | stackoff }
 offsetind = ${ vareg ~ WHITESPACE* ~ "+" ~ WHITESPACE* ~ int }
