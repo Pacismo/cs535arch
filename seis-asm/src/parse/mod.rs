@@ -658,7 +658,7 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
                     destination,
                 },
                 Rule::ident => Label {
-                    ident: opt.into_inner().next().unwrap().as_str().to_owned(),
+                    ident: opt.as_str().to_owned(),
                     destination,
                 },
                 Rule::constant => ConstantVal {
