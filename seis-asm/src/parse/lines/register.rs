@@ -15,16 +15,19 @@ pub enum MemoryLoadOp {
     Indirect {
         address: Register,
         destination: Register,
+        volatile: bool,
     },
     Offset {
         address: Register,
         offset: Short,
         destination: Register,
+        volatile: bool,
     },
     Indexed {
         address: Register,
         index: Register,
         destination: Register,
+        volatile: bool,
     },
     Stack {
         offset: Short,
@@ -43,7 +46,7 @@ pub enum ImmediateLoadOp {
         destination: Register,
         location: Byte,
         insert: bool,
-    }
+    },
 }
 
 #[derive(Debug)]
