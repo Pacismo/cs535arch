@@ -657,7 +657,7 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
                     value: parse_integer!(opt.into_inner().next().unwrap()),
                     destination,
                 },
-                Rule::label => Label {
+                Rule::ident => Label {
                     ident: opt.into_inner().next().unwrap().as_str().to_owned(),
                     destination,
                 },

@@ -206,9 +206,9 @@ tfr = @{ ^"TFR" ~ WHITESPACE+ ~ (reg | spreg) ~ WHITESPACE* ~ assign ~ WHITESPAC
 /// `LDR &ZPA => vareg`
 ldr = @{ ^"LDR" ~ WHITESPACE+ ~ (zpaload | immload) }
 
-/// `LOAD constant => vareg`, where `constant` is an `integer`, a `float`, a `label`, or a `const` (or a reference to it).
+/// `LOAD constant => vareg`, where `constant` is an `integer`, a `float`, an `ident`, or a `const` (or a reference to it).
 /// This expands to at least one LDR to load the value
-load = @{ ^"LOAD" ~ WHITESPACE+ ~ (float | integer | label | const | constref) ~ WHITESPACE* ~ assign ~ WHITESPACE* ~ vareg }
+load = @{ ^"LOAD" ~ WHITESPACE+ ~ (float | integer | ident | const | constref) ~ WHITESPACE* ~ assign ~ WHITESPACE* ~ vareg }
 
 zpaload = !{ zpgref ~ assign ~ vareg }
 immload = !{ integer ~ assign ~ vareg ~ ("." ~ part)? }
