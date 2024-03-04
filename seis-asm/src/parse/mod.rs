@@ -2,13 +2,11 @@ mod asm_parser;
 mod error;
 mod lines;
 
-use self::{
-    asm_parser::Rule,
-    error::{Error, ErrorSource},
-    lines::{Constant, Directive, Instruction, Jump, LineType, Lines, Span},
-};
+use asm_parser::Rule;
 use asm_parser::AsmParser;
+pub use error::{Error, ErrorSource};
 use libseis::registers;
+pub use lines::*;
 use pest::{
     error::{Error as PestError, ErrorVariant},
     iterators::{Pair, Pairs},
