@@ -687,7 +687,6 @@ pub fn tokenize(path: &Path) -> Result<Lines, Error> {
     let mut lines = Lines::new();
 
     for (line, number) in parsed.zip(1..) {
-        // println!("{number} = {line:#?}");
         match tokenize_line(line, Span::new(path, number)) {
             Ok(Some(result)) => lines.push_back(result),
             Ok(None) => break,
@@ -695,8 +694,6 @@ pub fn tokenize(path: &Path) -> Result<Lines, Error> {
             Err(e) => return Err(Error::new(path, e)),
         }
     }
-
-    println!("{lines:#?}");
 
     Ok(lines)
 }
