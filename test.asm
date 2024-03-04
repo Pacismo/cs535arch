@@ -16,4 +16,5 @@ main:
     fcmp v1, v2
     ldr 12, v1
     halt
+    load main, v1
     //LOAD .char => v1 cannot run.
