@@ -277,9 +277,8 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
             }))
         }
         x @ (Rule::cmp | Rule::tst) => {
-            use lines::IntCompOp;
+            use lines::IntCompOp::*;
             use Instruction::{Cmp, Tst};
-            use IntCompOp::{RegImm, RegReg};
 
             let mut inner = instruction.into_inner();
             let left = registers::get_id(inner.next().unwrap().as_str()).unwrap();
@@ -293,6 +292,10 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
                 Rule::vareg => RegReg {
                     left,
                     right: registers::get_id(right.as_str()).unwrap(),
+                },
+                Rule::ident => RegConst {
+                    left,
+                    right: right.as_str().to_owned(),
                 },
                 _ => unreachable!(),
             };
