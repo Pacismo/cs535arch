@@ -78,7 +78,7 @@ pub struct Constant {
 
 #[derive(Debug)]
 pub enum Directive {
-    Location { is_zero_page: bool, address: Word },
+    Location(Word),
     Public,
 }
 

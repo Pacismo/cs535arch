@@ -188,14 +188,10 @@ impl Display for ImmOp {
                     if *zero {
                         write!(f, "#{immediate} => V{destination:X}")
                     } else {
-                        write!(f, "#{immediate} =| V{destination:X}")
+                        write!(f, "#{immediate} => V{destination:X}.0")
                     }
                 } else {
-                    if *zero {
-                        write!(f, "#{immediate} => V{destination:X}.{shift}")
-                    } else {
-                        write!(f, "#{immediate} =| V{destination:X}.{shift}")
-                    }
+                    write!(f, "#{immediate} => V{destination:X}.{shift}")
                 }
             }
             ZeroPageTranslate {
@@ -263,17 +259,20 @@ pub enum MemOp {
     },
     /// Data from an address
     Indirect {
+        volatile: bool,
         address: Register,
         destination: Register,
     },
     /// Data from an address at an offset (times the width of the read)
     OffsetIndirect {
+        volatile: bool,
         address: Register,
         offset: Short,
         destination: Register,
     },
     /// Data from an address at an index (times the width of the read)
     IndexedIndirect {
+        volatile: bool,
         address: Register,
         index: Register,
         destination: Register,
@@ -291,16 +290,17 @@ impl MemOp {
     const ZPG_ADDR_MASK: Word = 0b0000_0000_0000_1111_1111_1111_1111_0000;
     const ZPG_ADDR_SHIFT: Word = 4;
 
-    const ADDR_MODE_MASK: Word = 0b0000_1110_0000_0000_0000_0000_0000_0000;
-    const ADDR_MODE_SHIFT: Word = 25;
+    const ADDR_MODE_MASK: Word = 0b0000_0000_1110_0000_0000_0000_0000_0000;
+    const ADDR_MODE_SHIFT: Word = 21;
 
     const ADDRESS_REG_MASK: Word = 0b0000_0000_0000_0000_0000_0000_1111_0000;
     const ADDRESS_REG_SHIFT: Word = 4;
     const INDEX_REG_MASK: Word = 0b0000_0000_0000_0000_0000_1111_0000_0000;
     const INDEX_REG_SHIFT: Word = 12;
-    const OFFSET_MASK: Word = 0b0000_0000_1111_1111_1111_1111_0000_0000;
+    const OFFSET_MASK: Word = 0b0000_0000_0000_1111_1111_1111_0000_0000;
     const OFFSET_SHIFT: Word = 8;
 
+    const VOLATILE_BIT: Word = 0b100;
     const INDIRECT_MODE: Word = 0b000;
     const OFFSET_MODE: Word = 0b001;
     const INDEXED_MODE: Word = 0b010;
@@ -317,15 +317,18 @@ impl Decode for MemOp {
 
         match addr_mode {
             Self::INDIRECT_MODE => Ok(Indirect {
+                volatile: (word & Self::VOLATILE_BIT) != 0,
                 address: ((word & Self::ADDRESS_REG_MASK) >> Self::ADDRESS_REG_SHIFT) as Register,
                 destination,
             }),
             Self::OFFSET_MODE => Ok(OffsetIndirect {
+                volatile: (word & Self::VOLATILE_BIT) != 0,
                 address: ((word & Self::ADDRESS_REG_MASK) >> Self::ADDRESS_REG_SHIFT) as Register,
                 offset: ((word & Self::OFFSET_MASK) >> Self::OFFSET_SHIFT) as Short,
                 destination,
             }),
             Self::INDEXED_MODE => Ok(IndexedIndirect {
+                volatile: (word & Self::VOLATILE_BIT) != 0,
                 address: ((word & Self::ADDRESS_REG_MASK) >> Self::ADDRESS_REG_SHIFT) as Register,
                 index: ((word & Self::INDEX_REG_MASK) >> Self::INDEX_REG_SHIFT) as Register,
                 destination,
@@ -357,29 +360,35 @@ impl Encode for MemOp {
                     | (destination as Word)
             }
             Indirect {
+                volatile,
                 address,
                 destination,
             } => {
                 (Self::INDIRECT_MODE << Self::ADDR_MODE_SHIFT)
+                    | if volatile { Self::VOLATILE_BIT } else { 0 }
                     | ((address as Word) << Self::ADDRESS_REG_SHIFT)
                     | (destination as Word)
             }
             OffsetIndirect {
+                volatile,
                 address,
                 offset,
                 destination,
             } => {
                 (Self::OFFSET_MODE << Self::ADDR_MODE_SHIFT)
+                    | if volatile { Self::VOLATILE_BIT } else { 0 }
                     | ((address as Word) << Self::ADDRESS_REG_SHIFT)
                     | ((offset as Word) << Self::OFFSET_SHIFT)
                     | (destination as Word)
             }
             IndexedIndirect {
+                volatile,
                 address,
                 index,
                 destination,
             } => {
                 (Self::INDEXED_MODE << Self::ADDR_MODE_SHIFT)
+                    | if volatile { Self::VOLATILE_BIT } else { 0 }
                     | ((address as Word) << Self::ADDRESS_REG_SHIFT)
                     | ((index as Word) << Self::INDEX_REG_SHIFT)
                     | (destination as Word)
@@ -406,19 +415,34 @@ impl Display for MemOp {
                 destination,
             } => write!(f, "@{address:#x} => V{destination:X}"),
             Indirect {
+                volatile,
                 address,
                 destination,
-            } => write!(f, "V{address:X} => V{destination:X}"),
+            } => write!(
+                f,
+                "V{address:X} {assign} V{destination:X}",
+                assign = if *volatile { "=>>" } else { "=>" }
+            ),
             OffsetIndirect {
+                volatile,
                 address,
                 offset,
                 destination,
-            } => write!(f, "V{address:X} + #{offset} => V{destination:X}"),
+            } => write!(
+                f,
+                "V{address:X} + #{offset} {assign} V{destination:X}",
+                assign = if *volatile { "=>>" } else { "=>" }
+            ),
             IndexedIndirect {
+                volatile,
                 address,
                 index,
                 destination,
-            } => write!(f, "V{address:X}[V{index:X}] => V{destination:X}"),
+            } => write!(
+                f,
+                "V{address:X}[V{index:X}] {assign} V{destination:X}",
+                assign = if *volatile { "=>>" } else { "=>" }
+            ),
             StackOffset {
                 offset,
                 destination,
@@ -434,11 +458,7 @@ pub enum PushOp {
 }
 
 impl PushOp {
-    const MASK: Word = 0b0000_0001_0000_0000_0000_0000_0000_0000;
-    const SHIFT: Word = 24;
-    const REGISTERS: Word = 0b0;
-    const EXTEND: Word = 0b1;
-
+    const EXTEND_MODE: Word = 0b0000_0001_0000_0000_0000_0000_0000_0000;
     const EXTEND_MASK: Word = 0b0000_0000_0000_0000_1111_1111_1111_1111;
 
     pub fn has_register(self, reg_id: Register) -> bool {
@@ -463,12 +483,11 @@ impl PushOp {
 impl Decode for PushOp {
     fn decode(word: Word) -> DecodeResult<Self> {
         use PushOp::*;
-        let op_mode = (word & Self::MASK) >> Self::SHIFT;
 
-        match op_mode {
-            Self::REGISTERS => Ok(Registers(decode(word)?)),
-            Self::EXTEND => Ok(Extend((word & Self::EXTEND_MASK) as Short)),
-            _ => Err(DecodeError::InvalidPushOp(op_mode)),
+        if word & Self::EXTEND_MODE == 0 {
+            Ok(Registers(decode(word)?))
+        } else {
+            Ok(Extend((word & Self::EXTEND_MASK) as Short))
         }
     }
 }
@@ -478,8 +497,8 @@ impl Encode for PushOp {
         use PushOp::*;
 
         match self {
-            Registers(reg) => (Self::REGISTERS << Self::SHIFT) | reg.encode(),
-            Extend(size) => (Self::EXTEND << Self::SHIFT) | size as Word,
+            Registers(reg) => reg.encode(),
+            Extend(size) => Self::EXTEND_MASK | size as Word,
         }
     }
 }
@@ -502,11 +521,7 @@ pub enum PopOp {
 }
 
 impl PopOp {
-    const MASK: Word = 0b0000_0001_0000_0000_0000_0000_0000_0000;
-    const SHIFT: Word = 24;
-    const REGISTERS: Word = 0b0;
-    const SHRINK: Word = 0b1;
-
+    const SHRINK_MODE: Word = 0b0000_0001_0000_0000_0000_0000_0000_0000;
     const SHRINK_MASK: Word = 0b0000_0000_0000_0000_1111_1111_1111_1111;
 
     pub fn has_register(self, reg_id: Register) -> bool {
@@ -531,12 +546,10 @@ impl PopOp {
 impl Decode for PopOp {
     fn decode(word: Word) -> DecodeResult<Self> {
         use PopOp::*;
-        let op_mode = (word & Self::MASK) >> Self::SHIFT;
-
-        match op_mode {
-            Self::REGISTERS => Ok(Registers(decode(word)?)),
-            Self::SHRINK => Ok(Shrink((word & Self::SHRINK_MASK) as Short)),
-            _ => Err(DecodeError::InvalidPopOp(op_mode)),
+        if word & Self::SHRINK_MODE == 0 {
+            Ok(Registers(decode(word)?))
+        } else {
+            Ok(Shrink((word & Self::SHRINK_MASK) as Short))
         }
     }
 }
@@ -546,8 +559,8 @@ impl Encode for PopOp {
         use PopOp::*;
 
         match self {
-            Registers(reg) => (Self::REGISTERS << Self::SHIFT) | reg.encode(),
-            Shrink(size) => (Self::SHRINK << Self::SHIFT) | size as Word,
+            Registers(reg) => reg.encode(),
+            Shrink(size) => Self::SHRINK_MODE | size as Word,
         }
     }
 }

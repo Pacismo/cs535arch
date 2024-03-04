@@ -1,7 +1,7 @@
 use super::asm_parser::Rule as AsmRule;
 use pest::error::Error as PestError;
-use std::{io::Error as IOError, path::Path};
 use std::{fmt::Display, path::PathBuf};
+use std::{io::Error as IOError, path::Path};
 
 #[derive(Debug)]
 pub struct Error {
@@ -20,7 +20,12 @@ impl Error {
 
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Error when parsing {}:\n{}", self.path.display(), self.source)
+        write!(
+            f,
+            "Error when parsing {}:\n{}",
+            self.path.display(),
+            self.source
+        )
     }
 }
 
@@ -75,7 +80,6 @@ impl Display for ErrorSource {
                     AsmRule::lpreg => "link pointer register".into(),
                     AsmRule::pcreg => "program counter register".into(),
                     AsmRule::psreg => "processor status register".into(),
-                    AsmRule::fsreg => "floating-point status register".into(),
                     AsmRule::spreg => "special-purpose register".into(),
                     AsmRule::reg => "register".into(),
                     AsmRule::sign => "sign".into(),
@@ -159,6 +163,7 @@ impl Display for ErrorSource {
                     AsmRule::immload => "immediate value".into(),
                     AsmRule::part => "short index".into(),
                     AsmRule::assign => "arrow (=> or ->) or comma".into(),
+                    AsmRule::volassign => "super arrow (=>> or ->>)".into(),
                 });
 
                 write!(f, "{renamed}")

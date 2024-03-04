@@ -25,9 +25,9 @@ impl Jump {
     /// Sign bit (signify negative)
     const SIGN_BIT: Word = 0b0000_0000_1000_0000_0000_0000_0000_0000;
     /// Mask to extract register bits
-    const REGISTER_MASK: Word = 0b0000_0000_1111_0000_0000_0000_0000_0000;
+    const REGISTER_MASK: Word = 0b0000_0000_0000_0000_0000_0000_1111_0000;
     /// Amount to shift register bits
-    const REGISTER_SHIFT: Word = 20;
+    const REGISTER_SHIFT: Word = 4;
 }
 
 impl Decode for Jump {
@@ -40,6 +40,7 @@ impl Decode for Jump {
             ))
         } else {
             let amount = word & Self::RELATIVE_MASK;
+            // Sign-extend if sign bit is 1
             if amount & Self::SIGN_BIT == 0 {
                 Ok(Relative((amount as SWord) << 2))
             } else {

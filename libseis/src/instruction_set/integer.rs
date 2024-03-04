@@ -174,16 +174,16 @@ impl CompOp {
     const IMMEDIATE_MASK: Word = 0b0000_0000_1000_0000_0000_0000_0000_0000;
 
     /// Right register mask
-    const RIGHT_REG_MASK: Word = 0b0000_0000_0000_0000_0000_0000_1111_0000;
+    const RIGHT_REG_MASK: Word = 0b0000_0000_0000_0000_0000_1111_0000_0000;
     /// Right immediate mask
-    const RIGHT_IMM_MASK: Word = 0b0000_0000_0111_1111_1111_1111_1111_0000;
+    const RIGHT_IMM_MASK: Word = 0b0000_0000_0111_1111_1111_1111_0000_0000;
     /// Right register shift
-    const RIGHT_PARAM_SHIFT: Word = 4;
+    const RIGHT_PARAM_SHIFT: Word = 8;
 
     /// Left register mask
-    const LEFT_REG_MASK: Word = 0b0000_0000_0000_0000_0000_0000_0000_1111;
+    const LEFT_REG_MASK: Word = 0b0000_0000_0000_0000_0000_0000_1111_0000;
     /// Left register shift
-    const LEFT_REG_SHIFT: Word = 0;
+    const LEFT_REG_SHIFT: Word = 4;
 }
 
 impl Decode for CompOp {

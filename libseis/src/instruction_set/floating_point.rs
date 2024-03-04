@@ -83,9 +83,9 @@ pub struct CompOp(Register, Register);
 impl CompOp {
     const REG_MASK: [Word; 2] = [
         0b0000_0000_0000_0000_0000_0000_1111_0000,
-        0b0000_0000_0000_0000_0000_0000_0000_1111,
+        0b0000_0000_0000_0000_0000_1111_0000_0000,
     ];
-    const REG_SHIFT: [Word; 2] = [4, 0];
+    const REG_SHIFT: [Word; 2] = [4, 8];
 }
 
 impl Decode for CompOp {
