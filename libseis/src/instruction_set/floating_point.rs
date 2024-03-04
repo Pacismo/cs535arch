@@ -147,7 +147,7 @@ pub enum FloatingPointOp {
     /// Floating-point modulo
     Fmod(BinaryOp),
     /// Floating-point comparison
-    Fcmp(BinaryOp),
+    Fcmp(CompOp),
     /// Floating-point negation
     Fneg(UnaryOp),
     /// Floating-point reciporacle
