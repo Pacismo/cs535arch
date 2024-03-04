@@ -186,12 +186,12 @@ impl Display for ImmOp {
             } => {
                 if *shift == 0 {
                     if *zero {
-                        write!(f, "#{immediate} => V{destination:X}")
+                        write!(f, "{immediate} => V{destination:X}")
                     } else {
-                        write!(f, "#{immediate} => V{destination:X}.0")
+                        write!(f, "{immediate} => V{destination:X}.0")
                     }
                 } else {
-                    write!(f, "#{immediate} => V{destination:X}.{shift}")
+                    write!(f, "{immediate} => V{destination:X}.{shift}")
                 }
             }
             ZeroPageTranslate {
@@ -430,7 +430,7 @@ impl Display for MemOp {
                 destination,
             } => write!(
                 f,
-                "V{address:X} + #{offset} {assign} V{destination:X}",
+                "V{address:X} + {offset} {assign} V{destination:X}",
                 assign = if *volatile { "=>>" } else { "=>" }
             ),
             IndexedIndirect {

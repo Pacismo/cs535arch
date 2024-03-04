@@ -80,7 +80,7 @@ impl Display for BinaryOp {
         use BinaryOp::*;
 
         match self {
-            Immediate(src, opt, dst) => write!(f, "V{src:X}, #{opt} => V{dst:X}"),
+            Immediate(src, opt, dst) => write!(f, "V{src:X}, {opt} => V{dst:X}"),
             Registers(src, opt, dst) => write!(f, "V{src:X}, V{opt:X} => V{dst:X}"),
         }
     }
@@ -177,6 +177,7 @@ impl CompOp {
     const RIGHT_REG_MASK: Word = 0b0000_0000_0000_0000_0000_1111_0000_0000;
     /// Right immediate mask
     const RIGHT_IMM_MASK: Word = 0b0000_0000_0111_1111_1111_1111_0000_0000;
+    const RIGHT_IMM_SIGN: Word = 0b0000_0000_0100_0000_0000_0000_0000_0000;
     /// Right register shift
     const RIGHT_PARAM_SHIFT: Word = 8;
 
@@ -197,7 +198,10 @@ impl Decode for CompOp {
             Ok(Registers(left as Register, right as Register))
         } else {
             let left = (word & Self::LEFT_REG_MASK) >> Self::LEFT_REG_SHIFT;
-            let right = (word & Self::RIGHT_IMM_MASK) >> Self::RIGHT_PARAM_SHIFT;
+            let mut right = (word & Self::RIGHT_IMM_MASK) >> Self::RIGHT_PARAM_SHIFT;
+            if word & Self::RIGHT_IMM_SIGN != 0 {
+                right |= 0b1111_1111_1000_0000_0000_0000_0000_0000;
+            }
 
             Ok(Immediate(left as Register, right))
         }
@@ -214,7 +218,8 @@ impl Encode for CompOp {
                     | ((right as Word) << Self::RIGHT_PARAM_SHIFT)
             }
             Immediate(left, right) => {
-                ((left as Word) << Self::LEFT_REG_MASK) | (right << Self::RIGHT_PARAM_SHIFT)
+                ((left as Word) << Self::LEFT_REG_SHIFT)
+                    | ((right << Self::RIGHT_PARAM_SHIFT) & Self::RIGHT_IMM_MASK)
             }
         }
     }
@@ -226,7 +231,7 @@ impl Display for CompOp {
 
         match self {
             Registers(left, right) => write!(f, "V{left:X}, V{right:X}"),
-            Immediate(left, right) => write!(f, "V{left:X}, #{right}"),
+            Immediate(left, right) => write!(f, "V{left:X}, {right}"),
         }
     }
 }
