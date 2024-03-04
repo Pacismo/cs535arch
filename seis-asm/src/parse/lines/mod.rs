@@ -4,7 +4,7 @@ mod register;
 
 pub use float::*;
 pub use integer::*;
-use libseis::types::{Register, Word};
+use libseis::types::{Byte, Register, Short, Word};
 pub use register::*;
 use std::{
     collections::LinkedList,
@@ -63,10 +63,10 @@ impl Lines {
 
 #[derive(Debug)]
 pub enum ConstantValue {
-    Byte(String),
-    Short(String),
-    Word(String),
-    Float(String),
+    Byte(Byte),
+    Short(Short),
+    Word(Word),
+    Float(f32),
     String(String),
 }
 
@@ -80,6 +80,7 @@ pub struct Constant {
 pub enum Directive {
     Location(Word),
     Public,
+    ZeroPage,
 }
 
 #[derive(Debug)]

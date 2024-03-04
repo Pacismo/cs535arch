@@ -67,17 +67,23 @@ fn tokenize_constant(mut pair: Pairs<'_, Rule>) -> Result<Constant, ErrorSource>
     use lines::ConstantValue::*;
 
     let name = pair.next().unwrap().into_inner().next().unwrap().as_str();
-    let value = match pair.next().unwrap() {
-        s if s.as_rule() == Rule::integer => match pair.next().unwrap().as_rule() {
-            Rule::byte => Byte(s.as_str().to_owned()),
-            Rule::short => Short(s.as_str().to_owned()),
-            Rule::word => Word(s.as_str().to_owned()),
-            _ => unreachable!(),
-        },
-        s if s.as_rule() == Rule::float => Float(s.as_str().to_owned()),
-        s if s.as_rule() == Rule::char => Byte(s.as_str()[1..2].to_owned()),
-        s if s.as_rule() == Rule::string => {
-            let string = s.as_str();
+    let value = pair.next().unwrap();
+    let value = match value.as_rule() {
+        Rule::integer => {
+            let mut inner = value.into_inner();
+            let value = inner.next().unwrap();
+            let valty = inner.next().map(|v| v.as_rule()).unwrap_or(Rule::word);
+            match valty {
+                Rule::byte => Byte(parse_integer!(value)),
+                Rule::short => Short(parse_integer!(value)),
+                Rule::word => Word(parse_integer!(value)),
+                _ => unreachable!("{:?}", value.as_rule()),
+            }
+        }
+        Rule::float => Float(value.as_str().parse().unwrap()),
+        Rule::char => Byte(value.as_str()[1..2].as_bytes()[0]),
+        Rule::string => {
+            let string = value.as_str();
             String(string[1..string.len() - 1].to_owned())
         }
 
@@ -117,13 +123,27 @@ fn tokenize_directive(mut pair: Pairs<'_, Rule>) -> Result<Directive, ErrorSourc
             } else {
                 Err(PestError::new_from_span(
                     ErrorVariant::CustomError {
-                        message: "\"public\" does not expect a value".into(),
+                        message: "\"public\" does not expect a value".to_owned(),
                     },
                     value.unwrap().as_span(),
                 )
                 .into())
             }
         }
+        "zeropage" => {
+            if value.is_none() {
+                Ok(Directive::ZeroPage)
+            } else {
+                Err(PestError::new_from_span(
+                    ErrorVariant::CustomError {
+                        message: "\"zeropage\" does not expect a value".to_owned(),
+                    },
+                    value.unwrap().as_span(),
+                )
+                .into())
+            }
+        }
+
         x => Err(PestError::new_from_span(
             ErrorVariant::CustomError {
                 message: format!("Did not recognize directive \"{x}\""),
@@ -155,13 +175,9 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
             let inner = instruction.into_inner().next().unwrap();
             let mode = match inner.as_rule() {
                 Rule::ident => Jump::Label(inner.as_str().to_owned()),
-                Rule::relative => Jump::Relative(parse_integer!(inner
-                    .into_inner()
-                    .next()
-                    .unwrap()
-                    .into_inner()
-                    .next()
-                    .unwrap())),
+                Rule::relative => {
+                    Jump::Relative(parse_integer!(inner.into_inner().next().unwrap()))
+                }
                 Rule::absolute => Jump::Absolute(registers::get_id(inner.as_str()).unwrap()),
                 _ => unreachable!(),
             };
@@ -437,7 +453,7 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
 
             let mut inner = instruction.into_inner();
             let mode = inner.next().unwrap();
-            inner.next();
+            let volatile = inner.next().unwrap().as_rule() == Rule::volassign;
             let destination = registers::get_id(inner.next().unwrap().as_str()).unwrap();
 
             let mode = match mode.as_rule() {
@@ -458,6 +474,7 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
                         address,
                         offset,
                         destination,
+                        volatile,
                     }
                 }
                 Rule::indexind => {
@@ -469,6 +486,7 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
                         address,
                         index,
                         destination,
+                        volatile,
                     }
                 }
                 Rule::vareg => {
@@ -477,6 +495,7 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
                     Indirect {
                         address,
                         destination,
+                        volatile,
                     }
                 }
                 Rule::stackoff => {
@@ -503,7 +522,7 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
 
             let mut inner = instruction.into_inner();
             let destination = registers::get_id(inner.next().unwrap().as_str()).unwrap();
-            inner.next();
+            let volatile = inner.next().unwrap().as_rule() == Rule::volassign;
             let mode = inner.next().unwrap();
 
             let mode = match mode.as_rule() {
@@ -524,6 +543,7 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
                         address,
                         offset,
                         destination,
+                        volatile,
                     }
                 }
                 Rule::indexind => {
@@ -535,6 +555,7 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
                         address,
                         index,
                         destination,
+                        volatile,
                     }
                 }
                 Rule::vareg => {
@@ -543,6 +564,7 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
                     Indirect {
                         address,
                         destination,
+                        volatile,
                     }
                 }
                 Rule::stackoff => {
@@ -576,24 +598,26 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
             use lines::ImmediateLoadOp::*;
             use Instruction::Ldr;
 
-            let mut inner = instruction.into_inner();
-            let opt = inner.next().unwrap();
-            inner.next();
-            let destination = registers::get_id(inner.next().unwrap().as_str()).unwrap();
-            let part = inner.next();
+            let mode = instruction.into_inner().next().unwrap();
 
-            match opt.as_rule() {
+            match mode.as_rule() {
                 Rule::immload => {
+                    let mut inner = mode.into_inner();
+                    let value = inner.next().unwrap();
+                    inner.next();
+                    let destination = registers::get_id(inner.next().unwrap().as_str()).unwrap();
+                    let part = inner.next();
+
                     if let Some(part) = part {
                         Ok(Ldr(Immediate {
-                            value: parse_integer!(opt.into_inner().next().unwrap()),
+                            value: parse_integer!(value.into_inner().next().unwrap()),
                             destination,
                             location: part.as_str().parse().unwrap(),
                             insert: true,
                         }))
                     } else {
                         Ok(Ldr(Immediate {
-                            value: parse_integer!(opt.into_inner().next().unwrap()),
+                            value: parse_integer!(value.into_inner().next().unwrap()),
                             destination,
                             location: 0,
                             insert: false,
@@ -601,12 +625,13 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
                     }
                 }
                 Rule::zpaload => {
-                    if let Some(part) = part {
-                        return Err(PestError::new_from_span(ErrorVariant::CustomError { message: format!("A zero-page address reference cannot be loaded as a partial value") }, part.as_span()).into());
-                    }
+                    let mut inner = mode.into_inner();
+                    let address = inner.next().unwrap();
+                    inner.next();
+                    let destination = registers::get_id(inner.next().unwrap().as_str()).unwrap();
 
                     Ok(Ldr(ZpgAddr {
-                        address: parse_integer!(opt.into_inner().next().unwrap()),
+                        address: parse_integer!(address.into_inner().next().unwrap()),
                         destination,
                     }))
                 }
@@ -670,7 +695,6 @@ fn tokenize_line(line: Pair<'_, Rule>, span: Span) -> Result<Option<LineType>, E
 ///
 /// This makes it easier to parse the data.
 pub fn tokenize(path: &Path) -> Result<Lines, Error> {
-    // TODO: parse using parser
     let mut file = BufReader::new(File::open(path).map_err(|e| Error::new(path, e.into()))?);
     let mut content = String::new();
 
