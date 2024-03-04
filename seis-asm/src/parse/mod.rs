@@ -23,7 +23,7 @@ use std::{
 /// Expands to a [`convert_base`], followed by a [`std::ops::FromResidual`], a parse and an unwrap.
 macro_rules! parse_integer {
     ($i:expr) => {
-        convert_base($i)?.parse().unwrap()
+        convert_base($i)?.parse::<i64>().unwrap() as _
     };
 }
 
@@ -221,6 +221,11 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
                     opt: parse_integer!(opt.into_inner().next().unwrap()),
                     destination,
                 },
+                Rule::ident => RegConst {
+                    source,
+                    opt: opt.as_str().to_owned(),
+                    destination,
+                },
                 _ => unreachable!(),
             };
 
@@ -299,29 +304,351 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
             })
         }
 
-        Rule::fadd => todo!(),
-        Rule::fsub => todo!(),
-        Rule::fmul => todo!(),
-        Rule::fdiv => todo!(),
-        Rule::fmod => todo!(),
-        Rule::fcmp => todo!(),
-        Rule::fneg => todo!(),
-        Rule::frec => todo!(),
-        Rule::itof => todo!(),
-        Rule::ftoi => todo!(),
-        Rule::fchk => todo!(),
+        x @ (Rule::fadd | Rule::fsub | Rule::fmul | Rule::fdiv | Rule::fmod) => {
+            use lines::FloatBinaryOp;
+            use Instruction::{Fadd, Fdiv, Fmod, Fmul, Fsub};
 
-        Rule::push => todo!(),
-        Rule::pop => todo!(),
-        Rule::lbr => todo!(),
-        Rule::sbr => todo!(),
-        Rule::lsr => todo!(),
-        Rule::ssr => todo!(),
-        Rule::llr => todo!(),
-        Rule::slr => todo!(),
-        Rule::tfr => todo!(),
-        Rule::ldr => todo!(),
-        Rule::load => todo!(),
+            let mut inner = instruction.into_inner();
+            let source = registers::get_id(inner.next().unwrap().as_str()).unwrap();
+            let opt = registers::get_id(inner.next().unwrap().as_str()).unwrap();
+            inner.next();
+            let destination = registers::get_id(inner.next().unwrap().as_str()).unwrap();
+
+            Ok(match x {
+                Rule::fadd => Fadd(FloatBinaryOp {
+                    source,
+                    opt,
+                    destination,
+                }),
+                Rule::fsub => Fsub(FloatBinaryOp {
+                    source,
+                    opt,
+                    destination,
+                }),
+                Rule::fmul => Fmul(FloatBinaryOp {
+                    source,
+                    opt,
+                    destination,
+                }),
+                Rule::fdiv => Fdiv(FloatBinaryOp {
+                    source,
+                    opt,
+                    destination,
+                }),
+                Rule::fmod => Fmod(FloatBinaryOp {
+                    source,
+                    opt,
+                    destination,
+                }),
+                _ => unreachable!(),
+            })
+        }
+        Rule::fcmp => {
+            use lines::FloatCompOp;
+            use Instruction::Fcmp;
+
+            let mut inner = instruction.into_inner();
+            let left = registers::get_id(inner.next().unwrap().as_str()).unwrap();
+            let right = registers::get_id(inner.next().unwrap().as_str()).unwrap();
+
+            Ok(Fcmp(FloatCompOp { left, right }))
+        }
+        x @ (Rule::fneg | Rule::frec | Rule::itof | Rule::ftoi) => {
+            use lines::FloatUnaryOp;
+            use Instruction::{Fneg, Frec, Ftoi, Itof};
+
+            let mut inner = instruction.into_inner();
+            let source = registers::get_id(inner.next().unwrap().as_str()).unwrap();
+            inner.next();
+            let destination = registers::get_id(inner.next().unwrap().as_str()).unwrap();
+
+            Ok(match x {
+                Rule::fneg => Fneg(FloatUnaryOp {
+                    source,
+                    destination,
+                }),
+                Rule::frec => Frec(FloatUnaryOp {
+                    source,
+                    destination,
+                }),
+                Rule::itof => Itof(FloatUnaryOp {
+                    source,
+                    destination,
+                }),
+                Rule::ftoi => Ftoi(FloatUnaryOp {
+                    source,
+                    destination,
+                }),
+                _ => unreachable!(),
+            })
+        }
+        Rule::fchk => {
+            use Instruction::Fchk;
+
+            let register =
+                registers::get_id(instruction.into_inner().next().unwrap().as_str()).unwrap();
+
+            Ok(Fchk(register))
+        }
+
+        x @ (Rule::push | Rule::pop) => {
+            use lines::StackOp::*;
+            use Instruction::{Pop, Push};
+
+            let mode = instruction.into_inner().next().unwrap();
+
+            let mode = match mode.as_rule() {
+                Rule::regstack => {
+                    let mut regs = vec![];
+
+                    for reg in mode.into_inner() {
+                        let regid = registers::get_id(reg.as_str()).unwrap();
+
+                        // Registers cannot appear more than once at a time
+                        if regs.contains(&regid) {
+                            return Err(PestError::new_from_span(
+                                ErrorVariant::CustomError {
+                                    message: format!(
+                                        "Register {} cannot appear more than once",
+                                        reg.as_str()
+                                    ),
+                                },
+                                reg.as_span(),
+                            )
+                            .into());
+                        }
+
+                        regs.push(regid);
+                    }
+
+                    Registers(regs)
+                }
+                Rule::oct | Rule::dec | Rule::hex => ExtendOrShrink(parse_integer!(mode)),
+                _ => unreachable!(),
+            };
+
+            Ok(match x {
+                Rule::push => Push(mode),
+                Rule::pop => Pop(mode),
+                _ => unreachable!(),
+            })
+        }
+        x @ (Rule::lbr | Rule::lsr | Rule::llr) => {
+            use lines::MemoryLoadOp::*;
+            use Instruction::{Lbr, Llr, Lsr};
+
+            let mut inner = instruction.into_inner();
+            let mode = inner.next().unwrap();
+            inner.next();
+            let destination = registers::get_id(inner.next().unwrap().as_str()).unwrap();
+
+            let mode = match mode.as_rule() {
+                Rule::zpgaddr => {
+                    let address = parse_integer!(mode.into_inner().next().unwrap());
+
+                    Zpg {
+                        address,
+                        destination,
+                    }
+                }
+                Rule::offsetind => {
+                    let mut inner = mode.into_inner();
+                    let address = registers::get_id(inner.next().unwrap().as_str()).unwrap();
+                    let offset = parse_integer!(inner.next().unwrap());
+
+                    Offset {
+                        address,
+                        offset,
+                        destination,
+                    }
+                }
+                Rule::indexind => {
+                    let mut inner = mode.into_inner();
+                    let address = registers::get_id(inner.next().unwrap().as_str()).unwrap();
+                    let index = registers::get_id(inner.next().unwrap().as_str()).unwrap();
+
+                    Indexed {
+                        address,
+                        index,
+                        destination,
+                    }
+                }
+                Rule::vareg => {
+                    let address = registers::get_id(mode.as_str()).unwrap();
+
+                    Indirect {
+                        address,
+                        destination,
+                    }
+                }
+                Rule::stackoff => {
+                    let offset = parse_integer!(mode.into_inner().next().unwrap());
+
+                    Stack {
+                        offset,
+                        destination,
+                    }
+                }
+                _ => unreachable!(),
+            };
+
+            Ok(match x {
+                Rule::lbr => Lbr(mode),
+                Rule::lsr => Lsr(mode),
+                Rule::llr => Llr(mode),
+                _ => unreachable!(),
+            })
+        }
+        x @ (Rule::sbr | Rule::ssr | Rule::slr) => {
+            use lines::MemoryLoadOp::*;
+            use Instruction::{Sbr, Slr, Ssr};
+
+            let mut inner = instruction.into_inner();
+            let destination = registers::get_id(inner.next().unwrap().as_str()).unwrap();
+            inner.next();
+            let mode = inner.next().unwrap();
+
+            let mode = match mode.as_rule() {
+                Rule::zpgaddr => {
+                    let address = parse_integer!(mode.into_inner().next().unwrap());
+
+                    Zpg {
+                        address,
+                        destination,
+                    }
+                }
+                Rule::offsetind => {
+                    let mut inner = mode.into_inner();
+                    let address = registers::get_id(inner.next().unwrap().as_str()).unwrap();
+                    let offset = parse_integer!(inner.next().unwrap());
+
+                    Offset {
+                        address,
+                        offset,
+                        destination,
+                    }
+                }
+                Rule::indexind => {
+                    let mut inner = mode.into_inner();
+                    let address = registers::get_id(inner.next().unwrap().as_str()).unwrap();
+                    let index = registers::get_id(inner.next().unwrap().as_str()).unwrap();
+
+                    Indexed {
+                        address,
+                        index,
+                        destination,
+                    }
+                }
+                Rule::vareg => {
+                    let address = registers::get_id(mode.as_str()).unwrap();
+
+                    Indirect {
+                        address,
+                        destination,
+                    }
+                }
+                Rule::stackoff => {
+                    let offset = parse_integer!(mode.into_inner().next().unwrap());
+
+                    Stack {
+                        offset,
+                        destination,
+                    }
+                }
+                _ => unreachable!(),
+            };
+
+            Ok(match x {
+                Rule::sbr => Sbr(mode),
+                Rule::ssr => Ssr(mode),
+                Rule::slr => Slr(mode),
+                _ => unreachable!(),
+            })
+        }
+        Rule::tfr => {
+            use Instruction::Tfr;
+
+            let mut inner = instruction.into_inner();
+            let source = registers::get_id(inner.next().unwrap().as_str()).unwrap();
+            let destination = registers::get_id(inner.next().unwrap().as_str()).unwrap();
+
+            Ok(Tfr(source, destination))
+        }
+        Rule::ldr => {
+            use lines::ImmediateLoadOp::*;
+            use Instruction::Ldr;
+
+            let mut inner = instruction.into_inner();
+            let opt = inner.next().unwrap();
+            inner.next();
+            let destination = registers::get_id(inner.next().unwrap().as_str()).unwrap();
+            let part = inner.next();
+
+            match opt.as_rule() {
+                Rule::immload => {
+                    if let Some(part) = part {
+                        Ok(Ldr(Immediate {
+                            value: parse_integer!(opt.into_inner().next().unwrap()),
+                            destination,
+                            location: part.as_str().parse().unwrap(),
+                            insert: true,
+                        }))
+                    } else {
+                        Ok(Ldr(Immediate {
+                            value: parse_integer!(opt.into_inner().next().unwrap()),
+                            destination,
+                            location: 0,
+                            insert: false,
+                        }))
+                    }
+                }
+                Rule::zpaload => {
+                    if let Some(part) = part {
+                        return Err(PestError::new_from_span(ErrorVariant::CustomError { message: format!("A zero-page address reference cannot be loaded as a partial value") }, part.as_span()).into());
+                    }
+
+                    Ok(Ldr(ZpgAddr {
+                        address: parse_integer!(opt.into_inner().next().unwrap()),
+                        destination,
+                    }))
+                }
+                _ => unreachable!(),
+            }
+        }
+        Rule::load => {
+            use lines::ExpandableLoadOp::*;
+            use Instruction::Load;
+
+            let mut inner = instruction.into_inner();
+
+            let opt = inner.next().unwrap();
+            inner.next();
+            let destination = registers::get_id(inner.next().unwrap().as_str()).unwrap();
+
+            Ok(Load(match opt.as_rule() {
+                Rule::float => Float {
+                    value: opt.as_str().parse().unwrap(),
+                    destination,
+                },
+                Rule::integer => Integer {
+                    value: parse_integer!(opt.into_inner().next().unwrap()),
+                    destination,
+                },
+                Rule::label => Label {
+                    ident: opt.into_inner().next().unwrap().as_str().to_owned(),
+                    destination,
+                },
+                Rule::constant => ConstantVal {
+                    ident: opt.into_inner().next().unwrap().as_str().to_owned(),
+                    destination,
+                },
+                Rule::constref => ConstantRef {
+                    ident: opt.into_inner().next().unwrap().as_str().to_owned(),
+                    destination,
+                },
+                _ => unreachable!(),
+            }))
+        }
 
         _ => unreachable!(),
     }

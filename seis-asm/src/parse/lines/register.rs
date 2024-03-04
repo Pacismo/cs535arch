@@ -1,14 +1,9 @@
 use libseis::types::{Byte, Register, Short};
 
 #[derive(Debug)]
-pub struct StackOp(pub Vec<Register>);
-
-impl std::ops::Deref for StackOp {
-    type Target = Vec<Register>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
+pub enum StackOp {
+    Registers(Vec<Register>),
+    ExtendOrShrink(Short),
 }
 
 #[derive(Debug)]
@@ -48,11 +43,7 @@ pub enum ImmediateLoadOp {
         destination: Register,
         location: Byte,
         insert: bool,
-    },
-    Constant {
-        ident: String,
-        destination: Register,
-    },
+    }
 }
 
 #[derive(Debug)]
