@@ -7,8 +7,8 @@
 
 #[location = 0]
 main:
-    halt
     add v1, .char => v1
     jle #1
     jmp main
+    halt
     //LOAD .char => v1

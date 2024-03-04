@@ -85,7 +85,6 @@ impl Display for ErrorSource {
                     AsmRule::integer => "integer".into(),
                     AsmRule::uinteger => "unsigned integer".into(),
                     AsmRule::character => "character".into(),
-                    AsmRule::int => "integer".into(),
                     AsmRule::float => "floating-point".into(),
                     AsmRule::string => "string".into(),
                     AsmRule::char => "character".into(),
@@ -159,8 +158,7 @@ impl Display for ErrorSource {
                     AsmRule::zpaload => "zero-page address".into(),
                     AsmRule::immload => "immediate value".into(),
                     AsmRule::part => "short index".into(),
-                    AsmRule::assign => "=> or ->".into(),
-                    AsmRule::insert => "=|".into(),
+                    AsmRule::assign => "arrow (=> or ->) or comma".into(),
                 });
 
                 write!(f, "{renamed}")

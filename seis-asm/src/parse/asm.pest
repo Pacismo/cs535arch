@@ -120,7 +120,6 @@ character = @{
   | ("\\" ~ ("u" ~ ASCII_HEX_DIGIT{4}))
 }
 
-int    = @{ "#" ~ integer }
 float  = ${ sign? ~ ASCII_NONZERO_DIGIT ~ ASCII_DIGIT* ~ "." ~ ASCII_DIGIT* ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)? }
 string = @{ "\"" ~ (!"\"" ~ character)* ~ "\"" }
 char   = @{ "'" ~ (!"\'" ~ character) ~ "'" }
@@ -142,7 +141,7 @@ jle  = ${ ^"JLE" ~ WHITESPACE+ ~ jump }
 
 jump     = _{ absolute | relative | ident }
 absolute = @{ vareg }
-relative = @{ int }
+relative = @{ integer }
 
 add = @{ ^"ADD" ~ WHITESPACE+ ~ int_binop }
 sub = @{ ^"SUB" ~ WHITESPACE+ ~ int_binop }
@@ -163,9 +162,9 @@ ror = @{ ^"ROR" ~ WHITESPACE+ ~ int_binop }
 cmp = @{ ^"CMP" ~ WHITESPACE+ ~ int_cmpop }
 tst = @{ ^"TST" ~ WHITESPACE+ ~ int_cmpop }
 
-int_binop = @{ vareg ~ WHITESPACE* ~ "," ~ WHITESPACE* ~ (vareg | int | const) ~ WHITESPACE* ~ assign ~ WHITESPACE* ~ vareg }
+int_binop = @{ vareg ~ WHITESPACE* ~ "," ~ WHITESPACE* ~ (vareg | integer | const) ~ WHITESPACE* ~ assign ~ WHITESPACE* ~ vareg }
 int_unop  = @{ vareg ~ WHITESPACE* ~ WHITESPACE* ~ assign ~ WHITESPACE* ~ vareg }
-int_cmpop = @{ vareg ~ WHITESPACE* ~ "," ~ WHITESPACE* ~ (vareg | int | const) }
+int_cmpop = @{ vareg ~ WHITESPACE* ~ "," ~ WHITESPACE* ~ (vareg | integer | const) }
 
 fadd = @{ ^"FADD" ~ WHITESPACE+ ~ float_binop }
 fsub = @{ ^"FSUB" ~ WHITESPACE+ ~ float_binop }
@@ -183,8 +182,8 @@ float_cmpop = @{ vareg ~ WHITESPACE* ~ "," ~ WHITESPACE* ~ vareg }
 float_binop = @{ vareg ~ WHITESPACE* ~ "," ~ WHITESPACE* ~ vareg ~ WHITESPACE* ~ assign ~ WHITESPACE* ~ vareg }
 float_unop  = @{ vareg ~ WHITESPACE* ~ assign ~ WHITESPACE* ~ vareg }
 
-push = ${ ^"PUSH" ~ WHITESPACE+ ~ (regstack | uinteger) }
-pop  = ${ ^"POP" ~ WHITESPACE+ ~ (regstack | uinteger) }
+push = @{ ^"PUSH" ~ WHITESPACE+ ~ (regstack | uinteger) }
+pop  = @{ ^"POP" ~ WHITESPACE+ ~ (regstack | uinteger) }
 
 regstack = ${ "{" ~ WHITESPACE* ~ reg ~ WHITESPACE* ~ ("," ~ WHITESPACE* ~ reg)* ~ WHITESPACE* ~ "}" }
 
@@ -195,8 +194,8 @@ ssr = @{ ^"SSR" ~ WHITESPACE+ ~ vareg ~ WHITESPACE* ~ assign ~ WHITESPACE* ~ loa
 llr = @{ ^"LLR" ~ WHITESPACE+ ~ loadsrc ~ WHITESPACE* ~ assign ~ WHITESPACE* ~ vareg }
 slr = @{ ^"SLR" ~ WHITESPACE+ ~ vareg ~ WHITESPACE* ~ assign ~ WHITESPACE* ~ loadsrc }
 
-loadsrc   = @{ zpgaddr | vareg | offsetind | indexind | stackoff }
-offsetind = ${ vareg ~ WHITESPACE* ~ "+" ~ WHITESPACE* ~ int }
+loadsrc   = @{ zpgaddr | offsetind | indexind | vareg | stackoff }
+offsetind = ${ vareg ~ WHITESPACE* ~ "+" ~ WHITESPACE* ~ uinteger }
 indexind  = ${ vareg ~ WHITESPACE* ~ "[" ~ WHITESPACE* ~ vareg ~ WHITESPACE* ~ "]" }
 stackoff  = ${ "%" ~ uinteger }
 
@@ -208,14 +207,13 @@ tfr = @{ ^"TFR" ~ WHITESPACE+ ~ (reg | spreg) ~ WHITESPACE* ~ assign ~ WHITESPAC
 /// `LDR &ZPA => vareg`
 ldr = @{ ^"LDR" ~ WHITESPACE+ ~ (zpaload | immload) }
 
-/// `LOAD constant => vareg`, where `constant` is an `int`, a `float`, a `label`, or a `const` (or a reference to it).
+/// `LOAD constant => vareg`, where `constant` is an `integer`, a `float`, a `label`, or a `const` (or a reference to it).
 /// This expands to at least one LDR to load the value
-load = @{ ^"LOAD" ~ WHITESPACE+ ~ (int | float | label | const | constref) ~ WHITESPACE* ~ assign ~ WHITESPACE* ~ vareg }
+load = @{ ^"LOAD" ~ WHITESPACE+ ~ (float | integer | label | const | constref) ~ WHITESPACE* ~ assign ~ WHITESPACE* ~ vareg }
 
 zpaload = !{ zpgref ~ assign ~ vareg }
-immload = !{ int ~ (assign | insert) ~ vareg ~ ("." ~ part)? }
+immload = !{ integer ~ assign ~ vareg ~ ("." ~ part)? }
 
 part = ${ "0" | "1" }
 
-assign = ${ "=>" | "->" }
-insert = ${ "=|" }
+assign = ${ "=>" | "->" | "," }
