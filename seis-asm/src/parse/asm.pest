@@ -18,7 +18,7 @@ instruction = {
 }
 
 directive = {
-    "#[" ~ ident ~ ("=" ~ (integer | string | zpgaddr))? ~ "]"
+    "#[" ~ ident ~ ("=" ~ (integer | string))? ~ "]"
 }
 
 controlop = _{
@@ -98,9 +98,8 @@ vareg  = ${ (^"V" ~ ('0'..'9' | 'a'..'f' | 'A'..'F')) }
 stareg = ${ ^"SP" | ^"BP" }
 lpreg  = ${ ^"LP" }
 pcreg  = ${ ^"PC" }
-psreg  = ${ ^"PS" }
-fsreg  = ${ ^"FS" }
-spreg  = _{ pcreg | psreg | fsreg }
+psreg  = ${ ^"ZF" | ^"OF" | ^"EPS" | ^"NAN" | ^"INF" }
+spreg  = _{ pcreg | psreg }
 
 reg = _{
     vareg
@@ -132,8 +131,8 @@ nop  = @{ ^"NOP" }
 jmp  = ${ ^"JMP" ~ WHITESPACE+ ~ jump }
 jsr  = ${ ^"JSR" ~ WHITESPACE+ ~ jump }
 ret  = @{ ^"RET" }
-jeq  = ${ ^"JEQ" ~ WHITESPACE+ ~ jump }
-jne  = ${ ^"JNE" ~ WHITESPACE+ ~ jump }
+jeq  = ${ (^"JEQ" | ^"JZE") ~ WHITESPACE+ ~ jump }
+jne  = ${ (^"JNE" | ^"JNZ") ~ WHITESPACE+ ~ jump }
 jgt  = ${ ^"JGT" ~ WHITESPACE+ ~ jump }
 jlt  = ${ ^"JLT" ~ WHITESPACE+ ~ jump }
 jge  = ${ ^"JGE" ~ WHITESPACE+ ~ jump }
@@ -150,11 +149,11 @@ dvu = @{ ^"DVU" ~ WHITESPACE+ ~ int_binop }
 dvs = @{ ^"DVS" ~ WHITESPACE+ ~ int_binop }
 mod = @{ ^"MOD" ~ WHITESPACE+ ~ int_binop }
 and = @{ ^"AND" ~ WHITESPACE+ ~ int_binop }
-ior = @{ ^"IOR" ~ WHITESPACE+ ~ int_binop }
-xor = @{ ^"XOR" ~ WHITESPACE+ ~ int_binop }
+ior = @{ (^"IOR" | ^"OR") ~ WHITESPACE+ ~ int_binop }
+xor = @{ (^"EOR" | ^"XOR") ~ WHITESPACE+ ~ int_binop }
 not = @{ ^"NOT" ~ WHITESPACE+ ~ int_unop }
 sxt = @{ ^"SXT" ~ WHITESPACE+ ~ type ~ WHITESPACE+ ~ vareg }
-bsl = @{ ^"BSL" ~ WHITESPACE+ ~ int_binop }
+bsl = @{ (^"BSL" | ^"ASL") ~ WHITESPACE+ ~ int_binop }
 bsr = @{ ^"BSR" ~ WHITESPACE+ ~ int_binop }
 asr = @{ ^"ASR" ~ WHITESPACE+ ~ int_binop }
 rol = @{ ^"ROL" ~ WHITESPACE+ ~ int_binop }
@@ -187,12 +186,12 @@ pop  = @{ ^"POP" ~ WHITESPACE+ ~ (regstack | uinteger) }
 
 regstack = ${ "{" ~ WHITESPACE* ~ reg ~ WHITESPACE* ~ ("," ~ WHITESPACE* ~ reg)* ~ WHITESPACE* ~ "}" }
 
-lbr = @{ ^"LBR" ~ WHITESPACE+ ~ loadsrc ~ WHITESPACE* ~ assign ~ WHITESPACE* ~ vareg }
-sbr = @{ ^"SBR" ~ WHITESPACE+ ~ vareg ~ WHITESPACE* ~ assign ~ WHITESPACE* ~ loadsrc }
-lsr = @{ ^"LSR" ~ WHITESPACE+ ~ loadsrc ~ WHITESPACE* ~ assign ~ WHITESPACE* ~ vareg }
-ssr = @{ ^"SSR" ~ WHITESPACE+ ~ vareg ~ WHITESPACE* ~ assign ~ WHITESPACE* ~ loadsrc }
-llr = @{ ^"LLR" ~ WHITESPACE+ ~ loadsrc ~ WHITESPACE* ~ assign ~ WHITESPACE* ~ vareg }
-slr = @{ ^"SLR" ~ WHITESPACE+ ~ vareg ~ WHITESPACE* ~ assign ~ WHITESPACE* ~ loadsrc }
+lbr = @{ ^"LBR" ~ WHITESPACE+ ~ loadsrc ~ WHITESPACE* ~ (volassign | assign) ~ WHITESPACE* ~ vareg }
+sbr = @{ ^"SBR" ~ WHITESPACE+ ~ vareg ~ WHITESPACE* ~ (volassign | assign) ~ WHITESPACE* ~ loadsrc }
+lsr = @{ ^"LSR" ~ WHITESPACE+ ~ loadsrc ~ WHITESPACE* ~ (volassign | assign) ~ WHITESPACE* ~ vareg }
+ssr = @{ ^"SSR" ~ WHITESPACE+ ~ vareg ~ WHITESPACE* ~ (volassign | assign) ~ WHITESPACE* ~ loadsrc }
+llr = @{ ^"LLR" ~ WHITESPACE+ ~ loadsrc ~ WHITESPACE* ~ (volassign | assign) ~ WHITESPACE* ~ vareg }
+slr = @{ ^"SLR" ~ WHITESPACE+ ~ vareg ~ WHITESPACE* ~ (volassign | assign) ~ WHITESPACE* ~ loadsrc }
 
 loadsrc   = @{ zpgaddr | offsetind | indexind | vareg | stackoff }
 offsetind = ${ vareg ~ WHITESPACE* ~ "+" ~ WHITESPACE* ~ uinteger }
@@ -216,4 +215,5 @@ immload = !{ integer ~ assign ~ vareg ~ ("." ~ part)? }
 
 part = ${ "0" | "1" }
 
-assign = ${ "=>" | "->" | "," }
+assign    = ${ "=>" | "->" | "," }
+volassign = ${ "=>>" | "->>" }

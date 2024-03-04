@@ -80,6 +80,7 @@ fn tokenize_constant(mut pair: Pairs<'_, Rule>) -> Result<Constant, ErrorSource>
             let string = s.as_str();
             String(string[1..string.len() - 1].to_owned())
         }
+
         _ => unreachable!(),
     };
 
@@ -94,27 +95,21 @@ fn tokenize_directive(mut pair: Pairs<'_, Rule>) -> Result<Directive, ErrorSourc
     let value = pair.next();
 
     match ident.as_str().to_lowercase().as_str() {
+        // TODO: add the ZeroPage directive
         "location" => {
             let value = value.ok_or_else(|| {
                 PestError::new_from_pos(
                     ErrorVariant::CustomError {
-                        message: "\"location\" expects an address or zero-page address".to_owned(),
+                        message: "\"location\" expects an address".to_owned(),
                     },
                     ident.as_span().end_pos(),
                 )
             })?;
 
-            if value.as_rule() == Rule::zpgaddr {
-                Ok(Directive::Location {
-                    is_zero_page: true,
-                    address: parse_integer!(value.into_inner().next().unwrap()),
-                })
-            } else {
-                Ok(Directive::Location {
-                    is_zero_page: false,
-                    address: parse_integer!(value.into_inner().next().unwrap()),
-                })
-            }
+            Ok(Directive::Location(parse_integer!(value
+                .into_inner()
+                .next()
+                .unwrap())))
         }
         "public" => {
             if value.is_none() {
