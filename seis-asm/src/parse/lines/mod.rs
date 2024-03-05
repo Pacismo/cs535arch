@@ -59,6 +59,10 @@ impl Lines {
     pub fn new() -> Self {
         Self(LinkedList::new())
     }
+
+    pub fn into_iter(self) -> std::collections::linked_list::IntoIter<LineType> {
+        self.0.into_iter()
+    }
 }
 
 #[derive(Debug)]
