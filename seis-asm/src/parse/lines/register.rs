@@ -40,6 +40,39 @@ pub enum MemoryLoadOp {
 }
 
 #[derive(Debug)]
+pub enum MemoryStoreOp {
+    Zpg {
+        address: Short,
+        source: Register,
+    },
+    ConstZpg {
+        constant: String,
+        source: Register,
+    },
+    Indirect {
+        address: Register,
+        source: Register,
+        volatile: bool,
+    },
+    Offset {
+        address: Register,
+        offset: Short,
+        source: Register,
+        volatile: bool,
+    },
+    Indexed {
+        address: Register,
+        index: Register,
+        source: Register,
+        volatile: bool,
+    },
+    Stack {
+        offset: Short,
+        source: Register,
+    },
+}
+
+#[derive(Debug)]
 pub enum ImmediateLoadOp {
     ZpgAddr {
         address: Short,

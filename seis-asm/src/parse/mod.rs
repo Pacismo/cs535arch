@@ -547,21 +547,27 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
             })
         }
         x @ (Rule::sbr | Rule::ssr | Rule::slr) => {
-            use lines::MemoryLoadOp::*;
+            use lines::MemoryStoreOp::*;
             use Instruction::{Sbr, Slr, Ssr};
 
             let mut inner = instruction.into_inner();
-            let destination = registers::get_id(inner.next().unwrap().as_str()).unwrap();
+            let source = registers::get_id(inner.next().unwrap().as_str()).unwrap();
             let volatile = inner.next().unwrap().as_rule() == Rule::volassign;
             let mode = inner.next().unwrap();
 
             let mode = match mode.as_rule() {
                 Rule::zpgaddr => {
-                    let address = parse_integer!(mode.into_inner().next().unwrap());
+                    let inner = mode.into_inner().next().unwrap();
 
-                    Zpg {
-                        address,
-                        destination,
+                    match inner.as_rule() {
+                        Rule::ident => ConstZpg {
+                            constant: inner.as_str().to_owned(),
+                            source,
+                        },
+                        _ => Zpg {
+                            address: parse_integer!(inner),
+                            source,
+                        },
                     }
                 }
                 Rule::offsetind => {
@@ -572,7 +578,7 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
                     Offset {
                         address,
                         offset,
-                        destination,
+                        source,
                         volatile,
                     }
                 }
@@ -584,7 +590,7 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
                     Indexed {
                         address,
                         index,
-                        destination,
+                        source,
                         volatile,
                     }
                 }
@@ -593,17 +599,14 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
 
                     Indirect {
                         address,
-                        destination,
+                        source,
                         volatile,
                     }
                 }
                 Rule::stackoff => {
                     let offset = parse_integer!(mode.into_inner().next().unwrap());
 
-                    Stack {
-                        offset,
-                        destination,
-                    }
+                    Stack { offset, source }
                 }
                 _ => unreachable!(),
             };
