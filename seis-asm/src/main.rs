@@ -10,7 +10,7 @@ use crate::linker::link_symbols;
 fn main() {
     let cli = cli::Command::parse();
 
-    let tokens = match cli
+    let lines = match cli
         .files
         .iter()
         .map(tokenize)
@@ -27,7 +27,7 @@ fn main() {
     };
 
     // TOKENS!
-    println!("{tokens:#?}");
+    println!("{lines:#?}");
 
-    let linked = link_symbols(tokens);
+    let _linked = link_symbols(lines);
 }
