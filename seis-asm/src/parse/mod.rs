@@ -686,7 +686,8 @@ fn tokenize_line(line: Pair<'_, Rule>, span: Span) -> Result<Option<LineType>, E
 /// First pass: tokenize the input.
 ///
 /// This makes it easier to parse the data.
-pub fn tokenize(path: &Path) -> Result<Lines, Error> {
+pub fn tokenize<T: AsRef<Path>>(path: T) -> Result<Lines, Error> {
+    let path = path.as_ref();
     let mut file = BufReader::new(File::open(path).map_err(|e| Error::new(path, e.into()))?);
     let mut content = String::new();
 
