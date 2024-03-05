@@ -3,12 +3,18 @@ pub mod error;
 mod labels;
 
 use self::{constants::Constant, error::Error};
-use crate::{linker::labels::Label, parse::Lines};
+use crate::{
+    linker::labels::Label,
+    parse::{Data, Instruction, Lines, Span},
+};
 use libseis::{
     pages::{PAGE_SIZE, STACK_PAGE, ZERO_PAGE},
     types::{Short, Word},
 };
-use std::{collections::HashMap, path::Path};
+use std::{
+    collections::{HashMap, LinkedList},
+    path::Path,
+};
 
 macro_rules! byte_len {
     ($container:ident) => {
@@ -80,19 +86,44 @@ impl PageSet {
 pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
     let mut pages: PageSet = PageSet::new();
     let mut constants: HashMap<String, Constant> = HashMap::new();
+    let mut to_eval = Lines::new();
+
+    for line in lines.into_iter() {
+        use crate::parse::LineType as T;
+        match line {
+            T::Constant(value, span) => {
+                if let Some(constant) = constants.get(&value.ident) {
+                    return Err(Error::ExistingConstant {
+                        name: value.ident,
+                        first: constant.span.clone(),
+                        repeat: span,
+                    });
+                }
+
+                constants.insert(
+                    value.ident,
+                    Constant {
+                        span,
+                        value: value.value,
+                    },
+                );
+            }
+
+            x => to_eval.push_back(x),
+        }
+    }
+
     let mut labels: HashMap<String, Label> = HashMap::new();
 
     let mut ip = 0;
 
-    for line in lines {
+    for line in to_eval {
         use crate::parse::LineType as T;
 
         println!("{line:#?}");
 
         match line {
-            T::Instruction(value, span) => {
-                todo!()
-            }
+            T::Instruction(value, span) => todo!(),
 
             T::Directive(value, span) => {
                 // TODO: put an assertion to ensure that the address does not go past the memory upper-bound.
@@ -113,24 +144,6 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
                         ip = address;
                     }
                 }
-            }
-
-            T::Constant(value, span) => {
-                if let Some(constant) = constants.get(&value.ident) {
-                    return Err(Error::ExistingConstant {
-                        name: value.ident,
-                        first: constant.span.clone(),
-                        repeat: span,
-                    });
-                }
-
-                constants.insert(
-                    value.ident,
-                    Constant {
-                        span,
-                        value: value.value,
-                    },
-                );
             }
 
             T::Label(name, span) => {
@@ -156,6 +169,8 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
                     D::String(strings) => todo!(),
                 }
             }
+
+            _ => unreachable!("constants are all removed from the list"),
         }
     }
 
