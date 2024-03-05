@@ -1,7 +1,9 @@
+mod data;
 mod float;
 mod integer;
 mod register;
 
+pub use data::Data;
 pub use float::*;
 pub use integer::*;
 use libseis::types::{Register, Word};
@@ -78,7 +80,6 @@ impl Lines {
 pub enum ConstantValue {
     Integer(Word),
     Float(f32),
-    String(String),
 }
 
 #[derive(Debug)]
@@ -105,6 +106,7 @@ pub enum LineType {
     Instruction(Instruction, Span),
     Directive(Directive, Span),
     Label(String, Span),
+    Data(Data, Span),
 }
 
 #[derive(Debug)]

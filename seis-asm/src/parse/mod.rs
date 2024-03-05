@@ -21,7 +21,7 @@ use std::{
 /// Expands to a [`convert_base`], followed by a [`std::ops::FromResidual`], a parse and an unwrap.
 macro_rules! parse_integer {
     ($i:expr) => {
-        convert_base($i)?.parse::<i64>().unwrap() as _
+        convert_base($i)?.parse::<i64>()? as _
     };
 }
 
@@ -61,6 +61,78 @@ fn convert_base(pair: Pair<'_, Rule>) -> Result<String, ErrorSource> {
     }
 }
 
+fn tokenize_data_block(mut pair: Pairs<'_, Rule>) -> Result<Data, ErrorSource> {
+    match pair.next().unwrap().as_str().to_lowercase().as_str() {
+        "byte" => pair
+            .map(|b| match b.as_rule() {
+                Rule::dec | Rule::oct | Rule::hex => Ok(parse_integer!(b)),
+                _ => Err(PestError::new_from_span(
+                    ErrorVariant::CustomError {
+                        message: "Byte blocks can only store integers".into(),
+                    },
+                    b.as_span(),
+                )
+                .into()),
+            })
+            .collect::<Result<_, _>>()
+            .map(Data::Byte),
+        "short" => pair
+            .map(|b| match b.as_rule() {
+                Rule::dec | Rule::oct | Rule::hex => Ok(parse_integer!(b)),
+                _ => Err(PestError::new_from_span(
+                    ErrorVariant::CustomError {
+                        message: "Short blocks can only store integers".into(),
+                    },
+                    b.as_span(),
+                )
+                .into()),
+            })
+            .collect::<Result<_, _>>()
+            .map(Data::Short),
+        "word" => pair
+            .map(|b| match b.as_rule() {
+                Rule::dec | Rule::oct | Rule::hex => Ok(parse_integer!(b)),
+                _ => Err(PestError::new_from_span(
+                    ErrorVariant::CustomError {
+                        message: "Word blocks can only store integers".into(),
+                    },
+                    b.as_span(),
+                )
+                .into()),
+            })
+            .collect::<Result<_, _>>()
+            .map(Data::Word),
+        "float" => pair
+            .map(|b| match b.as_rule() {
+                Rule::float => Ok(b.as_str().parse()?),
+                _ => Err(PestError::new_from_span(
+                    ErrorVariant::CustomError {
+                        message: "Float blocks can only store floats".into(),
+                    },
+                    b.as_span(),
+                )
+                .into()),
+            })
+            .collect::<Result<_, _>>()
+            .map(Data::Float),
+        "string" => pair
+            .map(|s| match s.as_rule() {
+                Rule::string => Ok(s.as_str().to_owned()),
+                _ => Err(PestError::new_from_span(
+                    ErrorVariant::CustomError {
+                        message: "String blocks can only store strings".into(),
+                    },
+                    s.as_span(),
+                )
+                .into()),
+            })
+            .collect::<Result<_, _>>()
+            .map(Data::String),
+
+        _ => unreachable!(),
+    }
+}
+
 fn tokenize_constant(mut pair: Pairs<'_, Rule>) -> Result<Constant, ErrorSource> {
     use lines::ConstantValue::*;
 
@@ -70,10 +142,6 @@ fn tokenize_constant(mut pair: Pairs<'_, Rule>) -> Result<Constant, ErrorSource>
         Rule::integer => Integer(parse_integer!(value.into_inner().next().unwrap())),
         Rule::float => Float(value.as_str().parse().unwrap()),
         Rule::char => Integer(value.as_str()[1..2].as_bytes()[0] as u32),
-        Rule::string => {
-            let string = value.as_str();
-            String(string[1..string.len() - 1].to_owned())
-        }
 
         _ => unreachable!(),
     };
@@ -652,6 +720,7 @@ fn tokenize_line(line: Pair<'_, Rule>, span: Span) -> Result<Option<LineType>, E
             line.into_inner().next().unwrap().as_str().to_owned(),
             span,
         )),
+        Rule::datablock => Some(Data(tokenize_data_block(line.into_inner())?, span)),
 
         Rule::EOI => None,
         _ => unreachable!("{line:#?}"),

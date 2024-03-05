@@ -21,11 +21,11 @@ pub enum Error {
         name: String,
         usage: Span,
     },
-    WritingCodeToZeroPage {
+    WritingToZeroPage {
         span: Span,
     },
-    WritingCodeToStack {
-        span: crate::parse::Span,
+    WritingToStack {
+        span: Span,
     },
 }
 
@@ -60,11 +60,11 @@ impl Display for Error {
                 f,
                 "Constant {name} has not been defined, but is used at {usage}"
             ),
-            WritingCodeToZeroPage { span } => {
-                write!(f, "Attempting to write code to the zero page at {span}\nPlease move the code to a different page.")
+            WritingToZeroPage { span } => {
+                write!(f, "Attempting to write code or data to the zero page at {span}\nPlease write to a different page.")
             }
-            WritingCodeToStack { span } => {
-                write!(f, "Attempting to write code to the stack page at {span}\nPlease move the code to a different page.")
+            WritingToStack { span } => {
+                write!(f, "Attempting to write code or data to the stack page at {span}\nPlease write to a different page.")
             }
         }
     }

@@ -1,6 +1,10 @@
 use super::asm_parser::Rule as AsmRule;
 use pest::error::Error as PestError;
-use std::{fmt::Display, path::PathBuf};
+use std::{
+    fmt::Display,
+    num::{ParseFloatError, ParseIntError},
+    path::PathBuf,
+};
 use std::{io::Error as IOError, path::Path};
 
 #[derive(Debug)]
@@ -39,6 +43,8 @@ impl std::error::Error for Error {
 pub enum ErrorSource {
     Pest(PestError<AsmRule>),
     IO(IOError),
+    FloatParse(ParseFloatError),
+    IntParse(ParseIntError),
 }
 
 impl std::error::Error for ErrorSource {
@@ -46,6 +52,8 @@ impl std::error::Error for ErrorSource {
         match self {
             ErrorSource::Pest(p) => Some(p),
             ErrorSource::IO(i) => Some(i),
+            ErrorSource::FloatParse(f) => Some(f),
+            ErrorSource::IntParse(i) => Some(i),
         }
     }
 }
@@ -63,6 +71,8 @@ impl Display for ErrorSource {
                     AsmRule::constant => "constant".into(),
                     AsmRule::instruction => "instruction".into(),
                     AsmRule::directive => "directive".into(),
+                    AsmRule::datablock => "data block".into(),
+                    AsmRule::datatype => "data type".into(),
                     AsmRule::controlop => "control operator".into(),
                     AsmRule::integerop => "integer operator".into(),
                     AsmRule::floatop => "floating-point operator".into(),
@@ -168,6 +178,8 @@ impl Display for ErrorSource {
                 write!(f, "{renamed}")
             }
             ErrorSource::IO(io) => write!(f, "{io}"),
+            ErrorSource::FloatParse(p) => write!(f, "{p}"),
+            ErrorSource::IntParse(i) => write!(f, "{i}"),
         }
     }
 }
@@ -181,5 +193,17 @@ impl From<PestError<AsmRule>> for ErrorSource {
 impl From<std::io::Error> for ErrorSource {
     fn from(value: std::io::Error) -> Self {
         Self::IO(value)
+    }
+}
+
+impl From<ParseFloatError> for ErrorSource {
+    fn from(value: ParseFloatError) -> Self {
+        Self::FloatParse(value)
+    }
+}
+
+impl From<ParseIntError> for ErrorSource {
+    fn from(value: ParseIntError) -> Self {
+        Self::IntParse(value)
     }
 }

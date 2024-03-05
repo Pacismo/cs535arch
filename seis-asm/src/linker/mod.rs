@@ -10,6 +10,12 @@ use libseis::{
 };
 use std::{collections::HashMap, path::Path};
 
+macro_rules! byte_len {
+    ($container:ident) => {
+        ($container.len() * std::mem::size_of_val($container.first().unwrap()))
+    };
+}
+
 pub struct Page {
     data: [u8; PAGE_SIZE],
     len: Word,
@@ -84,25 +90,27 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
         println!("{line:#?}");
 
         match line {
-            T::Instruction(value, span) => todo!(),
+            T::Instruction(value, span) => {
+                todo!()
+            }
 
             T::Directive(value, span) => {
                 // TODO: put an assertion to ensure that the address does not go past the memory upper-bound.
                 use crate::parse::Directive::*;
                 match value {
                     Location(address) => {
-                        if address & 0xFFFF_0000 == ZERO_PAGE {
-                            return Err(Error::WritingCodeToZeroPage { span });
-                        }
                         if address & 0xFFFF_0000 == STACK_PAGE {
-                            return Err(Error::WritingCodeToStack { span });
+                            return Err(Error::WritingToStack { span });
+                        }
+                        if address & 0xFFFF_0000 == ZERO_PAGE {
+                            return Err(Error::WritingToZeroPage { span });
+                        }
+
+                        if pages.page_of(address).len >= address & 0x0000_FFFF {
+                            println!("At {span}:\nBy writing to address {address:#x}, you may potentially be overwriting code or data. It is recommended that you move the code or data elsewhere.")
                         }
 
                         ip = address;
-
-                        if pages.page_of(ip).len >= ip & 0x0000_FFFF {
-                            println!("At {span}:\nBy writing to address {address:#x}, you may potentially be overwriting code or data. It is recommended that you move the code or data elsewhere.")
-                        }
                     }
                 }
             }
@@ -135,6 +143,18 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
                 }
 
                 labels.insert(name, Label { address: ip, span });
+            }
+
+            T::Data(data, span) => {
+                use crate::parse::Data as D;
+
+                match data {
+                    D::Byte(bytes) => todo!(),
+                    D::Short(shorts) => todo!(),
+                    D::Word(words) => todo!(),
+                    D::Float(floats) => todo!(),
+                    D::String(strings) => todo!(),
+                }
             }
         }
     }

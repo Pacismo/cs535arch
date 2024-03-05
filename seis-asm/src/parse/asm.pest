@@ -4,10 +4,16 @@ comment = _{ "//" ~ (!NEWLINE ~ ANY)* }
 
 program = _{ SOI ~ (line? ~ comment?) ~ (NEWLINE ~ line? ~ comment?)* ~ EOI }
 
-line = _{ constant | instruction | directive | label }
+line = _{ constant | instruction | directive | label | datablock }
+
+datablock = @{
+    "#" ~ datatype ~ "!" ~ WHITESPACE* ~ "{" ~ NEWLINE* ~ WHITESPACE* ~ (float | integer | string) ~ (NEWLINE* ~ WHITESPACE* ~ "," ~ NEWLINE* ~ WHITESPACE* ~ (float | integer | string))* ~ NEWLINE* ~ WHITESPACE* ~ ","? ~ WHITESPACE* ~ NEWLINE* ~ "}"
+}
+
+datatype = ${ ^"string" | type | ^"float" }
 
 constant = {
-    const ~ "=" ~ ((float) | (integer) | (char) | (string))
+    const ~ "=" ~ ((float) | (integer) | (char))
 }
 
 instruction = {
@@ -118,12 +124,12 @@ character = @{
   | ("\\" ~ ("u" ~ ASCII_HEX_DIGIT{4}))
 }
 
-float  = ${ sign? ~ ASCII_NONZERO_DIGIT ~ ASCII_DIGIT* ~ "." ~ ASCII_DIGIT* ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)? }
+float  = ${ sign? ~ ASCII_DIGIT* ~ "." ~ ASCII_DIGIT* ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)? }
 string = @{ "\"" ~ (!"\"" ~ character)* ~ "\"" }
 char   = @{ "'" ~ (!"\'" ~ character) ~ "'" }
 
-zpgaddr = ${ "@" ~ (uinteger | const) }
-zpgref  = ${ "&" ~ (uinteger | const) }
+zpgaddr = ${ "@" ~ (uinteger | ident) }
+zpgref  = ${ "&" ~ (uinteger | ident) }
 
 halt = @{ ^"HALT" }
 nop  = @{ ^"NOP" }
