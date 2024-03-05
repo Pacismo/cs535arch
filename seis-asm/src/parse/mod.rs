@@ -2,8 +2,8 @@ mod asm_parser;
 mod error;
 mod lines;
 
-use asm_parser::Rule;
 use asm_parser::AsmParser;
+use asm_parser::Rule;
 pub use error::{Error, ErrorSource};
 use libseis::registers;
 pub use lines::*;
@@ -99,7 +99,6 @@ fn tokenize_directive(mut pair: Pairs<'_, Rule>) -> Result<Directive, ErrorSourc
     let value = pair.next();
 
     match ident.as_str().to_lowercase().as_str() {
-        // TODO: add the ZeroPage directive
         "location" => {
             let value = value.ok_or_else(|| {
                 PestError::new_from_pos(
@@ -257,7 +256,6 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
             })
         }
         Rule::sxt => {
-            use lines::IntSignExtendOp;
             use Instruction::Sxt;
 
             let mut inner = instruction.into_inner();
@@ -272,7 +270,6 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
             Ok(Sxt(IntSignExtendOp { register, width }))
         }
         Rule::not => {
-            use lines::IntUnaryOp;
             use Instruction::Not;
 
             let mut inner = instruction.into_inner();
@@ -317,7 +314,6 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
         }
 
         x @ (Rule::fadd | Rule::fsub | Rule::fmul | Rule::fdiv | Rule::fmod) => {
-            use lines::FloatBinaryOp;
             use Instruction::{Fadd, Fdiv, Fmod, Fmul, Fsub};
 
             let mut inner = instruction.into_inner();
@@ -356,7 +352,6 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
             })
         }
         Rule::fcmp => {
-            use lines::FloatCompOp;
             use Instruction::Fcmp;
 
             let mut inner = instruction.into_inner();
@@ -366,7 +361,6 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
             Ok(Fcmp(FloatCompOp { left, right }))
         }
         x @ (Rule::fneg | Rule::frec | Rule::itof | Rule::ftoi) => {
-            use lines::FloatUnaryOp;
             use Instruction::{Fneg, Frec, Ftoi, Itof};
 
             let mut inner = instruction.into_inner();
