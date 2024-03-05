@@ -4,7 +4,7 @@ mod register;
 
 pub use float::*;
 pub use integer::*;
-use libseis::types::{Byte, Register, Short, Word};
+use libseis::types::{Register, Word};
 pub use register::*;
 use std::{
     collections::LinkedList,
@@ -12,7 +12,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Span {
     pub file: PathBuf,
     pub line: u64,
@@ -41,6 +41,15 @@ impl Display for Span {
 #[derive(Debug)]
 pub struct Lines(pub(super) LinkedList<LineType>);
 
+impl IntoIterator for Lines {
+    type Item = <LinkedList<LineType> as IntoIterator>::Item;
+    type IntoIter = <LinkedList<LineType> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
 impl std::ops::DerefMut for Lines {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
@@ -67,9 +76,7 @@ impl Lines {
 
 #[derive(Debug)]
 pub enum ConstantValue {
-    Byte(Byte),
-    Short(Short),
-    Word(Word),
+    Integer(Word),
     Float(f32),
     String(String),
 }
@@ -83,8 +90,6 @@ pub struct Constant {
 #[derive(Debug)]
 pub enum Directive {
     Location(Word),
-    Public,
-    ZeroPage,
 }
 
 #[derive(Debug)]
@@ -99,7 +104,7 @@ pub enum LineType {
     Constant(Constant, Span),
     Instruction(Instruction, Span),
     Directive(Directive, Span),
-    Label(String),
+    Label(String, Span),
 }
 
 #[derive(Debug)]

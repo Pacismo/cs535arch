@@ -12,6 +12,10 @@ pub enum MemoryLoadOp {
         address: Short,
         destination: Register,
     },
+    ConstZpg {
+        constant: String,
+        destination: Register,
+    },
     Indirect {
         address: Register,
         destination: Register,
@@ -41,6 +45,10 @@ pub enum ImmediateLoadOp {
         address: Short,
         destination: Register,
     },
+    ConstZpgAddr {
+        constant: String,
+        destination: Register,
+    },
     Immediate {
         value: Short,
         destination: Register,
@@ -64,10 +72,6 @@ pub enum ExpandableLoadOp {
         destination: Register,
     },
     ConstantVal {
-        ident: String,
-        destination: Register,
-    },
-    ConstantRef {
         ident: String,
         destination: Register,
     },

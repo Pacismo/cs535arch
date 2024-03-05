@@ -70,7 +70,6 @@ impl Display for ErrorSource {
                     AsmRule::ident => "identity".into(),
                     AsmRule::label => "label".into(),
                     AsmRule::r#const => "constant".into(),
-                    AsmRule::constref => "reference to a constant".into(),
                     AsmRule::byte => "byte".into(),
                     AsmRule::short => "short".into(),
                     AsmRule::word => "word".into(),

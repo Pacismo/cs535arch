@@ -67,19 +67,9 @@ fn tokenize_constant(mut pair: Pairs<'_, Rule>) -> Result<Constant, ErrorSource>
     let name = pair.next().unwrap().into_inner().next().unwrap().as_str();
     let value = pair.next().unwrap();
     let value = match value.as_rule() {
-        Rule::integer => {
-            let mut inner = value.into_inner();
-            let value = inner.next().unwrap();
-            let valty = inner.next().map(|v| v.as_rule()).unwrap_or(Rule::word);
-            match valty {
-                Rule::byte => Byte(parse_integer!(value)),
-                Rule::short => Short(parse_integer!(value)),
-                Rule::word => Word(parse_integer!(value)),
-                _ => unreachable!("{:?}", value.as_rule()),
-            }
-        }
+        Rule::integer => Integer(parse_integer!(value.into_inner().next().unwrap())),
         Rule::float => Float(value.as_str().parse().unwrap()),
-        Rule::char => Byte(value.as_str()[1..2].as_bytes()[0]),
+        Rule::char => Integer(value.as_str()[1..2].as_bytes()[0] as u32),
         Rule::string => {
             let string = value.as_str();
             String(string[1..string.len() - 1].to_owned())
@@ -113,32 +103,6 @@ fn tokenize_directive(mut pair: Pairs<'_, Rule>) -> Result<Directive, ErrorSourc
                 .into_inner()
                 .next()
                 .unwrap())))
-        }
-        "public" => {
-            if value.is_none() {
-                Ok(Directive::Public)
-            } else {
-                Err(PestError::new_from_span(
-                    ErrorVariant::CustomError {
-                        message: "\"public\" does not expect a value".to_owned(),
-                    },
-                    value.unwrap().as_span(),
-                )
-                .into())
-            }
-        }
-        "zeropage" => {
-            if value.is_none() {
-                Ok(Directive::ZeroPage)
-            } else {
-                Err(PestError::new_from_span(
-                    ErrorVariant::CustomError {
-                        message: "\"zeropage\" does not expect a value".to_owned(),
-                    },
-                    value.unwrap().as_span(),
-                )
-                .into())
-            }
         }
 
         x => Err(PestError::new_from_span(
@@ -450,11 +414,17 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
 
             let mode = match mode.as_rule() {
                 Rule::zpgaddr => {
-                    let address = parse_integer!(mode.into_inner().next().unwrap());
+                    let inner = mode.into_inner().next().unwrap();
 
-                    Zpg {
-                        address,
-                        destination,
+                    match inner.as_rule() {
+                        Rule::ident => ConstZpg {
+                            constant: inner.as_str().to_owned(),
+                            destination,
+                        },
+                        _ => Zpg {
+                            address: parse_integer!(inner),
+                            destination,
+                        },
                     }
                 }
                 Rule::offsetind => {
@@ -622,9 +592,15 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
                     inner.next();
                     let destination = registers::get_id(inner.next().unwrap().as_str()).unwrap();
 
-                    Ok(Ldr(ZpgAddr {
-                        address: parse_integer!(address.into_inner().next().unwrap()),
-                        destination,
+                    Ok(Ldr(match address.as_rule() {
+                        Rule::ident => ConstZpgAddr {
+                            constant: address.into_inner().next().unwrap().as_str().to_owned(),
+                            destination,
+                        },
+                        _ => ZpgAddr {
+                            address: parse_integer!(address.into_inner().next().unwrap()),
+                            destination,
+                        },
                     }))
                 }
                 _ => unreachable!(),
@@ -657,10 +633,6 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
                     ident: opt.into_inner().next().unwrap().as_str().to_owned(),
                     destination,
                 },
-                Rule::constref => ConstantRef {
-                    ident: opt.into_inner().next().unwrap().as_str().to_owned(),
-                    destination,
-                },
                 _ => unreachable!(),
             }))
         }
@@ -676,7 +648,10 @@ fn tokenize_line(line: Pair<'_, Rule>, span: Span) -> Result<Option<LineType>, E
         Rule::constant => Some(Constant(tokenize_constant(line.into_inner())?, span)),
         Rule::instruction => Some(Instruction(tokenize_instruction(line.into_inner())?, span)),
         Rule::directive => Some(Directive(tokenize_directive(line.into_inner())?, span)),
-        Rule::label => Some(Label(line.into_inner().next().unwrap().as_str().to_owned())),
+        Rule::label => Some(Label(
+            line.into_inner().next().unwrap().as_str().to_owned(),
+            span,
+        )),
 
         Rule::EOI => None,
         _ => unreachable!("{line:#?}"),

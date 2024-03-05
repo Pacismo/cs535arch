@@ -7,7 +7,7 @@ program = _{ SOI ~ (line? ~ comment?) ~ (NEWLINE ~ line? ~ comment?)* ~ EOI }
 line = _{ constant | instruction | directive | label }
 
 constant = {
-    const ~ "=" ~ ((float) | (integer ~ (":" ~ type)?) | (char) | (string))
+    const ~ "=" ~ ((float) | (integer) | (char) | (string))
 }
 
 instruction = {
@@ -84,10 +84,9 @@ registerop = _{
   | load
 }
 
-ident    = ${ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
-label    = ${ ident ~ ":" }
-const    = @{ "." ~ ident }
-constref = @{ "&" ~ ident }
+ident = ${ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
+label = ${ ident ~ ":" }
+const = @{ "." ~ ident }
 
 byte  = ${ ^"byte" }
 short = ${ ^"short" }
@@ -123,8 +122,8 @@ float  = ${ sign? ~ ASCII_NONZERO_DIGIT ~ ASCII_DIGIT* ~ "." ~ ASCII_DIGIT* ~ (^
 string = @{ "\"" ~ (!"\"" ~ character)* ~ "\"" }
 char   = @{ "'" ~ (!"\'" ~ character) ~ "'" }
 
-zpgaddr = ${ "@" ~ uinteger }
-zpgref  = ${ "&" ~ uinteger }
+zpgaddr = ${ "@" ~ (uinteger | const) }
+zpgref  = ${ "&" ~ (uinteger | const) }
 
 halt = @{ ^"HALT" }
 nop  = @{ ^"NOP" }
@@ -208,7 +207,7 @@ ldr = @{ ^"LDR" ~ WHITESPACE+ ~ (zpaload | immload) }
 
 /// `LOAD constant => vareg`, where `constant` is an `integer`, a `float`, an `ident`, or a `const` (or a reference to it).
 /// This expands to at least one LDR to load the value
-load = @{ ^"LOAD" ~ WHITESPACE+ ~ (float | integer | ident | const | constref) ~ WHITESPACE* ~ assign ~ WHITESPACE* ~ vareg }
+load = @{ ^"LOAD" ~ WHITESPACE+ ~ (float | integer | ident | const) ~ WHITESPACE* ~ assign ~ WHITESPACE* ~ vareg }
 
 zpaload = !{ zpgref ~ assign ~ vareg }
 immload = !{ integer ~ assign ~ vareg ~ ("." ~ part)? }
