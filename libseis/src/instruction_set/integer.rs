@@ -254,7 +254,7 @@ pub enum IntegerOp {
     /// Compare
     Cmp(CompOp),
     /// Test
-    Tst(BinaryOp),
+    Tst(CompOp),
     /// And
     And(BinaryOp),
     /// Inclusive or
