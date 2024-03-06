@@ -1,6 +1,10 @@
 mod cli;
 mod linker;
 mod parse;
+#[cfg(test)]
+mod test;
+
+use std::fs::File;
 
 use clap::Parser;
 use parse::{tokenize, Error, Lines};
@@ -9,6 +13,7 @@ use crate::linker::link_symbols;
 
 fn main() {
     let cli = cli::Command::parse();
+    let output = cli.output.unwrap_or("./a.out".into());
 
     let lines = match cli
         .files
@@ -29,5 +34,9 @@ fn main() {
     // TOKENS!
     println!("{lines:#?}");
 
-    let _linked = link_symbols(lines);
+    let linked = link_symbols(lines).expect("Failed to link code");
+
+    linked
+        .write(File::create(output).expect("Could not open output file"))
+        .expect("Failed to write to file");
 }

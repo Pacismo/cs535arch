@@ -14,8 +14,8 @@ use libseis::{
 };
 use std::{
     collections::{HashMap, LinkedList},
+    io::{Seek, Write},
     mem::transmute,
-    path::Path,
 };
 
 macro_rules! byte_len {
@@ -39,20 +39,12 @@ impl Default for Page {
 }
 
 impl Page {
-    pub fn read(&self, byte: Word) -> u8 {
-        self.data[(byte & 0xFFFF) as usize]
-    }
-
     pub fn write(&mut self, byte: Word, value: u8) {
         let addr = byte & 0xFFFF;
         if addr >= self.len {
             self.len = addr + 1;
         }
         self.data[byte as usize] = value;
-    }
-
-    pub fn bytes(&self) -> &[u8] {
-        &self.data
     }
 
     pub fn data(&self) -> &[u8] {
@@ -80,8 +72,15 @@ impl PageSet {
         self.page(page_id)
     }
 
-    pub fn write<A: AsRef<Path>>(self, destination: A) -> std::io::Result<()> {
-        todo!()
+    pub fn write<W: Write + Seek>(self, mut destination: W) -> std::io::Result<()> {
+        use std::io::SeekFrom::Start;
+
+        for (page_number, page) in self.0 {
+            let base_address = (page_number as u64) << 16;
+            destination.seek(Start(base_address))?;
+            destination.write(page.data())?;
+        }
+        Ok(())
     }
 }
 
@@ -146,78 +145,46 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
         println!("{line:#?}");
 
         match line {
-            T::Instruction(value, span) => match value {
-                Instruction::Load(l) => {
-                    use crate::parse::ExpandableLoadOp as E;
-                    use crate::parse::ImmediateLoadOp as L;
-                    match l {
-                        E::Integer { value, destination } => {
-                            let left = ((value & 0xFFFF_0000) >> 16) as Short;
-                            let right = (value & 0x0000_FFFF) as Short;
-                            expanded.push_back((
-                                Instruction::Ldr(L::Immediate {
-                                    value: right,
-                                    destination,
-                                    location: 0,
-                                    insert: false,
-                                }),
-                                ip,
-                                span.clone(),
-                            ));
-                            if left == 0 {
-                                ip += 1;
-                            } else {
+            T::Instruction(value, span) => {
+                if ip % 4 != 0 {
+                    return Err(Error::MisalignedCode { span });
+                }
+
+                match value {
+                    Instruction::Load(l) => {
+                        use crate::parse::ExpandableLoadOp as E;
+                        use crate::parse::ImmediateLoadOp as L;
+                        match l {
+                            E::Integer { value, destination } => {
+                                let left = ((value & 0xFFFF_0000) >> 16) as Short;
+                                let right = (value & 0x0000_FFFF) as Short;
                                 expanded.push_back((
                                     Instruction::Ldr(L::Immediate {
-                                        value: left,
+                                        value: right,
                                         destination,
-                                        location: 1,
-                                        insert: true,
-                                    }),
-                                    ip + 1,
-                                    span,
-                                ));
-                                ip += 2;
-                            }
-                        }
-                        E::Float { value, destination } => {
-                            let value: Word = unsafe { transmute(value) };
-                            let left = ((value & 0xFFFF_0000) >> 16) as Short;
-                            let right = (value & 0x0000_FFFF) as Short;
-                            expanded.push_back((
-                                Instruction::Ldr(L::Immediate {
-                                    value: right,
-                                    destination,
-                                    location: 0,
-                                    insert: false,
-                                }),
-                                ip,
-                                span.clone(),
-                            ));
-                            if left == 0 {
-                                ip += 1;
-                            } else {
-                                expanded.push_back((
-                                    Instruction::Ldr(L::Immediate {
-                                        value: left,
-                                        destination,
-                                        location: 1,
-                                        insert: true,
+                                        location: 0,
+                                        insert: false,
                                     }),
                                     ip,
-                                    span,
+                                    span.clone(),
                                 ));
-                                ip += 2;
+                                ip += 4;
+                                if left != 0 {
+                                    expanded.push_back((
+                                        Instruction::Ldr(L::Immediate {
+                                            value: left,
+                                            destination,
+                                            location: 1,
+                                            insert: true,
+                                        }),
+                                        ip,
+                                        span,
+                                    ));
+                                    ip += 4;
+                                }
                             }
-                        }
-                        E::ConstantVal { ident, destination } => {
-                            if let Some(value) = constants.get(&ident) {
-                                use crate::parse::ConstantValue as T;
-                                let value = match value.value {
-                                    T::Integer(int) => int,
-                                    T::Float(float) => unsafe { transmute(float) },
-                                };
-
+                            E::Float { value, destination } => {
+                                let value: Word = unsafe { transmute(value) };
                                 let left = ((value & 0xFFFF_0000) >> 16) as Short;
                                 let right = (value & 0x0000_FFFF) as Short;
                                 expanded.push_back((
@@ -240,24 +207,61 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
                                             location: 1,
                                             insert: true,
                                         }),
-                                        ip + 1,
+                                        ip,
                                         span,
                                     ));
                                     ip += 2;
                                 }
                             }
-                        }
-                        label => {
-                            expanded.push_back((Instruction::Load(label), ip, span));
-                            ip += 2;
+                            E::ConstantVal { ident, destination } => {
+                                if let Some(value) = constants.get(&ident) {
+                                    use crate::parse::ConstantValue as T;
+                                    let value = match value.value {
+                                        T::Integer(int) => int,
+                                        T::Float(float) => unsafe { transmute(float) },
+                                    };
+
+                                    let left = ((value & 0xFFFF_0000) >> 16) as Short;
+                                    let right = (value & 0x0000_FFFF) as Short;
+                                    expanded.push_back((
+                                        Instruction::Ldr(L::Immediate {
+                                            value: right,
+                                            destination,
+                                            location: 0,
+                                            insert: false,
+                                        }),
+                                        ip,
+                                        span.clone(),
+                                    ));
+                                    if left == 0 {
+                                        ip += 1;
+                                    } else {
+                                        expanded.push_back((
+                                            Instruction::Ldr(L::Immediate {
+                                                value: left,
+                                                destination,
+                                                location: 1,
+                                                insert: true,
+                                            }),
+                                            ip + 1,
+                                            span,
+                                        ));
+                                        ip += 2;
+                                    }
+                                }
+                            }
+                            label => {
+                                expanded.push_back((Instruction::Load(label), ip, span));
+                                ip += 8;
+                            }
                         }
                     }
+                    x => {
+                        expanded.push_back((x, ip, span));
+                        ip += 4;
+                    }
                 }
-                x => {
-                    expanded.push_back((x, ip, span));
-                    ip += 1;
-                }
-            },
+            }
 
             T::Directive(value, span) => {
                 // TODO: put an assertion to ensure that the address does not go past the memory upper-bound.
@@ -269,10 +273,6 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
                         }
                         if address & 0xFFFF_0000 == ZERO_PAGE {
                             return Err(Error::WritingToZeroPage { span });
-                        }
-
-                        if pages.page_of(address).len >= address & 0x0000_FFFF {
-                            println!("At {span}:\nBy writing to address {address:#x}, you may potentially be overwriting code or data. It is recommended that you move the code or data elsewhere.")
                         }
 
                         ip = address;
@@ -379,89 +379,304 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
     for (instruction, address, span) in expanded {
         use crate::parse::{
             ExpandableLoadOp::Label, Instruction as I, IntBinaryOp as IBO, IntCompOp as ICO,
-            Jump as J,
+            Jump as J, MemoryLoadOp as MLO, MemoryStoreOp as MSO, StackOp as SO,
         };
         use libseis::instruction_set::{
-            control::Jump, integer, ControlOp::*, FloatingPointOp::*, Instruction::*, IntegerOp::*,
+            control::Jump,
+            floating_point, integer, register,
+            ControlOp::*,
+            FloatingPointOp::*,
+            Instruction::{Control, FloatingPoint as FP, Integer, Register},
+            IntegerOp::*,
             RegisterOp::*,
         };
 
+        if pages.page_of(address).len > address & 0x0000_FFFF {
+            println!("At {span}:\nBy writing to address {address:#x}, you may potentially be overwriting code or data. It is recommended that you move the code or data elsewhere.")
+        }
+
         let write = |(b, a)| pages.page_of(a).write(a, b);
 
-        let transform_jump = |j| match j {
-            J::Absolute(reg) => Ok(Jump::Register(reg)),
-            J::Relative(rel) => Ok(Jump::Relative(rel as SWord)),
-            J::Label(label_name) => {
-                if let Some(label) = labels.get(&label_name) {
-                    let laddr = label.address;
-                    let dist = (address - laddr) as SWord;
-                    if dist > -8_388_608 || dist < 8_388_607 {
-                        Ok(Jump::Relative(dist))
-                    } else {
-                        Err(Error::JumpTooLong {
-                            label: label_name,
-                            span: span.clone(),
-                        })
-                    }
-                } else {
-                    Err(Error::NonExistingLabel {
-                        name: label_name,
-                        usage: span.clone(),
-                    })
-                }
-            }
-        };
-
-        let transform_int_bop = |b| match b {
-            IBO::RegReg {
-                source,
-                opt,
-                destination,
-            } => Ok(integer::BinaryOp::Registers(source, opt, destination)),
-            IBO::RegImm {
-                source,
-                opt,
-                destination,
-            } => Ok(integer::BinaryOp::Immediate(source, opt, destination)),
-            IBO::RegConst {
-                source,
-                opt,
-                destination,
-            } => {
-                if let Some(optval) = constants.get(&opt) {
-                    use crate::parse::ConstantValue as T;
-                    let value = match optval.value {
-                        T::Integer(i) => i,
-                        T::Float(_) => {
-                            return Err(Error::IntTypeMismatch {
-                                name: opt,
-                                span: span.clone(),
+        macro_rules! transform {
+            (jump $j:ident) => {
+                match $j {
+                    J::Absolute(reg) => Ok(Jump::Register(reg)),
+                    J::Relative(rel) => Ok(Jump::Relative(rel as SWord)),
+                    J::Label(label_name) => {
+                        if let Some(label) = labels.get(&label_name) {
+                            let laddr = label.address;
+                            let dist = (address - laddr) as SWord;
+                            if dist > -8_388_608 || dist < 8_388_607 {
+                                Ok(Jump::Relative(dist << 2))
+                            } else {
+                                Err(Error::JumpTooLong {
+                                    label: label_name,
+                                    span: span.clone(),
+                                })
+                            }
+                        } else {
+                            Err(Error::NonExistingLabel {
+                                name: label_name,
+                                usage: span.clone(),
                             })
                         }
-                    };
-
-                    if optval.bits > 15 {
-                        Err(Error::ConstTooLong {
-                            name: opt,
-                            span: span.clone(),
-                        })
-                    } else {
-                        Ok(integer::BinaryOp::Immediate(source, value, destination))
                     }
-                } else {
-                    Err(Error::NonExistingConstant {
-                        name: opt,
-                        usage: span.clone(),
-                    })
                 }
-            }
-        };
+            };
+            (ibo $b:ident) => {
+                match $b {
+                    IBO::RegReg {
+                        source,
+                        opt,
+                        destination,
+                    } => Ok(integer::BinaryOp::Registers(source, opt, destination)),
+                    IBO::RegImm {
+                        source,
+                        opt,
+                        destination,
+                    } => Ok(integer::BinaryOp::Immediate(source, opt, destination)),
+                    IBO::RegConst {
+                        source,
+                        opt,
+                        destination,
+                    } => {
+                        if let Some(optval) = constants.get(&opt) {
+                            use crate::parse::ConstantValue as T;
+                            let value = match optval.value {
+                                T::Integer(i) => i,
+                                T::Float(_) => {
+                                    return Err(Error::IntTypeMismatch {
+                                        name: opt,
+                                        span: span.clone(),
+                                    })
+                                }
+                            };
 
-        let transform_int_cop = |c| match c {
-            ICO::RegReg { left, right } => Ok(integer::CompOp::Registers(left, right)),
-            ICO::RegImm { left, right } => Ok(integer::CompOp::Immediate(left, right)),
-            ICO::RegConst { left, right } => todo!(),
-        };
+                            if optval.bits > 15 {
+                                Err(Error::ConstTooLong {
+                                    name: opt,
+                                    span: span.clone(),
+                                })
+                            } else {
+                                Ok(integer::BinaryOp::Immediate(source, value, destination))
+                            }
+                        } else {
+                            Err(Error::NonExistingConstant {
+                                name: opt,
+                                usage: span.clone(),
+                            })
+                        }
+                    }
+                }
+            };
+            (ico $c:ident) => {
+                match $c {
+                    ICO::RegReg { left, right } => Ok(integer::CompOp::Registers(left, right)),
+                    ICO::RegImm { left, right } => Ok(integer::CompOp::Immediate(left, right)),
+                    ICO::RegConst { left, right } => {
+                        if let Some(rvalue) = constants.get(&right) {
+                            use crate::parse::ConstantValue as T;
+                            let value = match rvalue.value {
+                                T::Integer(i) => i,
+                                T::Float(_) => {
+                                    return Err(Error::IntTypeMismatch {
+                                        name: right,
+                                        span: span.clone(),
+                                    })
+                                }
+                            };
+
+                            if rvalue.bits > 15 {
+                                Err(Error::ConstTooLong {
+                                    name: right,
+                                    span: span.clone(),
+                                })
+                            } else {
+                                Ok(integer::CompOp::Immediate(left, value))
+                            }
+                        } else {
+                            Err(Error::NonExistingConstant {
+                                name: right,
+                                usage: span.clone(),
+                            })
+                        }
+                    }
+                }
+            };
+            (fbo $b:ident) => {
+                floating_point::BinaryOp($b.source, $b.opt, $b.destination)
+            };
+            (fuo $u:ident) => {
+                floating_point::UnaryOp($u.source, $u.destination)
+            };
+            (push $p:ident) => {
+                match $p {
+                    SO::Registers(v) => register::PushOp::Registers(v.into_iter().collect()),
+                    SO::ExtendOrShrink(a) => register::PushOp::Extend(a),
+                }
+            };
+            (pop $p:ident) => {
+                match $p {
+                    SO::Registers(v) => register::PopOp::Registers(v.into_iter().collect()),
+                    SO::ExtendOrShrink(a) => register::PopOp::Shrink(a),
+                }
+            };
+            (load $l:ident) => {
+                match $l {
+                    MLO::Zpg {
+                        address,
+                        destination,
+                    } => Ok(register::ReadOp::ZeroPage {
+                        address,
+                        destination,
+                    }),
+                    MLO::ConstZpg {
+                        constant,
+                        destination,
+                    } => {
+                        if let Some(cvalue) = constants.get(&constant) {
+                            use crate::parse::ConstantValue as T;
+                            let value = match cvalue.value {
+                                T::Integer(i) => i,
+                                T::Float(_) => {
+                                    return Err(Error::IntTypeMismatch {
+                                        name: constant,
+                                        span: span.clone(),
+                                    })
+                                }
+                            };
+
+                            if cvalue.bits > 16 {
+                                Err(Error::ConstTooLong {
+                                    name: constant,
+                                    span: span.clone(),
+                                })
+                            } else {
+                                Ok(register::ReadOp::ZeroPage {
+                                    address: value as Short,
+                                    destination,
+                                })
+                            }
+                        } else {
+                            Err(Error::NonExistingConstant {
+                                name: constant,
+                                usage: span.clone(),
+                            })
+                        }
+                    }
+                    MLO::Indirect {
+                        address,
+                        destination,
+                        volatile,
+                    } => Ok(register::ReadOp::Indirect {
+                        volatile,
+                        address,
+                        destination,
+                    }),
+                    MLO::Offset {
+                        address,
+                        offset,
+                        destination,
+                        volatile,
+                    } => Ok(register::ReadOp::OffsetIndirect {
+                        address,
+                        offset,
+                        destination,
+                        volatile,
+                    }),
+                    MLO::Indexed {
+                        address,
+                        index,
+                        destination,
+                        volatile,
+                    } => Ok(register::ReadOp::IndexedIndirect {
+                        address,
+                        index,
+                        destination,
+                        volatile,
+                    }),
+                    MLO::Stack {
+                        offset,
+                        destination,
+                    } => Ok(register::ReadOp::StackOffset {
+                        offset,
+                        destination,
+                    }),
+                }
+            };
+            (stor $s:ident) => {
+                match $s {
+                    MSO::Zpg { address, source } => {
+                        Ok(register::WriteOp::ZeroPage { address, source })
+                    }
+                    MSO::ConstZpg { constant, source } => {
+                        if let Some(cvalue) = constants.get(&constant) {
+                            use crate::parse::ConstantValue as T;
+                            let value = match cvalue.value {
+                                T::Integer(i) => i,
+                                T::Float(_) => {
+                                    return Err(Error::IntTypeMismatch {
+                                        name: constant,
+                                        span: span.clone(),
+                                    })
+                                }
+                            };
+
+                            if cvalue.bits > 16 {
+                                Err(Error::ConstTooLong {
+                                    name: constant,
+                                    span: span.clone(),
+                                })
+                            } else {
+                                Ok(register::WriteOp::ZeroPage {
+                                    address: value as Short,
+                                    source,
+                                })
+                            }
+                        } else {
+                            Err(Error::NonExistingConstant {
+                                name: constant,
+                                usage: span.clone(),
+                            })
+                        }
+                    }
+                    MSO::Indirect {
+                        address,
+                        source,
+                        volatile,
+                    } => Ok(register::WriteOp::Indirect {
+                        volatile,
+                        address,
+                        source,
+                    }),
+                    MSO::Offset {
+                        address,
+                        offset,
+                        source,
+                        volatile,
+                    } => Ok(register::WriteOp::OffsetIndirect {
+                        address,
+                        offset,
+                        source,
+                        volatile,
+                    }),
+                    MSO::Indexed {
+                        address,
+                        index,
+                        source,
+                        volatile,
+                    } => Ok(register::WriteOp::IndexedIndirect {
+                        address,
+                        index,
+                        source,
+                        volatile,
+                    }),
+                    MSO::Stack { offset, source } => {
+                        Ok(register::WriteOp::StackOffset { offset, source })
+                    }
+                }
+            };
+        }
 
         match instruction {
             I::Halt => Control(Halt)
@@ -476,49 +691,49 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
                 .into_iter()
                 .zip(address..)
                 .for_each(write),
-            I::Jmp(j) => Control(Jmp(transform_jump(j)?))
+            I::Jmp(j) => Control(Jmp(transform!(jump j)?))
                 .encode()
                 .to_be_bytes()
                 .into_iter()
                 .zip(address..)
                 .for_each(write),
-            I::Jsr(j) => Control(Jsr(transform_jump(j)?))
+            I::Jsr(j) => Control(Jsr(transform!(jump j)?))
                 .encode()
                 .to_be_bytes()
                 .into_iter()
                 .zip(address..)
                 .for_each(write),
-            I::Jeq(j) => Control(Jeq(transform_jump(j)?))
+            I::Jeq(j) => Control(Jeq(transform!(jump j)?))
                 .encode()
                 .to_be_bytes()
                 .into_iter()
                 .zip(address..)
                 .for_each(write),
-            I::Jne(j) => Control(Jne(transform_jump(j)?))
+            I::Jne(j) => Control(Jne(transform!(jump j)?))
                 .encode()
                 .to_be_bytes()
                 .into_iter()
                 .zip(address..)
                 .for_each(write),
-            I::Jgt(j) => Control(Jgt(transform_jump(j)?))
+            I::Jgt(j) => Control(Jgt(transform!(jump j)?))
                 .encode()
                 .to_be_bytes()
                 .into_iter()
                 .zip(address..)
                 .for_each(write),
-            I::Jlt(j) => Control(Jlt(transform_jump(j)?))
+            I::Jlt(j) => Control(Jlt(transform!(jump j)?))
                 .encode()
                 .to_be_bytes()
                 .into_iter()
                 .zip(address..)
                 .for_each(write),
-            I::Jge(j) => Control(Jge(transform_jump(j)?))
+            I::Jge(j) => Control(Jge(transform!(jump j)?))
                 .encode()
                 .to_be_bytes()
                 .into_iter()
                 .zip(address..)
                 .for_each(write),
-            I::Jle(j) => Control(Jle(transform_jump(j)?))
+            I::Jle(j) => Control(Jle(transform!(jump j)?))
                 .encode()
                 .to_be_bytes()
                 .into_iter()
@@ -531,85 +746,85 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
                 .zip(address..)
                 .for_each(write),
 
-            I::Add(b) => Integer(Add(transform_int_bop(b)?))
+            I::Add(b) => Integer(Add(transform!(ibo b)?))
                 .encode()
                 .to_be_bytes()
                 .into_iter()
                 .zip(address..)
                 .for_each(write),
-            I::Sub(b) => Integer(Sub(transform_int_bop(b)?))
+            I::Sub(b) => Integer(Sub(transform!(ibo b)?))
                 .encode()
                 .to_be_bytes()
                 .into_iter()
                 .zip(address..)
                 .for_each(write),
-            I::Mul(b) => Integer(Mul(transform_int_bop(b)?))
+            I::Mul(b) => Integer(Mul(transform!(ibo b)?))
                 .encode()
                 .to_be_bytes()
                 .into_iter()
                 .zip(address..)
                 .for_each(write),
-            I::Dvu(b) => Integer(Dvu(transform_int_bop(b)?))
+            I::Dvu(b) => Integer(Dvu(transform!(ibo b)?))
                 .encode()
                 .to_be_bytes()
                 .into_iter()
                 .zip(address..)
                 .for_each(write),
-            I::Dvs(b) => Integer(Dvs(transform_int_bop(b)?))
+            I::Dvs(b) => Integer(Dvs(transform!(ibo b)?))
                 .encode()
                 .to_be_bytes()
                 .into_iter()
                 .zip(address..)
                 .for_each(write),
-            I::Mod(b) => Integer(Mod(transform_int_bop(b)?))
+            I::Mod(b) => Integer(Mod(transform!(ibo b)?))
                 .encode()
                 .to_be_bytes()
                 .into_iter()
                 .zip(address..)
                 .for_each(write),
-            I::And(b) => Integer(And(transform_int_bop(b)?))
+            I::And(b) => Integer(And(transform!(ibo b)?))
                 .encode()
                 .to_be_bytes()
                 .into_iter()
                 .zip(address..)
                 .for_each(write),
-            I::Ior(b) => Integer(Ior(transform_int_bop(b)?))
+            I::Ior(b) => Integer(Ior(transform!(ibo b)?))
                 .encode()
                 .to_be_bytes()
                 .into_iter()
                 .zip(address..)
                 .for_each(write),
-            I::Xor(b) => Integer(Xor(transform_int_bop(b)?))
+            I::Xor(b) => Integer(Xor(transform!(ibo b)?))
                 .encode()
                 .to_be_bytes()
                 .into_iter()
                 .zip(address..)
                 .for_each(write),
-            I::Bsl(b) => Integer(Bsl(transform_int_bop(b)?))
+            I::Bsl(b) => Integer(Bsl(transform!(ibo b)?))
                 .encode()
                 .to_be_bytes()
                 .into_iter()
                 .zip(address..)
                 .for_each(write),
-            I::Bsr(b) => Integer(Bsr(transform_int_bop(b)?))
+            I::Bsr(b) => Integer(Bsr(transform!(ibo b)?))
                 .encode()
                 .to_be_bytes()
                 .into_iter()
                 .zip(address..)
                 .for_each(write),
-            I::Asr(b) => Integer(Asr(transform_int_bop(b)?))
+            I::Asr(b) => Integer(Asr(transform!(ibo b)?))
                 .encode()
                 .to_be_bytes()
                 .into_iter()
                 .zip(address..)
                 .for_each(write),
-            I::Rol(b) => Integer(Rol(transform_int_bop(b)?))
+            I::Rol(b) => Integer(Rol(transform!(ibo b)?))
                 .encode()
                 .to_be_bytes()
                 .into_iter()
                 .zip(address..)
                 .for_each(write),
-            I::Ror(b) => Integer(Ror(transform_int_bop(b)?))
+            I::Ror(b) => Integer(Ror(transform!(ibo b)?))
                 .encode()
                 .to_be_bytes()
                 .into_iter()
@@ -627,46 +842,255 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
                 .into_iter()
                 .zip(address..)
                 .for_each(write),
-            I::Cmp(c) => Integer(Cmp(transform_int_cop(c)?))
+            I::Cmp(c) => Integer(Cmp(transform!(ico c)?))
                 .encode()
                 .to_be_bytes()
                 .into_iter()
                 .zip(address..)
                 .for_each(write),
-            I::Tst(c) => Integer(Tst(transform_int_cop(c)?))
+            I::Tst(c) => Integer(Tst(transform!(ico c)?))
                 .encode()
                 .to_be_bytes()
                 .into_iter()
                 .zip(address..)
                 .for_each(write),
 
-            I::Fadd(_) => todo!(),
-            I::Fsub(_) => todo!(),
-            I::Fmul(_) => todo!(),
-            I::Fdiv(_) => todo!(),
-            I::Fmod(_) => todo!(),
-            I::Fcmp(_) => todo!(),
-            I::Fneg(_) => todo!(),
-            I::Frec(_) => todo!(),
-            I::Itof(_) => todo!(),
-            I::Ftoi(_) => todo!(),
-            I::Fchk(_) => todo!(),
+            I::Fadd(b) => FP(Fadd(transform!(fbo b)))
+                .encode()
+                .to_be_bytes()
+                .into_iter()
+                .zip(address..)
+                .for_each(write),
+            I::Fsub(b) => FP(Fsub(transform!(fbo b)))
+                .encode()
+                .to_be_bytes()
+                .into_iter()
+                .zip(address..)
+                .for_each(write),
+            I::Fmul(b) => FP(Fmul(transform!(fbo b)))
+                .encode()
+                .to_be_bytes()
+                .into_iter()
+                .zip(address..)
+                .for_each(write),
+            I::Fdiv(b) => FP(Fdiv(transform!(fbo b)))
+                .encode()
+                .to_be_bytes()
+                .into_iter()
+                .zip(address..)
+                .for_each(write),
+            I::Fmod(b) => FP(Fmod(transform!(fbo b)))
+                .encode()
+                .to_be_bytes()
+                .into_iter()
+                .zip(address..)
+                .for_each(write),
+            I::Fcmp(c) => FP(Fcmp(floating_point::CompOp(c.left, c.right)))
+                .encode()
+                .to_be_bytes()
+                .into_iter()
+                .zip(address..)
+                .for_each(write),
+            I::Fneg(u) => FP(Fneg(transform!(fuo u)))
+                .encode()
+                .to_be_bytes()
+                .into_iter()
+                .zip(address..)
+                .for_each(write),
+            I::Frec(u) => FP(Frec(transform!(fuo u)))
+                .encode()
+                .to_be_bytes()
+                .into_iter()
+                .zip(address..)
+                .for_each(write),
+            I::Itof(u) => FP(Itof(transform!(fuo u)))
+                .encode()
+                .to_be_bytes()
+                .into_iter()
+                .zip(address..)
+                .for_each(write),
+            I::Ftoi(u) => FP(Ftoi(transform!(fuo u)))
+                .encode()
+                .to_be_bytes()
+                .into_iter()
+                .zip(address..)
+                .for_each(write),
+            I::Fchk(target) => FP(Fchk(floating_point::CheckOp(target)))
+                .encode()
+                .to_be_bytes()
+                .into_iter()
+                .zip(address..)
+                .for_each(write),
 
-            I::Push(_) => todo!(),
-            I::Pop(_) => todo!(),
-            I::Lbr(_) => todo!(),
-            I::Sbr(_) => todo!(),
-            I::Lsr(_) => todo!(),
-            I::Ssr(_) => todo!(),
-            I::Llr(_) => todo!(),
-            I::Slr(_) => todo!(),
-            I::Tfr(_, _) => todo!(),
-            I::Ldr(_) => todo!(),
+            I::Push(p) => Register(Push(transform!(push p)))
+                .encode()
+                .to_be_bytes()
+                .into_iter()
+                .zip(address..)
+                .for_each(write),
+            I::Pop(p) => Register(Pop(transform!(pop p)))
+                .encode()
+                .to_be_bytes()
+                .into_iter()
+                .zip(address..)
+                .for_each(write),
+            I::Lbr(l) => Register(Lbr(transform!(load l)?))
+                .encode()
+                .to_be_bytes()
+                .into_iter()
+                .zip(address..)
+                .for_each(write),
+            I::Sbr(s) => Register(Sbr(transform!(stor s)?))
+                .encode()
+                .to_be_bytes()
+                .into_iter()
+                .zip(address..)
+                .for_each(write),
+            I::Lsr(l) => Register(Lsr(transform!(load l)?))
+                .encode()
+                .to_be_bytes()
+                .into_iter()
+                .zip(address..)
+                .for_each(write),
+            I::Ssr(s) => Register(Ssr(transform!(stor s)?))
+                .encode()
+                .to_be_bytes()
+                .into_iter()
+                .zip(address..)
+                .for_each(write),
+            I::Llr(l) => Register(Llr(transform!(load l)?))
+                .encode()
+                .to_be_bytes()
+                .into_iter()
+                .zip(address..)
+                .for_each(write),
+            I::Slr(s) => Register(Slr(transform!(stor s)?))
+                .encode()
+                .to_be_bytes()
+                .into_iter()
+                .zip(address..)
+                .for_each(write),
+            I::Tfr(source, destination) => Register(Tfr(register::RegOp {
+                source,
+                destination,
+            }))
+            .encode()
+            .to_be_bytes()
+            .into_iter()
+            .zip(address..)
+            .for_each(write),
+            I::Ldr(l) => {
+                use crate::parse::ImmediateLoadOp as L;
+                use libseis::instruction_set::register::ImmOp::*;
+                match l {
+                    L::ZpgAddr {
+                        address,
+                        destination,
+                    } => Register(Ldr(ZeroPageTranslate {
+                        address,
+                        destination,
+                    })),
+                    L::ConstZpgAddr {
+                        constant,
+                        destination,
+                    } => {
+                        if let Some(cval) = constants.get(&constant) {
+                            use crate::parse::ConstantValue as T;
+                            let value = match cval.value {
+                                T::Integer(i) => i,
+                                T::Float(_) => {
+                                    return Err(Error::IntTypeMismatch {
+                                        name: constant,
+                                        span: span.clone(),
+                                    })
+                                }
+                            };
 
-            I::Load(Label { ident, destination }) => todo!(),
+                            if cval.bits > 16 {
+                                return Err(Error::ConstTooLong {
+                                    name: constant,
+                                    span: span.clone(),
+                                });
+                            } else {
+                                Register(Ldr(ZeroPageTranslate {
+                                    address: value as Short,
+                                    destination,
+                                }))
+                            }
+                        } else {
+                            return Err(Error::NonExistingConstant {
+                                name: constant,
+                                usage: span.clone(),
+                            });
+                        }
+                    }
+                    L::Immediate {
+                        value,
+                        destination,
+                        location,
+                        insert,
+                    } => Register(Ldr(Immediate {
+                        zero: !insert,
+                        shift: location,
+                        immediate: value,
+                        destination,
+                    })),
+                }
+                .encode()
+                .to_be_bytes()
+                .into_iter()
+                .zip(address..)
+                .for_each(write)
+            }
+
+            I::Load(Label { ident, destination }) => {
+                if let Some(label) = labels.get(&ident) {
+                    use register::ImmOp::Immediate;
+                    let left = (label.address & 0xFFFF_0000) >> 16;
+                    let right = label.address & 0x0000_FFFF;
+
+                    Register(Ldr(Immediate {
+                        zero: true,
+                        shift: 0,
+                        immediate: right as Short,
+                        destination,
+                    }))
+                    .encode()
+                    .to_be_bytes()
+                    .into_iter()
+                    .chain(
+                        Register(Ldr(Immediate {
+                            zero: false,
+                            shift: 1,
+                            immediate: left as Short,
+                            destination,
+                        }))
+                        .encode()
+                        .to_be_bytes()
+                        .into_iter(),
+                    )
+                    .zip(address..)
+                    .for_each(write)
+                } else {
+                    return Err(Error::NonExistingLabel {
+                        name: ident,
+                        usage: span,
+                    });
+                }
+            }
 
             _ => unreachable!("Non-label LOAD instructions have already been evaluated."),
         }
+    }
+
+    for (data, address, span) in data {
+        if pages.page_of(address).len > address & 0x0000_FFFF {
+            println!("At {span}:\nBy writing to address {address:#x}, you may potentially be overwriting code or data. It is recommended that you move the code or data elsewhere.")
+        }
+
+        data.into_iter()
+            .zip(address..)
+            .for_each(|(b, a)| pages.page_of(a).write(a, b));
     }
 
     Ok(pages)

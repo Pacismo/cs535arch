@@ -1,8 +1,6 @@
-#[zeropage]
-.long = 250:long
+.long = 250
 // comment
 .float = 1.0
-.string = "a string"
 .char = 'c'
 .unsp = 250
 

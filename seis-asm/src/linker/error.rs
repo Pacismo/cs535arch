@@ -39,6 +39,9 @@ pub enum Error {
         name: String,
         span: Span,
     },
+    MisalignedCode {
+        span: Span,
+    },
 }
 
 impl std::error::Error for Error {}
@@ -80,7 +83,8 @@ impl Display for Error {
             }
             JumpTooLong { label, span } => write!(f, "Label {label} is too far away from the instruction at {span} to jump to\nLoad the label to a register and do an absolute jump"),
             IntTypeMismatch { name, span } => write!(f, "Tried to load {name} as an integer at {span}"),
-            ConstTooLong { name, span } => write!(f, "The constant {name} at {span} is too long to be put in the immediate field")
+            ConstTooLong { name, span } => write!(f, "The constant {name} at {span} is too long to be put in the immediate field"),
+            MisalignedCode { span } => write!(f, "The code at {span} is not aligned to a word boundary."),
         }
     }
 }
