@@ -36,6 +36,17 @@ impl RegisterFlags {
     }
 }
 
+impl FromIterator<Register> for RegisterFlags {
+    fn from_iter<T: IntoIterator<Item = Register>>(iter: T) -> Self {
+        let mut flags = 0;
+        for reg in iter {
+            assert!(reg <= LP);
+            flags |= 1 << reg as Word;
+        }
+        Self(flags)
+    }
+}
+
 impl Decode for RegisterFlags {
     fn decode(word: Word) -> DecodeResult<Self> {
         let register_flags = word & Self::REG_MASK;
@@ -251,7 +262,198 @@ impl Display for RegOp {
 /// Represents addressing modes.
 /// Includes translation for the zero-page.
 #[derive(Debug, Clone, Copy)]
-pub enum MemOp {
+pub enum WriteOp {
+    /// Address with the zero-page ID in the upper bytes
+    ZeroPage { address: Short, source: Register },
+    /// Data from an address
+    Indirect {
+        volatile: bool,
+        address: Register,
+        source: Register,
+    },
+    /// Data from an address at an offset (times the width of the read)
+    OffsetIndirect {
+        volatile: bool,
+        address: Register,
+        offset: Short,
+        source: Register,
+    },
+    /// Data from an address at an index (times the width of the read)
+    IndexedIndirect {
+        volatile: bool,
+        address: Register,
+        index: Register,
+        source: Register,
+    },
+    /// Data from the stack, offset (multiplied by the width of the read) from the stack pointer
+    StackOffset { offset: Short, source: Register },
+}
+
+impl WriteOp {
+    const DST_REG_MASK: Word = 0b0000_0000_0000_0000_0000_0000_0000_1111;
+
+    const ZPG_ADDR_MASK: Word = 0b0000_0000_0000_1111_1111_1111_1111_0000;
+    const ZPG_ADDR_SHIFT: Word = 4;
+
+    const ADDR_MODE_MASK: Word = 0b0000_0000_1110_0000_0000_0000_0000_0000;
+    const ADDR_MODE_SHIFT: Word = 21;
+
+    const ADDRESS_REG_MASK: Word = 0b0000_0000_0000_0000_0000_0000_1111_0000;
+    const ADDRESS_REG_SHIFT: Word = 4;
+    const INDEX_REG_MASK: Word = 0b0000_0000_0000_0000_0000_1111_0000_0000;
+    const INDEX_REG_SHIFT: Word = 12;
+    const OFFSET_MASK: Word = 0b0000_0000_0000_1111_1111_1111_0000_0000;
+    const OFFSET_SHIFT: Word = 8;
+
+    const VOLATILE_BIT: Word = 0b100;
+    const INDIRECT_MODE: Word = 0b000;
+    const OFFSET_MODE: Word = 0b001;
+    const INDEXED_MODE: Word = 0b010;
+    const STACK_OFFSET_MODE: Word = 0b011;
+
+    const ZERO_PAGE_MODE: Word = 0b111;
+}
+
+impl Decode for WriteOp {
+    fn decode(word: Word) -> DecodeResult<Self> {
+        use WriteOp::*;
+        let addr_mode = (word & Self::ADDR_MODE_MASK) >> Self::ADDR_MODE_SHIFT;
+        let source = (word & Self::DST_REG_MASK) as Register;
+
+        match addr_mode {
+            Self::INDIRECT_MODE => Ok(Indirect {
+                volatile: (word & Self::VOLATILE_BIT) != 0,
+                address: ((word & Self::ADDRESS_REG_MASK) >> Self::ADDRESS_REG_SHIFT) as Register,
+                source,
+            }),
+            Self::OFFSET_MODE => Ok(OffsetIndirect {
+                volatile: (word & Self::VOLATILE_BIT) != 0,
+                address: ((word & Self::ADDRESS_REG_MASK) >> Self::ADDRESS_REG_SHIFT) as Register,
+                offset: ((word & Self::OFFSET_MASK) >> Self::OFFSET_SHIFT) as Short,
+                source,
+            }),
+            Self::INDEXED_MODE => Ok(IndexedIndirect {
+                volatile: (word & Self::VOLATILE_BIT) != 0,
+                address: ((word & Self::ADDRESS_REG_MASK) >> Self::ADDRESS_REG_SHIFT) as Register,
+                index: ((word & Self::INDEX_REG_MASK) >> Self::INDEX_REG_SHIFT) as Register,
+                source,
+            }),
+            Self::STACK_OFFSET_MODE => Ok(StackOffset {
+                offset: ((word & Self::OFFSET_MASK) >> Self::OFFSET_SHIFT) as Short,
+                source,
+            }),
+            Self::ZERO_PAGE_MODE => Ok(ZeroPage {
+                address: ((word & Self::ZPG_ADDR_MASK) >> Self::ZPG_ADDR_SHIFT) as Short,
+                source,
+            }),
+            _ => Err(DecodeError::InvalidAddressingMode(addr_mode)),
+        }
+    }
+}
+
+impl Encode for WriteOp {
+    fn encode(self) -> Word {
+        use WriteOp::*;
+
+        match self {
+            ZeroPage {
+                address,
+                source: destination,
+            } => {
+                (Self::ZERO_PAGE_MODE << Self::ADDR_MODE_SHIFT)
+                    | ((address as Word) << Self::ZPG_ADDR_SHIFT)
+                    | (destination as Word)
+            }
+            Indirect {
+                volatile,
+                address,
+                source: destination,
+            } => {
+                (Self::INDIRECT_MODE << Self::ADDR_MODE_SHIFT)
+                    | if volatile { Self::VOLATILE_BIT } else { 0 }
+                    | ((address as Word) << Self::ADDRESS_REG_SHIFT)
+                    | (destination as Word)
+            }
+            OffsetIndirect {
+                volatile,
+                address,
+                offset,
+                source: destination,
+            } => {
+                (Self::OFFSET_MODE << Self::ADDR_MODE_SHIFT)
+                    | if volatile { Self::VOLATILE_BIT } else { 0 }
+                    | ((address as Word) << Self::ADDRESS_REG_SHIFT)
+                    | ((offset as Word) << Self::OFFSET_SHIFT)
+                    | (destination as Word)
+            }
+            IndexedIndirect {
+                volatile,
+                address,
+                index,
+                source: destination,
+            } => {
+                (Self::INDEXED_MODE << Self::ADDR_MODE_SHIFT)
+                    | if volatile { Self::VOLATILE_BIT } else { 0 }
+                    | ((address as Word) << Self::ADDRESS_REG_SHIFT)
+                    | ((index as Word) << Self::INDEX_REG_SHIFT)
+                    | (destination as Word)
+            }
+            StackOffset {
+                offset,
+                source: destination,
+            } => {
+                (Self::STACK_OFFSET_MODE << Self::ADDR_MODE_SHIFT)
+                    | ((offset as Word) << Self::OFFSET_SHIFT)
+                    | (destination as Word)
+            }
+        }
+    }
+}
+
+impl Display for WriteOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use WriteOp::*;
+
+        match self {
+            ZeroPage { address, source } => write!(f, "V{source:X} => @{address:#x}"),
+            Indirect {
+                volatile,
+                address,
+                source,
+            } => write!(
+                f,
+                "V{source:X} {assign} V{address:X}",
+                assign = if *volatile { "=>>" } else { "=>" }
+            ),
+            OffsetIndirect {
+                volatile,
+                address,
+                offset,
+                source,
+            } => write!(
+                f,
+                "V{source:X} {assign} V{address:X} + {offset}",
+                assign = if *volatile { "=>>" } else { "=>" }
+            ),
+            IndexedIndirect {
+                volatile,
+                address,
+                index,
+                source,
+            } => write!(
+                f,
+                "V{source:X} {assign} V{address:X}[V{index:X}]",
+                assign = if *volatile { "=>>" } else { "=>" }
+            ),
+            StackOffset { offset, source } => write!(f, "V{source:X} => %{offset}"),
+        }
+    }
+}
+
+/// Represents addressing modes.
+/// Includes translation for the zero-page.
+#[derive(Debug, Clone, Copy)]
+pub enum ReadOp {
     /// Address with the zero-page ID in the upper bytes
     ZeroPage {
         address: Short,
@@ -284,7 +486,7 @@ pub enum MemOp {
     },
 }
 
-impl MemOp {
+impl ReadOp {
     const DST_REG_MASK: Word = 0b0000_0000_0000_0000_0000_0000_0000_1111;
 
     const ZPG_ADDR_MASK: Word = 0b0000_0000_0000_1111_1111_1111_1111_0000;
@@ -309,9 +511,9 @@ impl MemOp {
     const ZERO_PAGE_MODE: Word = 0b111;
 }
 
-impl Decode for MemOp {
+impl Decode for ReadOp {
     fn decode(word: Word) -> DecodeResult<Self> {
-        use MemOp::*;
+        use ReadOp::*;
         let addr_mode = (word & Self::ADDR_MODE_MASK) >> Self::ADDR_MODE_SHIFT;
         let destination = (word & Self::DST_REG_MASK) as Register;
 
@@ -346,9 +548,9 @@ impl Decode for MemOp {
     }
 }
 
-impl Encode for MemOp {
+impl Encode for ReadOp {
     fn encode(self) -> Word {
-        use MemOp::*;
+        use ReadOp::*;
 
         match self {
             ZeroPage {
@@ -405,9 +607,9 @@ impl Encode for MemOp {
     }
 }
 
-impl Display for MemOp {
+impl Display for ReadOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use MemOp::*;
+        use ReadOp::*;
 
         match self {
             ZeroPage {
@@ -578,12 +780,12 @@ impl Display for PopOp {
 
 #[derive(Debug, Clone, Copy)]
 pub enum RegisterOp {
-    Lbr(MemOp),
-    Lsr(MemOp),
-    Llr(MemOp),
-    Sbr(MemOp),
-    Ssr(MemOp),
-    Slr(MemOp),
+    Lbr(ReadOp),
+    Lsr(ReadOp),
+    Llr(ReadOp),
+    Sbr(WriteOp),
+    Ssr(WriteOp),
+    Slr(WriteOp),
     Tfr(RegOp),
     Push(PushOp),
     Pop(PopOp),
