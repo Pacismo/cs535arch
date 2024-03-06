@@ -119,9 +119,8 @@ oct       = ${ "0" ~ ASCII_OCT_DIGIT+ }
 integer   = @{ sign? ~ uinteger }
 uinteger  = _{ hex | oct | dec }
 character = @{
-    (!"\\" ~ ANY)
-  | ("\\" ~ ("\"" | "\\" | "'" | "/" | "b" | "f" | "n" | "r" | "t"))
-  | ("\\" ~ ("u" ~ ASCII_HEX_DIGIT{4}))
+    (!("\\" | "\"") ~ ANY)
+  | ("\\" ~ ("\"" | "\\" | "'" | "/" | "n" | "r" | "t"))
 }
 
 float  = ${ sign? ~ ASCII_DIGIT* ~ "." ~ ASCII_DIGIT* ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)? }
