@@ -6,7 +6,7 @@ mod register;
 pub use data::Data;
 pub use float::*;
 pub use integer::*;
-use libseis::types::{Register, Word};
+use libseis::types::{Register, SWord, Word};
 pub use register::*;
 use std::{
     collections::LinkedList,
@@ -95,7 +95,7 @@ pub enum Directive {
 
 #[derive(Debug)]
 pub enum Jump {
-    Relative(Word),
+    Relative(SWord),
     Absolute(Register),
     Label(String),
 }

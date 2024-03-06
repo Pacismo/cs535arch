@@ -5,7 +5,10 @@ mod lines;
 use asm_parser::AsmParser;
 use asm_parser::Rule;
 pub use error::{Error, ErrorSource};
-use libseis::registers;
+use libseis::{
+    registers,
+    types::{SWord, Word},
+};
 pub use lines::*;
 use pest::{
     error::{Error as PestError, ErrorVariant},
@@ -202,10 +205,24 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
             use Instruction::{Jeq, Jge, Jgt, Jle, Jlt, Jmp, Jne, Jsr};
 
             let inner = instruction.into_inner().next().unwrap();
+            let ispan = inner.as_span();
             let mode = match inner.as_rule() {
                 Rule::ident => Jump::Label(inner.as_str().to_owned()),
                 Rule::relative => {
-                    Jump::Relative(parse_integer!(inner.into_inner().next().unwrap()))
+                    let value: SWord = parse_integer!(inner.into_inner().next().unwrap());
+                    if value > -8388608 || value < 8388607 {
+                        Jump::Relative(value << 2)
+                    } else {
+                        return Err(PestError::new_from_span(
+                            ErrorVariant::CustomError {
+                                message: format!(
+                                    "Value {value} is too long to fit in a 24-bit immediate field"
+                                ),
+                            },
+                            ispan,
+                        )
+                        .into());
+                    }
                 }
                 Rule::absolute => Jump::Absolute(registers::get_id(inner.as_str()).unwrap()),
                 _ => unreachable!(),
