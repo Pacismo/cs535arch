@@ -27,6 +27,18 @@ pub enum Error {
     WritingToStack {
         span: Span,
     },
+    JumpTooLong {
+        label: String,
+        span: Span,
+    },
+    IntTypeMismatch {
+        name: String,
+        span: Span,
+    },
+    ConstTooLong {
+        name: String,
+        span: Span,
+    },
 }
 
 impl std::error::Error for Error {}
@@ -61,11 +73,14 @@ impl Display for Error {
                 "Constant {name} has not been defined, but is used at {usage}"
             ),
             WritingToZeroPage { span } => {
-                write!(f, "Attempting to write code or data to the zero page at {span}\nPlease write to a different page.")
+                write!(f, "Attempting to write code or data to the zero page at {span}\nPlease write to a different page")
             }
             WritingToStack { span } => {
-                write!(f, "Attempting to write code or data to the stack page at {span}\nPlease write to a different page.")
+                write!(f, "Attempting to write code or data to the stack page at {span}\nPlease write to a different page")
             }
+            JumpTooLong { label, span } => write!(f, "Label {label} is too far away from the instruction at {span} to jump to\nLoad the label to a register and do an absolute jump"),
+            IntTypeMismatch { name, span } => write!(f, "Tried to load {name} as an integer at {span}"),
+            ConstTooLong { name, span } => write!(f, "The constant {name} at {span} is too long to be put in the immediate field")
         }
     }
 }

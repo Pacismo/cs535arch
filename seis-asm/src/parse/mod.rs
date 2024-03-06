@@ -5,10 +5,7 @@ mod lines;
 use asm_parser::AsmParser;
 use asm_parser::Rule;
 pub use error::{Error, ErrorSource};
-use libseis::{
-    registers,
-    types::{SWord, Word},
-};
+use libseis::{registers, types::SWord};
 pub use lines::*;
 use pest::{
     error::{Error as PestError, ErrorVariant},
@@ -273,11 +270,28 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
                     opt: registers::get_id(opt.as_str()).unwrap(),
                     destination,
                 },
-                Rule::integer => RegImm {
-                    source,
-                    opt: parse_integer!(opt.into_inner().next().unwrap()),
-                    destination,
-                },
+                Rule::integer => {
+                    let optspan = opt.as_span();
+                    let value = parse_integer!(opt.into_inner().next().unwrap());
+
+                    if value > 32767 {
+                        return Err(PestError::new_from_span(
+                            ErrorVariant::CustomError {
+                                message: format!(
+                                    "Value {value} is too long to fit in a 15-bit immediate field"
+                                ),
+                            },
+                            optspan,
+                        )
+                        .into());
+                    }
+
+                    RegImm {
+                        source,
+                        opt: value,
+                        destination,
+                    }
+                }
                 Rule::ident => RegConst {
                     source,
                     opt: opt.as_str().to_owned(),
@@ -488,6 +502,7 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
                 _ => unreachable!(),
             })
         }
+        // TODO: assert that offsets fit in 12 bits
         x @ (Rule::lbr | Rule::lsr | Rule::llr) => {
             use lines::MemoryLoadOp::*;
             use Instruction::{Lbr, Llr, Lsr};
