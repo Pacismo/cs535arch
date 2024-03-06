@@ -78,18 +78,18 @@ impl Display for Jump {
 /// Absolute addresses ignore the least significant 2 bits
 #[derive(Debug, Clone, Copy)]
 pub enum ControlOp {
-    /// Stops the processor
-    ///
-    /// ```seis
-    /// HALT ; Stop the processor
-    /// ```
-    Halt,
     /// Does nothing
     ///
     /// ```seis
     /// NOP ; No operation
     /// ```
     Nop,
+    /// Stops the processor
+    ///
+    /// ```seis
+    /// HALT ; Stop the processor
+    /// ```
+    Halt,
     /// Sets the PC to the link register
     ///
     /// ```seis
@@ -174,14 +174,14 @@ impl ControlOp {
     /// Amount to shift the control-op bits
     const SHIFT: Word = 25;
 
-    /// HALT bits
-    ///
-    /// [`ControlOp::Halt`]
-    const HALT: Word = 0b0000;
     /// NOP bits
     ///
     /// [`ControlOp::Nop`]
-    const NOP: Word = 0b0001;
+    const NOP: Word = 0b0000;
+    /// HALT bits
+    ///
+    /// [`ControlOp::Halt`]
+    const HALT: Word = 0b0001;
     /// JMP bits
     ///
     /// [`ControlOp::Jmp`]
