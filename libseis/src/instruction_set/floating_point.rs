@@ -8,7 +8,7 @@ use crate::{
 use super::{Decode, Encode};
 
 #[derive(Debug, Clone, Copy)]
-pub struct BinaryOp(Register, Register, Register);
+pub struct BinaryOp(pub Register, pub Register, pub Register);
 
 impl BinaryOp {
     /// Masks for the source, option, and destination registers
@@ -46,7 +46,7 @@ impl Display for BinaryOp {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct UnaryOp(Register, Register);
+pub struct UnaryOp(pub Register, pub Register);
 
 impl UnaryOp {
     const REG_MASK: [Word; 2] = [
@@ -78,7 +78,7 @@ impl Display for UnaryOp {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct CompOp(Register, Register);
+pub struct CompOp(pub Register, pub Register);
 
 impl CompOp {
     const REG_MASK: [Word; 2] = [
