@@ -1,3 +1,5 @@
+use std::mem::{size_of, take};
+
 use super::*;
 
 #[derive(Debug)]
@@ -28,26 +30,28 @@ pub struct MappedLru {
 }
 
 impl Cache for MappedLru {
-    fn get_byte(&self, address: Word) -> Option<Byte> {
+    fn get_byte(&self, address: Word) -> ReadResult<Byte> {
         let (tag, set, off) = self.split_address(address);
 
         let set = &self.lines[set];
         if set.valid && set.tag == tag {
-            Some(set.data[off])
+            Ok(set.data[off])
+        } else if set.valid {
+            Err(Status::Conflict)
         } else {
-            None
+            Err(Status::Cold)
         }
     }
 
-    fn get_short(&self, address: Word) -> Option<Short> {
-        Some(Short::from_be_bytes([
+    fn get_short(&self, address: Word) -> ReadResult<Short> {
+        Ok(Short::from_be_bytes([
             self.get_byte(address)?,
             self.get_byte(address + 1)?,
         ]))
     }
 
-    fn get_word(&self, address: Word) -> Option<Word> {
-        Some(Word::from_be_bytes([
+    fn get_word(&self, address: Word) -> ReadResult<Word> {
+        Ok(Word::from_be_bytes([
             self.get_byte(address)?,
             self.get_byte(address + 1)?,
             self.get_byte(address + 2)?,
@@ -109,26 +113,41 @@ impl Cache for MappedLru {
         2usize.pow(self.off_bits as u32)
     }
 
-    fn write_line(&mut self, address: Word, memory: &Memory) -> Option<(Word, Box<[u8]>)> {
+    fn write_line(&mut self, address: Word, memory: &mut Memory) -> bool {
         let (tag, set, _) = self.split_address(address);
 
         let line = &mut self.lines[set];
 
-        let old_line_data = if line.dirty {
-            let old_line = std::mem::take(line);
-            Some(old_line)
-        } else {
-            None
-        };
+        let old_line = if line.dirty { Some(take(line)) } else { None };
 
         *line = Line {
             valid: true,
             dirty: false,
             tag,
-            data: memory.read_bytes(address, 2usize.pow(self.off_bits as u32)),
+            data: unsafe {
+                // The data comes in as words. I have to transform it into a pointer to an array of bytes of equivalent length
+                let boxed = memory.read_words(address, 2usize.pow(self.off_bits as u32));
+                let len = boxed.len() * size_of::<Word>();
+                let ptr = Box::into_raw(boxed) as *mut u8;
+                let sptr = std::slice::from_raw_parts_mut(ptr, len) as *mut [u8];
+
+                Box::from_raw(sptr)
+            },
         };
 
-        old_line_data.map(|old| (self.construct_address(old.tag, set as Word, 0), old.data))
+        if let Some(old_line) = old_line {
+            old_line
+                .data
+                .chunks_exact(4)
+                .zip((self.construct_address(old_line.tag, set as Word, 0)..).step_by(4))
+                .for_each(|(b, a)| {
+                    // The cache stores values as bytes -- reconstruct words using chunks
+                    memory.write_word(a, Word::from_be_bytes([b[0], b[1], b[2], b[3]]))
+                });
+            true
+        } else {
+            false
+        }
     }
 }
 
@@ -136,6 +155,7 @@ impl MappedLru {
     pub fn new(off_bits: usize, set_bits: usize) -> Self {
         assert!(off_bits > 4, "off_bits must be greater than 4");
         assert!(set_bits > 0, "set_bits must be greater than 0");
+
         let tag_bits = 32 - (off_bits + set_bits);
 
         let mut lines = vec![];
