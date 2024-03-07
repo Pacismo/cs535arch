@@ -7,3 +7,9 @@ edition = "2021"
 
 [dependencies.libseis]
 path = "../libseis"
+
+[dev-dependencies.rand]
+version = "0.8.5"
+
+[dev-dependencies.rand_chacha]
+version = "0.3.1"
