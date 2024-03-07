@@ -1,4 +1,7 @@
-use libmem::cache::{Cache, NullCache, Status};
+use libmem::{
+    cache::{Cache, NullCache, Status},
+    memory::Memory,
+};
 use rand::{
     distributions::{uniform::SampleUniform, DistIter, Distribution, Uniform},
     SeedableRng,
@@ -64,4 +67,33 @@ fn write_short_miss() {
     for address in rng_iter(0, 0x0000_0000, 0xFFFF_FFFE).take(32) {
         assert!(!cache.write_short(address, gen()));
     }
+}
+
+#[test]
+fn write_word_miss() {
+    let mut cache = NullCache;
+    let mut gen = rng_closure(32, 0, 4294967295);
+
+    for address in rng_iter(0, 0x0000_0000, 0xFFFF_FFFC).take(32) {
+        assert!(!cache.write_word(address, gen()));
+    }
+}
+
+#[test]
+fn read_line() {
+    let mut cache = NullCache;
+    let mut memory = Memory::new(4);
+    let mut gen = rng_closure(32, 0, 4096);
+
+    let val = gen();
+    memory.write_word(0x0000_0000, val);
+
+    assert!(!cache.write_line(0x0000_0000, &mut memory));
+
+    assert!(matches!(cache.get_word(0x0000_0000), Err(Status::Disabled)))
+}
+
+#[test]
+fn line_len() {
+    assert!(NullCache.line_len() == 0)
 }

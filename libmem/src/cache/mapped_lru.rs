@@ -21,6 +21,9 @@ impl Default for Line {
     }
 }
 
+/// Represents an n-way set-associative cache.
+///
+/// The number of sets and words that can be stored in the cache are determined at runtime.
 #[derive(Debug)]
 pub struct MappedLru {
     tag_bits: usize,
@@ -152,9 +155,23 @@ impl Cache for MappedLru {
 }
 
 impl MappedLru {
+    /// Creates a new [`MappedLru`] with an offset bitfield width and a set bitfield width set at runtime.
+    ///
+    /// `off_bits` must be between 2 and 32, inclusive.
+    ///
+    /// `set_bits` must be between 0 and 30, inclusive.
+    ///
+    /// `off_bits + set_bits` must be at most 32.
+    ///
+    /// The remaining bits are used for the tag field.
     pub fn new(off_bits: usize, set_bits: usize) -> Self {
-        assert!(off_bits > 4, "off_bits must be greater than 4");
-        assert!(set_bits > 0, "set_bits must be greater than 0");
+        assert!(off_bits >= 2, "off_bits must be at least 2");
+        assert!(off_bits <= 32, "off_bits must be at most 32");
+        assert!(set_bits <= 30, "set_bits can be at most 30");
+        assert!(
+            off_bits + set_bits <= 32,
+            "off_bits + set_bits cannot exceed 32"
+        );
 
         let tag_bits = 32 - (off_bits + set_bits);
 
@@ -171,6 +188,18 @@ impl MappedLru {
             set_bits,
             off_bits,
         }
+    }
+
+    pub fn tag_bits(&self) -> usize {
+        self.tag_bits
+    }
+
+    pub fn set_bits(&self) -> usize {
+        self.set_bits
+    }
+
+    pub fn off_bits(&self) -> usize {
+        self.off_bits
     }
 
     fn split_address(&self, address: Word) -> (Word, usize, usize) {
