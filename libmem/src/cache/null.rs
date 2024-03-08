@@ -4,15 +4,15 @@ use super::*;
 pub struct NullCache;
 
 impl Cache for NullCache {
-    fn get_byte(&self, _: Word) -> ReadResult<Byte> {
+    fn get_byte(&mut self, _: Word) -> ReadResult<Byte> {
         Err(Status::Disabled)
     }
 
-    fn get_short(&self, _: Word) -> ReadResult<Short> {
+    fn get_short(&mut self, _: Word) -> ReadResult<Short> {
         Err(Status::Disabled)
     }
 
-    fn get_word(&self, _: Word) -> ReadResult<Word> {
+    fn get_word(&mut self, _: Word) -> ReadResult<Word> {
         Err(Status::Disabled)
     }
 

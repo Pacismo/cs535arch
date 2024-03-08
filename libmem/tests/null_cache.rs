@@ -24,7 +24,7 @@ fn rng_iter<T: SampleUniform>(seed: u64, low: T, high: T) -> DistIter<Uniform<T>
 
 #[test]
 fn get_byte_miss() {
-    let cache = NullCache;
+    let mut cache = NullCache;
 
     for address in rng_iter(0, 0x0000_0000, 0xFFFF_FFFF).take(32) {
         assert!(matches!(cache.get_byte(address), Err(Status::Disabled)))
@@ -33,7 +33,7 @@ fn get_byte_miss() {
 
 #[test]
 fn get_short_miss() {
-    let cache = NullCache;
+    let mut cache = NullCache;
 
     for address in rng_iter(0, 0x0000_0000, 0xFFFF_FFFE).take(32) {
         assert!(matches!(cache.get_short(address), Err(Status::Disabled)))
@@ -42,7 +42,7 @@ fn get_short_miss() {
 
 #[test]
 fn get_word_miss() {
-    let cache = NullCache;
+    let mut cache = NullCache;
 
     for address in rng_iter(0, 0x0000_0000, 0xFFFF_FFFC).take(32) {
         assert!(matches!(cache.get_word(address), Err(Status::Disabled)))

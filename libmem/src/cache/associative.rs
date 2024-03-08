@@ -1,59 +1,48 @@
+use super::{Cache, ReadResult, Status};
+use crate::memory::Memory;
+use libseis::types::{Byte, Short, Word};
 use std::mem::{size_of, take};
-
-use super::*;
 
 #[derive(Debug)]
 pub struct Line {
-    valid: bool,
     dirty: bool,
     tag: Word,
     data: Box<[u8]>,
 }
 
-impl Default for Line {
-    fn default() -> Self {
-        Self {
-            valid: false,
-            dirty: false,
-            tag: 0,
-            data: vec![].into_boxed_slice(),
-        }
-    }
-}
-
-/// Represents an n-way set-associative cache.
+/// Represents a one-way set-associative cache.
 ///
 /// The number of sets and words that can be stored in the cache are determined at runtime.
 #[derive(Debug)]
-pub struct MappedLru {
-    tag_bits: usize,
+pub struct Associative {
     set_bits: usize,
     off_bits: usize,
-    lines: Box<[Line]>,
+    lines: Box<[Option<Box<Line>>]>,
 }
 
-impl Cache for MappedLru {
-    fn get_byte(&self, address: Word) -> ReadResult<Byte> {
+impl Cache for Associative {
+    fn get_byte(&mut self, address: Word) -> ReadResult<Byte> {
         let (tag, set, off) = self.split_address(address);
 
-        let set = &self.lines[set];
-        if set.valid && set.tag == tag {
-            Ok(set.data[off])
-        } else if set.valid {
-            Err(Status::Conflict)
+        if let Some(set) = &self.lines[set] {
+            if set.tag == tag {
+                Ok(set.data[off])
+            } else {
+                Err(Status::Conflict)
+            }
         } else {
             Err(Status::Cold)
         }
     }
 
-    fn get_short(&self, address: Word) -> ReadResult<Short> {
+    fn get_short(&mut self, address: Word) -> ReadResult<Short> {
         Ok(Short::from_be_bytes([
             self.get_byte(address)?,
             self.get_byte(address + 1)?,
         ]))
     }
 
-    fn get_word(&self, address: Word) -> ReadResult<Word> {
+    fn get_word(&mut self, address: Word) -> ReadResult<Word> {
         Ok(Word::from_be_bytes([
             self.get_byte(address)?,
             self.get_byte(address + 1)?,
@@ -65,11 +54,14 @@ impl Cache for MappedLru {
     fn write_byte(&mut self, address: Word, data: Byte) -> bool {
         let (tag, set, off) = self.split_address(address);
 
-        let set = &mut self.lines[set];
-        if set.valid && set.tag == tag {
-            set.data[off] = data;
-            set.dirty = true;
-            true
+        if let Some(set) = &mut self.lines[set] {
+            if set.tag == tag {
+                set.data[off] = data;
+                set.dirty = true;
+                true
+            } else {
+                false
+            }
         } else {
             false
         }
@@ -108,8 +100,11 @@ impl Cache for MappedLru {
     fn has_address(&self, address: Word) -> bool {
         let (tag, set, _) = self.split_address(address);
 
-        let set = &self.lines[set];
-        set.valid && set.tag == tag
+        if let Some(set) = &self.lines[set] {
+            set.tag == tag
+        } else {
+            false
+        }
     }
 
     fn line_len(&self) -> usize {
@@ -119,12 +114,25 @@ impl Cache for MappedLru {
     fn write_line(&mut self, address: Word, memory: &mut Memory) -> bool {
         let (tag, set, _) = self.split_address(address);
 
-        let line = &mut self.lines[set];
+        // Flush a previously-existing line if it is dirty. Otherwise, purge its contents.
+        let replaced = if let Some(line) = take(&mut self.lines[set]) {
+            if line.dirty {
+                line.data
+                    .chunks_exact(4)
+                    .zip((self.construct_address(line.tag, set as Word, 0)..).step_by(4))
+                    .for_each(|(b, a)| {
+                        // The cache stores values as bytes -- reconstruct words using chunks
+                        memory.write_word(a, Word::from_be_bytes([b[0], b[1], b[2], b[3]]))
+                    });
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        };
 
-        let old_line = if line.dirty { Some(take(line)) } else { None };
-
-        *line = Line {
-            valid: true,
+        self.lines[set] = Some(Box::new(Line {
             dirty: false,
             tag,
             data: unsafe {
@@ -136,25 +144,13 @@ impl Cache for MappedLru {
 
                 Box::from_raw(sptr)
             },
-        };
+        }));
 
-        if let Some(old_line) = old_line {
-            old_line
-                .data
-                .chunks_exact(4)
-                .zip((self.construct_address(old_line.tag, set as Word, 0)..).step_by(4))
-                .for_each(|(b, a)| {
-                    // The cache stores values as bytes -- reconstruct words using chunks
-                    memory.write_word(a, Word::from_be_bytes([b[0], b[1], b[2], b[3]]))
-                });
-            true
-        } else {
-            false
-        }
+        replaced
     }
 }
 
-impl MappedLru {
+impl Associative {
     /// Creates a new [`MappedLru`] with an offset bitfield width and a set bitfield width set at runtime.
     ///
     /// `off_bits` must be between 2 and 32, inclusive.
@@ -173,40 +169,38 @@ impl MappedLru {
             "off_bits + set_bits cannot exceed 32"
         );
 
-        let tag_bits = 32 - (off_bits + set_bits);
-
         let mut lines = vec![];
 
-        lines.resize_with(2usize.pow(set_bits as u32), || Line {
-            data: vec![0; 2usize.pow(off_bits as u32)].into_boxed_slice(),
-            ..Default::default()
-        });
+        lines.resize_with(2usize.pow(set_bits as u32), || None);
 
         Self {
             lines: lines.into_boxed_slice(),
-            tag_bits,
             set_bits,
             off_bits,
         }
     }
 
+    /// Returns the number of bits used for the tag.
     pub fn tag_bits(&self) -> usize {
-        self.tag_bits
+        32 - (self.off_bits + self.set_bits)
     }
 
+    /// Returns the number of bits used for the set.
     pub fn set_bits(&self) -> usize {
         self.set_bits
     }
 
+    /// Returns the number of bits used for the offset.
     pub fn off_bits(&self) -> usize {
         self.off_bits
     }
 
+    /// Splits an address into its constituent *tag*, *set*, and *offset* indices.
     fn split_address(&self, address: Word) -> (Word, usize, usize) {
         let set_shift = self.off_bits;
         let set_mask = (1 << self.set_bits) - 1;
         let tag_shift = self.off_bits + self.set_bits;
-        let tag_mask = (1 << self.tag_bits) - 1;
+        let tag_mask = (1 << self.tag_bits()) - 1;
         let off_mask = (1 << self.off_bits) - 1;
 
         let tag = (address >> tag_shift) & tag_mask;
@@ -216,11 +210,12 @@ impl MappedLru {
         (tag, set as usize, off as usize)
     }
 
+    /// Constructs an address from its constituent *tag*, *set*, and *offset* indices.
     fn construct_address(&self, tag: Word, set: Word, off: Word) -> Word {
         let set_shift = self.off_bits;
         let set_mask = (1 << self.set_bits) - 1;
         let tag_shift = self.off_bits + self.set_bits;
-        let tag_mask = (1 << self.tag_bits) - 1;
+        let tag_mask = (1 << self.tag_bits()) - 1;
         let off_mask = (1 << self.off_bits) - 1;
 
         ((tag & tag_mask) << tag_shift) | ((set & set_mask) << set_shift) | (off & off_mask)

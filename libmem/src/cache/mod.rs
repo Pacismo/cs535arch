@@ -1,9 +1,9 @@
-mod mapped_lru;
+mod associative;
 mod null;
 use std::fmt::Debug;
 
+pub use associative::Associative;
 use libseis::types::{Byte, Short, Word};
-pub use mapped_lru::MappedLru;
 pub use null::NullCache;
 
 use crate::memory::Memory;
@@ -18,15 +18,15 @@ pub trait Cache: Debug {
     /// Gets the byte at the specified address.
     ///
     /// Returns a value only on cache hit.
-    fn get_byte(&self, address: Word) -> ReadResult<Byte>;
+    fn get_byte(&mut self, address: Word) -> ReadResult<Byte>;
     /// Gets the short at the specified address.
     ///
     /// Returns a value only on cache hit.
-    fn get_short(&self, address: Word) -> ReadResult<Short>;
+    fn get_short(&mut self, address: Word) -> ReadResult<Short>;
     /// Gets the word at the specified address.
     ///
     /// Returns a value only on cache hit.
-    fn get_word(&self, address: Word) -> ReadResult<Word>;
+    fn get_word(&mut self, address: Word) -> ReadResult<Word>;
 
     /// Sets the byte at the specified address.
     ///
