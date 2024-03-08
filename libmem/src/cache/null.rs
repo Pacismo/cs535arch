@@ -40,3 +40,10 @@ impl Cache for NullCache {
         false
     }
 }
+
+impl NullCache {
+    #[inline]
+    pub fn new() -> Self {
+        Self
+    }
+}

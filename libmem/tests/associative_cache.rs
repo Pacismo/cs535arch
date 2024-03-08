@@ -1,4 +1,4 @@
-use libmem::cache::Associative;
+use libmem::cache::{Associative, Cache, Status};
 use rand::{
     distributions::{uniform::SampleUniform, DistIter, Distribution, Uniform},
     SeedableRng,
@@ -79,15 +79,27 @@ fn bits() {
 
 #[test]
 fn read_byte_cold() {
-    todo!()
+    let mut cache = Associative::new(4, 4);
+
+    for a in rng_iter(0, 0x0000_0000, 0x0000_1234).take(32) {
+        assert!(matches!(cache.get_byte(a), Err(Status::Cold)));
+    }
 }
 
 #[test]
 fn read_short_cold() {
-    todo!()
+    let mut cache = Associative::new(4, 4);
+
+    for a in rng_iter(0, 0x0000_0000, 0x0000_1234).take(32) {
+        assert!(matches!(cache.get_short(a), Err(Status::Cold)));
+    }
 }
 
 #[test]
 fn read_word_cold() {
-    todo!()
+    let mut cache = Associative::new(4, 4);
+
+    for a in rng_iter(0, 0x0000_0000, 0x0000_1234).take(32) {
+        assert!(matches!(cache.get_word(a), Err(Status::Cold)));
+    }
 }
