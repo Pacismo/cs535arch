@@ -21,7 +21,7 @@ pub struct Associative {
 }
 
 impl Cache for Associative {
-    fn get_byte(&mut self, address: Word) -> ReadResult<Byte> {
+    fn read_byte(&self, address: Word) -> ReadResult<Byte> {
         let (tag, set, off) = self.split_address(address);
 
         if let Some(set) = &self.lines[set] {
@@ -35,20 +35,32 @@ impl Cache for Associative {
         }
     }
 
-    fn get_short(&mut self, address: Word) -> ReadResult<Short> {
+    fn read_short(&self, address: Word) -> ReadResult<Short> {
         Ok(Short::from_be_bytes([
-            self.get_byte(address)?,
-            self.get_byte(address + 1)?,
+            self.read_byte(address)?,
+            self.read_byte(address + 1)?,
         ]))
     }
 
-    fn get_word(&mut self, address: Word) -> ReadResult<Word> {
+    fn read_word(&self, address: Word) -> ReadResult<Word> {
         Ok(Word::from_be_bytes([
-            self.get_byte(address)?,
-            self.get_byte(address + 1)?,
-            self.get_byte(address + 2)?,
-            self.get_byte(address + 3)?,
+            self.read_byte(address)?,
+            self.read_byte(address + 1)?,
+            self.read_byte(address + 2)?,
+            self.read_byte(address + 3)?,
         ]))
+    }
+
+    fn get_byte(&mut self, address: Word) -> ReadResult<Byte> {
+        self.read_byte(address)
+    }
+
+    fn get_short(&mut self, address: Word) -> ReadResult<Short> {
+        self.read_short(address)
+    }
+
+    fn get_word(&mut self, address: Word) -> ReadResult<Word> {
+        self.read_word(address)
     }
 
     fn write_byte(&mut self, address: Word, data: Byte) -> bool {
@@ -219,5 +231,12 @@ impl Associative {
         let off_mask = (1 << self.off_bits) - 1;
 
         ((tag & tag_mask) << tag_shift) | ((set & set_mask) << set_shift) | (off & off_mask)
+    }
+
+    /// Boxes the self to produce a dyn [`Cache`]
+    #[inline(always)]
+    #[track_caller]
+    pub fn boxed(self) -> Box<dyn Cache> {
+        Box::new(self)
     }
 }

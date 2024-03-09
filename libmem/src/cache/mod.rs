@@ -1,12 +1,11 @@
 mod associative;
 mod null;
-use std::fmt::Debug;
 
+use crate::memory::Memory;
 pub use associative::Associative;
 use libseis::types::{Byte, Short, Word};
 pub use null::NullCache;
-
-use crate::memory::Memory;
+use std::fmt::Debug;
 
 /// Interface for a cache.
 ///
@@ -15,15 +14,28 @@ use crate::memory::Memory;
 /// This interface also requires the struct implement [`Debug`]
 /// to allow debug information to be printed to the screen.
 pub trait Cache: Debug {
-    /// Gets the byte at the specified address.
+    /// Gets the byte at the address without modifying the contents of the cache.
+    ///
+    /// See also: [`Cache::get_byte`]
+    fn read_byte(&self, address: Word) -> ReadResult<Byte>;
+    /// Gets the short at the address without modifying the contents of the cache.
+    ///
+    /// See also: [`Cache::get_short`]
+    fn read_short(&self, address: Word) -> ReadResult<Short>;
+    /// Gets the word at the address without modifying the contents of the cache.
+    ///
+    /// See also: [`Cache::get_word`]
+    fn read_word(&self, address: Word) -> ReadResult<Word>;
+
+    /// Gets the byte at the specified address. This may potentially modify the contents of the cache.
     ///
     /// Returns a value only on cache hit.
     fn get_byte(&mut self, address: Word) -> ReadResult<Byte>;
-    /// Gets the short at the specified address.
+    /// Gets the short at the specified address. This may potentially modify the contents of the cache.
     ///
     /// Returns a value only on cache hit.
     fn get_short(&mut self, address: Word) -> ReadResult<Short>;
-    /// Gets the word at the specified address.
+    /// Gets the word at the specified address. This may potentially modify the contents of the cache.
     ///
     /// Returns a value only on cache hit.
     fn get_word(&mut self, address: Word) -> ReadResult<Word>;

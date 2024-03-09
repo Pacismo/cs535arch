@@ -36,7 +36,7 @@ impl Memory {
         assert!(count > 0, "Count must be greater than 0");
 
         Self {
-            pages: (0..count).map(|_| None).collect(),
+            pages: vec![None; count].into_boxed_slice(),
         }
     }
 
