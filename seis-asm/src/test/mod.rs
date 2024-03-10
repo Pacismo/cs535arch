@@ -1,7 +1,11 @@
-use crate::parse::{tokenize, ImmediateLoadOp, Instruction as InstructionToken, LineType};
+use crate::{
+    linker::link_symbols,
+    parse::{tokenize, ImmediateLoadOp, Instruction as InstructionToken, IntBinaryOp, LineType},
+};
 use libseis::{
     instruction_set::{
         control::ControlOp::Halt,
+        encode,
         integer::{
             BinaryOp::*,
             IntegerOp::{Add, Mul},
@@ -10,8 +14,14 @@ use libseis::{
         Instruction::{self, *},
     },
     registers::V,
+    types::Word,
 };
-use std::{error::Error, fs::File, io::Write, path::Path};
+use std::{
+    error::Error,
+    fs::File,
+    io::{Read, Write},
+    path::Path,
+};
 
 #[test]
 fn basic_asm() -> Result<(), Box<dyn Error>> {
@@ -24,6 +34,8 @@ main:
     add v0, v1, v2
     halt
 "#;
+
+    /// Represented visually to help match against above code.
     const EXPECTED_CODE: [Instruction; 6] = [
         Register(Ldr(Immediate {
             zero: true,
@@ -59,32 +71,107 @@ main:
         _ => panic!("First token must be a label"),
     }
     let token = token_iter.next().expect("Could not get second token");
-    assert!(matches!(
-        token,
-        LineType::Instruction(
-            InstructionToken::Ldr(ImmediateLoadOp::Immediate {
-                value: 1,
-                destination: 0,
-                location: 0,
-                insert: false,
-            }),
-            _,
+    assert!(
+        matches!(
+            token,
+            LineType::Instruction(
+                InstructionToken::Ldr(ImmediateLoadOp::Immediate {
+                    value: 1,
+                    destination: 0,
+                    location: 0,
+                    insert: false,
+                }),
+                _,
+            ),
         ),
-    ));
+        "{token:#?}"
+    );
     let token = token_iter.next().expect("Could not get third token");
-    assert!(matches!(
-        token,
-        LineType::Instruction(
-            InstructionToken::Ldr(ImmediateLoadOp::Immediate {
-                value: 2,
-                destination: 1,
-                location: 0,
-                insert: false
-            }),
-            _
-        )
-    ));
-    // TODO: check the rest of the tokens
+    assert!(
+        matches!(
+            token,
+            LineType::Instruction(
+                InstructionToken::Ldr(ImmediateLoadOp::Immediate {
+                    value: 2,
+                    destination: 1,
+                    location: 0,
+                    insert: false
+                }),
+                _
+            )
+        ),
+        "{token:#?}"
+    );
+    let token = token_iter.next().expect("Could not get fourth token");
+    assert!(
+        matches!(
+            token,
+            LineType::Instruction(
+                InstructionToken::Ldr(ImmediateLoadOp::Immediate {
+                    value: 3,
+                    destination: 1,
+                    location: 1,
+                    insert: true
+                }),
+                _
+            )
+        ),
+        "{token:#?}"
+    );
+    let token = token_iter.next().expect("Could not get fifth token");
+    assert!(
+        matches!(
+            token,
+            LineType::Instruction(
+                InstructionToken::Mul(IntBinaryOp::RegImm {
+                    source: 1,
+                    opt: 2,
+                    destination: 3
+                }),
+                _
+            )
+        ),
+        "{token:#?}"
+    );
+    let token = token_iter.next().expect("Could not get sixth token");
+    assert!(
+        matches!(
+            token,
+            LineType::Instruction(
+                InstructionToken::Add(IntBinaryOp::RegReg {
+                    source: 0,
+                    opt: 1,
+                    destination: 2
+                }),
+                _
+            )
+        ),
+        "{token:#?}"
+    );
+    let token = token_iter.next().expect("Could not get seventh token");
+    assert!(
+        matches!(token, LineType::Instruction(InstructionToken::Halt, _)),
+        "{token:#?}"
+    );
+    assert!(token_iter.next().is_none(), "There should be seven tokens");
+    drop(token_iter);
+
+    let result = link_symbols(tokens).expect("Should've linked properly");
+
+    result.write(File::create(file)?)?;
+    let mut reader = File::open(file)?;
+    let mut bytes = vec![];
+    reader.read_to_end(&mut bytes)?;
+
+    for (word, expected) in bytes.chunks_exact(4).zip(EXPECTED_CODE.map(encode)) {
+        let word = Word::from_be_bytes([word[0], word[1], word[2], word[3]]);
+
+        // Encoded expected should match fetched word.
+        assert_eq!(word, expected);
+    }
+
+    // Delete the file -- it is useless.
+    std::fs::remove_file(file).expect(&format!("Could not delete file {}", file.display()));
 
     Ok(())
 }

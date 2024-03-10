@@ -142,8 +142,6 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
     for line in non_const {
         use crate::parse::LineType as T;
 
-        println!("{line:#?}");
-
         match line {
             T::Instruction(value, span) => {
                 if ip % 4 != 0 {

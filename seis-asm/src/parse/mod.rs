@@ -270,9 +270,9 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
                     opt: registers::get_id(opt.as_str()).unwrap(),
                     destination,
                 },
-                Rule::integer => {
+                Rule::dec | Rule::oct | Rule::hex => {
                     let optspan = opt.as_span();
-                    let value = parse_integer!(opt.into_inner().next().unwrap());
+                    let value = parse_integer!(opt);
 
                     if value > 32767 {
                         return Err(PestError::new_from_span(
@@ -297,7 +297,7 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
                     opt: opt.as_str().to_owned(),
                     destination,
                 },
-                _ => unreachable!(),
+                _ => unreachable!("{opt:?}"),
             };
 
             Ok(match x {
