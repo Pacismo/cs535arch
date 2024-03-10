@@ -3,6 +3,7 @@ mod single_level;
 use libseis::types::{Byte, Short, Word};
 pub use single_level::SingleLevel;
 
+#[derive(Debug, Clone, Copy)]
 pub enum Status {
     /// The module is idle, awaiting a new command.
     Idle,
