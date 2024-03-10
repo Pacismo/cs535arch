@@ -4,7 +4,9 @@ mod interactive;
 use clap::Parser;
 use cli::Args;
 use inquire::Text;
+use interactive::{Command, Type};
 use libmem::{cache::*, memory::Memory};
+use libseis::types::{Byte, Short};
 use std::{error::Error, slice::from_ref};
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -30,21 +32,23 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut memory = Memory::new(args.pages);
 
     loop {
-        let input = Text::new("MEM >")
-            .with_autocomplete(interactive::CommandCompleter::default())
-            .prompt()
-            .expect("Could not read input");
-
-        match interactive::Command::try_parse_from(input.split_whitespace()) {
-            Ok(cmd) => match cmd {
-                interactive::Command::Exit => break,
-                interactive::Command::Read { address } => println!("address: {address}"),
-                interactive::Command::Write { address, ty, value } => {
-                    println!("{address} = {value}:{ty:?}")
+        if let Some(input) = Text::new("MEM >")
+            .with_autocomplete(Command::autocompleter())
+            .prompt_skippable()
+            .expect("Could not read input")
+        {
+            match Command::try_parse_from(input.split_whitespace()) {
+                Ok(Command::Exit) => break,
+                Ok(Command::Read { sign, ty, address }) => {
+                    println!("{address:#010X} ({sign} {ty})")
                 }
-            },
-            Err(e) if input.contains("help") => println!("{e}"),
-            Err(e) => println!("Type \"help\" for help"),
+                Ok(Command::Write { ty, address, value }) => match ty {
+                    Type::Word => println!("{address:#010X} = {value}"),
+                    Type::Short => println!("{address:#010X} = {}", value as Short),
+                    Type::Byte => println!("{address:#010X} = {}", value as Byte),
+                },
+                Err(e) => println!("{e}"),
+            }
         }
     }
 
