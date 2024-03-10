@@ -51,6 +51,10 @@ impl Cache for NullCache {
         0
     }
 
+    fn within_line(&self, _: Word, _: usize) -> bool {
+        false
+    }
+
     fn write_line(&mut self, _: Word, _: &mut Memory) -> bool {
         false
     }

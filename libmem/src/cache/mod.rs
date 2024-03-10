@@ -58,6 +58,9 @@ pub trait Cache: Debug {
     /// Returns the length of a line, in bits.
     fn line_len(&self) -> usize;
 
+    /// Returns whether the address' value is contained in the same line up to the length
+    fn within_line(&self, address: Word, length: usize) -> bool;
+
     /// Fetches the data to be stored in the cache from main memory.
     ///
     /// Writes any evicted lines back and returns true if an eviction occurred.

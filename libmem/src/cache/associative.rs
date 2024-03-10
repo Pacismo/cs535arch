@@ -203,6 +203,17 @@ impl Cache for Associative {
         2usize.pow(self.off_bits as u32)
     }
 
+    fn within_line(&self, address: Word, length: usize) -> bool {
+        let (_, _, off) = self.split_address(address);
+
+        // Asserts that adding `length` to the offset will not overflow to the next set.
+        if (off + length) & !(2usize.pow(length as u32)) != 0 {
+            false
+        } else {
+            true
+        }
+    }
+
     fn write_line(&mut self, address: Word, memory: &mut Memory) -> bool {
         let (tag, set, _) = self.split_address(address);
 
