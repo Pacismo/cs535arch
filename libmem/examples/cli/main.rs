@@ -34,7 +34,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         SingleLevel::new_with_boxed(cache, memory, args.miss_penalty, args.writethrough);
 
     loop {
-        if let Some(input) = Text::new("MEM >")
+        if let Some(input) = Text::new("")
+            .with_placeholder("enter command")
             .with_autocomplete(Command::autocompleter())
             .with_help_message("Provide a command using the list above for guidance")
             .prompt_skippable()
