@@ -1,34 +1,37 @@
 mod autocomplete;
 
+use self::autocomplete::{ArgumentField, StringCompleter};
 use autocomplete::Node;
 use clap::{Parser, ValueEnum};
 use inquire::Autocomplete;
 use libseis::types::{SWord, Word};
 use std::fmt::Display;
 
-use self::autocomplete::{ArgumentField, StringCompleter};
-
 #[derive(Debug, Clone)]
 pub struct CommandCompleter {
     root: Vec<Box<dyn Node>>,
 }
 
-fn recurse_suggestions(path: &[&str], node: &[Box<dyn Node>], next_level: bool) -> Vec<String> {
+fn recurse_suggestions<'a>(
+    path: &[&str],
+    node: &'a [Box<dyn Node>],
+    next_level: bool,
+) -> Vec<&'a dyn Node> {
     if node.len() == 0 {
         vec![]
     } else if path.is_empty() {
-        node.iter().map(ToString::to_string).collect()
+        node.iter().map(AsRef::as_ref).collect()
     } else if path.len() == 1 {
         if next_level {
             node.iter()
                 .find_map(|r| {
                     r.exact(path[0])
-                        .then(|| r.subtree().iter().map(ToString::to_string).collect())
+                        .then(|| r.subtree().iter().map(AsRef::as_ref).collect())
                 })
                 .unwrap_or_default()
         } else {
             node.iter()
-                .filter_map(|r| r.matches(path[0]).then(|| r.to_string()))
+                .filter_map(|r| r.matches(path[0]).then(|| r.as_ref()))
                 .collect()
         }
     } else {
@@ -65,11 +68,24 @@ impl Autocomplete for CommandCompleter {
         if separated.len() == 0 {
             Ok(self.root.iter().map(|r| format!("{r}")).collect())
         } else {
-            Ok(recurse_suggestions(
-                &separated,
-                &self.root,
-                input.ends_with(' '),
-            ))
+            let next_level = input.ends_with(' ');
+            let all_but_last = separated
+                .iter()
+                .take(separated.len() - (!next_level) as usize)
+                .map(|s| s.to_string())
+                .reduce(|l, r| format!("{l} {r}"))
+                .unwrap_or_default();
+
+            Ok(recurse_suggestions(&separated, &self.root, next_level)
+                .into_iter()
+                .map(|s| {
+                    if !all_but_last.is_empty() {
+                        s.complete(input)
+                    } else {
+                        s.to_string()
+                    }
+                })
+                .collect())
         }
     }
 

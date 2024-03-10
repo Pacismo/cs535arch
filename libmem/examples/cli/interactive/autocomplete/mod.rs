@@ -35,7 +35,12 @@ impl Node for String {
             let last = parts.len() - 1;
             parts[last] = self.as_str();
 
-            parts.into_iter().collect()
+            let first = parts[0].to_owned();
+
+            parts
+                .into_iter()
+                .skip(1)
+                .fold(first, |l, r| format!("{l} {r}"))
         }
     }
 
@@ -62,10 +67,19 @@ impl Node for &'static str {
         if parts.len() == 0 {
             self.to_string()
         } else {
-            let last = parts.len() - 1;
-            parts[last] = self;
+            if !input.ends_with(' ') {
+                let last = parts.len() - 1;
+                parts[last] = self;
+            } else {
+                parts.push(&self);
+            }
 
-            parts.into_iter().collect()
+            let first = parts[0].to_owned();
+
+            parts
+                .into_iter()
+                .skip(1)
+                .fold(first, |l, r| format!("{l} {r}"))
         }
     }
 
@@ -98,10 +112,19 @@ impl Node for StringCompleter {
         if parts.len() == 0 {
             self.string.clone()
         } else {
-            let last = parts.len() - 1;
-            parts[last] = self.string.as_str();
+            if !input.ends_with(' ') {
+                let last = parts.len() - 1;
+                parts[last] = self.string.as_str();
+            } else {
+                parts.push(&self.string.as_str());
+            }
 
-            parts.into_iter().collect()
+            let first = parts[0].to_owned();
+
+            parts
+                .into_iter()
+                .skip(1)
+                .fold(first, |l, r| format!("{l} {r}"))
         }
     }
 
