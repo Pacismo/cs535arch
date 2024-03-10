@@ -24,7 +24,7 @@ fn rng_iter<T: SampleUniform>(seed: u64, low: T, high: T) -> DistIter<Uniform<T>
 ///
 /// Also measures time (which led me to do an on-write allocate policy)
 #[test]
-#[ignore = "Tests arithmetic and allocation performance"]
+#[ignore = "tests arithmetic and allocation performance"]
 fn bits() {
     let mut failures = 0;
     println!("|   Run   | Tag | Set | Offset |      Time      | Result |");
@@ -111,7 +111,7 @@ fn write_byte_cold() {
     let mut rng = rng_closure(1, 0, 0xFF);
 
     for a in rng_iter(0, 0x0000_0000, 0x0000_1234).take(32) {
-        assert!(!cache.write_byte(a, rng()))
+        assert!(cache.write_byte(a, rng()).is_miss())
     }
 }
 
@@ -121,7 +121,7 @@ fn write_short_cold() {
     let mut rng = rng_closure(1, 0, 0xFFFF);
 
     for a in rng_iter(0, 0x0000_0000, 0x0000_1234).take(32) {
-        assert!(!cache.write_short(a, rng()))
+        assert!(cache.write_short(a, rng()).is_miss())
     }
 }
 
@@ -131,6 +131,6 @@ fn write_word_cold() {
     let mut rng = rng_closure(1, 0, 0xFFFF_FFFF);
 
     for a in rng_iter(0, 0x0000_0000, 0x0000_1234).take(32) {
-        assert!(!cache.write_word(a, rng()))
+        assert!(cache.write_word(a, rng()).is_miss())
     }
 }

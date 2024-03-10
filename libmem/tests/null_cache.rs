@@ -55,7 +55,7 @@ fn write_byte_miss() {
     let mut gen = rng_closure(32, 0, 255);
 
     for address in rng_iter(0, 0x0000_0000, 0xFFFF_FFFF).take(32) {
-        assert!(!cache.write_byte(address, gen()))
+        assert!(cache.write_byte(address, gen()).is_miss());
     }
 }
 
@@ -65,7 +65,7 @@ fn write_short_miss() {
     let mut gen = rng_closure(32, 0, 65535);
 
     for address in rng_iter(0, 0x0000_0000, 0xFFFF_FFFE).take(32) {
-        assert!(!cache.write_short(address, gen()));
+        assert!(cache.write_short(address, gen()).is_miss());
     }
 }
 
@@ -75,7 +75,7 @@ fn write_word_miss() {
     let mut gen = rng_closure(32, 0, 4294967295);
 
     for address in rng_iter(0, 0x0000_0000, 0xFFFF_FFFC).take(32) {
-        assert!(!cache.write_word(address, gen()));
+        assert!(cache.write_word(address, gen()).is_miss());
     }
 }
 
