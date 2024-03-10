@@ -7,62 +7,50 @@ use super::*;
 pub struct NullCache;
 
 impl Cache for NullCache {
-    #[inline(always)]
-    fn read_byte(&self, address: Word) -> ReadResult<Byte> {
+    fn read_byte(&self, _: Word) -> ReadResult<Byte> {
         Err(Status::Disabled)
     }
 
-    #[inline(always)]
-    fn read_short(&self, address: Word) -> ReadResult<Short> {
+    fn read_short(&self, _: Word) -> ReadResult<Short> {
         Err(Status::Disabled)
     }
 
-    #[inline(always)]
-    fn read_word(&self, address: Word) -> ReadResult<Word> {
+    fn read_word(&self, _: Word) -> ReadResult<Word> {
         Err(Status::Disabled)
     }
 
-    #[inline(always)]
     fn get_byte(&mut self, _: Word) -> ReadResult<Byte> {
         Err(Status::Disabled)
     }
 
-    #[inline(always)]
     fn get_short(&mut self, _: Word) -> ReadResult<Short> {
         Err(Status::Disabled)
     }
 
-    #[inline(always)]
     fn get_word(&mut self, _: Word) -> ReadResult<Word> {
         Err(Status::Disabled)
     }
 
-    #[inline(always)]
-    fn write_byte(&mut self, _: Word, _: Byte) -> bool {
-        false
+    fn write_byte(&mut self, _: Word, _: Byte) -> Status {
+        Status::Disabled
     }
 
-    #[inline(always)]
-    fn write_short(&mut self, _: Word, _: Short) -> bool {
-        false
+    fn write_short(&mut self, _: Word, _: Short) -> Status {
+        Status::Disabled
     }
 
-    #[inline(always)]
-    fn write_word(&mut self, _: Word, _: Word) -> bool {
-        false
+    fn write_word(&mut self, _: Word, _: Word) -> Status {
+        Status::Disabled
     }
 
-    #[inline(always)]
     fn has_address(&self, _: Word) -> bool {
         false
     }
 
-    #[inline(always)]
     fn line_len(&self) -> usize {
         0
     }
 
-    #[inline(always)]
     fn write_line(&mut self, _: Word, _: &mut Memory) -> bool {
         false
     }

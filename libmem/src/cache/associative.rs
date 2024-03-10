@@ -63,49 +63,129 @@ impl Cache for Associative {
         self.read_word(address)
     }
 
-    fn write_byte(&mut self, address: Word, data: Byte) -> bool {
+    fn write_byte(&mut self, address: Word, data: Byte) -> Status {
         let (tag, set, off) = self.split_address(address);
 
         if let Some(set) = &mut self.lines[set] {
             if set.tag == tag {
                 set.data[off] = data;
                 set.dirty = true;
-                true
+                Status::Hit
             } else {
-                false
+                Status::Conflict
             }
         } else {
-            false
+            Status::Cold
         }
     }
 
-    fn write_short(&mut self, address: Word, data: Short) -> bool {
-        if self.has_address(address) && self.has_address(address + 1) {
-            data.to_be_bytes()
-                .into_iter()
-                .zip(address..)
-                .for_each(|(data, address)| {
-                    self.write_byte(address, data);
-                });
+    fn write_short(&mut self, address: Word, data: Short) -> Status {
+        let (tag, set, off) = self.split_address(address);
+        let off_mask = (1 << self.off_bits) - 1;
 
-            true
+        if off != off_mask {
+            if let Some(set) = &mut self.lines[set] {
+                if set.tag == tag {
+                    let bytes = data.to_be_bytes();
+                    set.data[off] = bytes[0];
+                    set.data[off + 1] = bytes[1];
+
+                    Status::Hit
+                } else {
+                    Status::Conflict
+                }
+            } else {
+                Status::Cold
+            }
         } else {
-            false
+            let (otag, oset) = if set + 1 < self.lines.len() {
+                (tag, set + 1)
+            } else {
+                (tag + 1, 0)
+            };
+
+            let mut first = take(&mut self.lines[set]);
+            let mut second = take(&mut self.lines[oset]);
+
+            let status = if let Some((first, second)) = first.as_mut().zip(second.as_mut()) {
+                if first.tag == tag && second.tag == otag {
+                    let bytes = data.to_be_bytes();
+                    first.data[off_mask as usize] = bytes[0];
+                    second.data[off_mask as usize] = bytes[1];
+
+                    first.dirty = true;
+                    second.dirty = true;
+
+                    Status::Hit
+                } else {
+                    Status::Conflict
+                }
+            } else {
+                Status::Cold
+            };
+
+            self.lines[set] = first;
+            self.lines[oset] = second;
+            status
         }
     }
 
-    fn write_word(&mut self, address: Word, data: Word) -> bool {
-        if (address..address + 4).all(|v| self.has_address(v)) {
-            data.to_be_bytes()
-                .into_iter()
-                .zip(address..)
-                .for_each(|(data, address)| {
-                    self.write_byte(address, data);
-                });
+    fn write_word(&mut self, address: Word, data: Word) -> Status {
+        let (tag, set, off) = self.split_address(address);
+        let off_mask = (1 << self.off_bits) - 1;
 
-            true
+        if off < off_mask - 3 {
+            if let Some(set) = &mut self.lines[set] {
+                if set.tag == tag {
+                    let bytes = data.to_be_bytes();
+                    set.data[off] = bytes[0];
+                    set.data[off + 1] = bytes[1];
+                    set.data[off + 2] = bytes[2];
+                    set.data[off + 3] = bytes[3];
+
+                    Status::Hit
+                } else {
+                    Status::Conflict
+                }
+            } else {
+                Status::Cold
+            }
         } else {
-            false
+            let (otag, oset) = if set + 1 < self.lines.len() {
+                (tag, set + 1)
+            } else {
+                (tag + 1, 0)
+            };
+
+            let mut first = take(&mut self.lines[set]);
+            let mut second = take(&mut self.lines[oset]);
+
+            let status = if let Some((first, second)) = first.as_mut().zip(second.as_mut()) {
+                if first.tag == tag && second.tag == otag {
+                    let bytes = data.to_be_bytes();
+
+                    for i in off..off + 4 {
+                        if i <= off_mask {
+                            first.data[i] = bytes[i - off];
+                        } else {
+                            second.data[i - off_mask] = bytes[i - off];
+                        }
+                    }
+
+                    first.dirty = true;
+                    second.dirty = true;
+
+                    Status::Hit
+                } else {
+                    Status::Conflict
+                }
+            } else {
+                Status::Cold
+            };
+
+            self.lines[set] = first;
+            self.lines[oset] = second;
+            status
         }
     }
 

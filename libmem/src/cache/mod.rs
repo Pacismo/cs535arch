@@ -43,15 +43,15 @@ pub trait Cache: Debug {
     /// Sets the byte at the specified address.
     ///
     /// Returns true if the write was a hit.
-    fn write_byte(&mut self, address: Word, data: Byte) -> bool;
+    fn write_byte(&mut self, address: Word, data: Byte) -> Status;
     /// Sets the short at the specified address.
     ///
     /// Returns true if the write was a hit.
-    fn write_short(&mut self, address: Word, data: Short) -> bool;
+    fn write_short(&mut self, address: Word, data: Short) -> Status;
     /// Sets the word at the specified address.
     ///
     /// Returns true if the write was a hit.
-    fn write_word(&mut self, address: Word, data: Word) -> bool;
+    fn write_word(&mut self, address: Word, data: Word) -> Status;
 
     /// Returns `true` if the cache contains the provided address.
     fn has_address(&self, address: Word) -> bool;
@@ -65,13 +65,29 @@ pub trait Cache: Debug {
 }
 
 /// The status of a read.
+#[derive(Debug, Clone, Copy)]
 pub enum Status {
+    /// The cache got a hit
+    Hit,
+
     /// The cache is disabled (i.e. this is a [`NullCache`])
     Disabled,
+
     /// Cold miss (not initialized)
     Cold,
+
     /// Conflict miss (initialized, but wrong tag or address)
     Conflict,
+}
+
+impl Status {
+    pub fn is_miss(self) -> bool {
+        matches!(self, Self::Cold | Self::Conflict)
+    }
+
+    pub fn is_hit(self) -> bool {
+        matches!(self, Self::Hit)
+    }
 }
 
 type ReadResult<T> = Result<T, Status>;
