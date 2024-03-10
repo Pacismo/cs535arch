@@ -66,8 +66,8 @@ impl MemoryModule for SingleLevel {
                         if self.cache.write_line(addr, &mut self.memory) {
                             self.evictions += 1;
                         }
-                        if addr % 2 != 0 {
-                            if self.cache.write_line(addr, &mut self.memory) {
+                        if self.cache.within_line(addr, 2) {
+                            if self.cache.write_line(addr + 1, &mut self.memory) {
                                 self.evictions += 1;
                             }
                         }
@@ -82,8 +82,8 @@ impl MemoryModule for SingleLevel {
                         if self.cache.write_line(addr, &mut self.memory) {
                             self.evictions += 1;
                         }
-                        if addr % 4 != 0 {
-                            if self.cache.write_line(addr, &mut self.memory) {
+                        if self.cache.within_line(addr, 2) {
+                            if self.cache.write_line(addr + 3, &mut self.memory) {
                                 self.evictions += 1;
                             }
                         }
@@ -413,8 +413,17 @@ impl SingleLevel {
         miss_penalty: usize,
         writethrough: bool,
     ) -> Self {
+        Self::new_with_boxed(Box::new(cache), memory, miss_penalty, writethrough)
+    }
+
+    pub fn new_with_boxed(
+        cache: Box<dyn Cache>,
+        memory: Memory,
+        miss_penalty: usize,
+        writethrough: bool,
+    ) -> Self {
         Self {
-            cache: Box::new(cache),
+            cache,
             memory,
 
             miss_penalty,
