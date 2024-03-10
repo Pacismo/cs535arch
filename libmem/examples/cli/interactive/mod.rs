@@ -81,8 +81,6 @@ impl Autocomplete for CommandCompleter {
         let lowercase = input.to_lowercase();
         let mut separated = lowercase.split_whitespace().collect::<Vec<_>>();
 
-        // TODO: handle the different commands
-
         if separated.len() == 0 {
             return Ok(None);
         }
@@ -97,18 +95,22 @@ impl Autocomplete for CommandCompleter {
                 .iter()
                 .find_map(|r| recurse_navigate(&separated, r.as_ref()))
             {
-                Ok(Some(format!(
-                    "{} {}",
-                    separated
-                        .iter()
-                        .take(separated.len() - 1)
-                        .fold(String::new(), |a, e| if a.is_empty() {
-                            e.to_string()
-                        } else {
-                            format!("{a} {e}")
-                        }),
-                    suggestion.complete(separated.last().unwrap())
-                )))
+                if separated.len() == 1 {
+                    Ok(Some(suggestion.complete(separated.first().unwrap())))
+                } else {
+                    Ok(Some(format!(
+                        "{} {}",
+                        separated
+                            .iter()
+                            .take(separated.len() - 1)
+                            .fold(String::new(), |a, e| if a.is_empty() {
+                                e.to_string()
+                            } else {
+                                format!("{a} {e}")
+                            }),
+                        suggestion.complete(separated.last().unwrap())
+                    )))
+                }
             } else {
                 Ok(None)
             }
