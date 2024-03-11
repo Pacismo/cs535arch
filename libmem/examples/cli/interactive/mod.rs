@@ -5,7 +5,7 @@ use autocomplete::Node;
 use clap::{Parser, ValueEnum};
 use inquire::Autocomplete;
 use libseis::types::{SWord, Word};
-use std::{fmt::Display, sync::Arc};
+use std::{fmt::Display, mem::take, sync::Arc};
 
 /// This represents the auto-completion for the interactive console as a forest of node trees.
 ///
@@ -13,83 +13,30 @@ use std::{fmt::Display, sync::Arc};
 /// Nodes have branches that are navigated to provide a complete suggestion or completion.
 #[derive(Debug, Clone)]
 pub struct CommandCompleter {
-    root: Arc<[Arc<dyn Node>]>,
+    nodes: Arc<[Arc<dyn Node>]>,
 }
 
-fn recurse_suggestions<'a>(
-    path: &[&str],
-    node: &'a [Arc<dyn Node>],
-    next_level: bool,
-) -> Vec<&'a dyn Node> {
-    if node.len() == 0 {
-        vec![]
-    } else if path.is_empty() {
-        node.iter().map(AsRef::as_ref).collect()
-    } else if path.len() == 1 {
-        if next_level {
-            node.iter()
-                .find_map(|r| {
-                    r.exact(path[0])
-                        .then(|| r.subtree().iter().map(AsRef::as_ref).collect())
-                })
-                .unwrap_or_default()
-        } else {
-            node.iter()
-                .filter_map(|r| r.matches(path[0]).then(|| r.as_ref()))
-                .collect()
-        }
-    } else {
-        node.iter()
-            .filter_map(|r| {
-                r.exact(path[0])
-                    .then(|| recurse_suggestions(&path[1..], r.subtree(), next_level))
-            })
-            .reduce(|mut a, e| {
-                a.extend_from_slice(&e);
-                a
-            })
-            .unwrap_or_default()
-    }
-}
-
-fn recurse_navigate<'a>(path: &[&str], node: &'a dyn Node) -> Option<&'a dyn Node> {
-    if path.len() == 1 {
-        node.matches(path[0]).then_some(node)
-    } else if node.exact(path[0]) && path.len() > 1 {
-        node.subtree()
+impl CommandCompleter {
+    fn complete(&self, input: &[&str], display: bool) -> Vec<String> {
+        self.nodes
             .iter()
-            .find_map(|r| recurse_navigate(&path[1..], r.as_ref()))
-    } else {
-        None
+            .flat_map(|n| n.complete(input, display))
+            .collect()
     }
 }
 
 impl Autocomplete for CommandCompleter {
     fn get_suggestions(&mut self, input: &str) -> Result<Vec<String>, inquire::CustomUserError> {
         let lowercase = input.to_lowercase();
-        let separated = lowercase.split_whitespace().collect::<Vec<&str>>();
+        let mut separated = lowercase.split_whitespace().collect::<Vec<_>>();
 
         if separated.len() == 0 {
-            Ok(self.root.iter().map(|r| format!("{r}")).collect())
+            Ok(self.complete(&[""], true))
         } else {
-            let next_level = input.ends_with(' ');
-            let all_but_last = separated
-                .iter()
-                .take(separated.len() - (!next_level) as usize)
-                .map(|s| s.to_string())
-                .reduce(|l, r| format!("{l} {r}"))
-                .unwrap_or_default();
-
-            Ok(recurse_suggestions(&separated, &self.root, next_level)
-                .into_iter()
-                .map(|s| {
-                    if !all_but_last.is_empty() {
-                        s.complete(input)
-                    } else {
-                        s.to_string()
-                    }
-                })
-                .collect())
+            if input.ends_with(' ') {
+                separated.push("")
+            }
+            Ok(self.complete(&separated, true))
         }
     }
 
@@ -98,44 +45,18 @@ impl Autocomplete for CommandCompleter {
         input: &str,
         highlighted_suggestion: Option<String>,
     ) -> Result<inquire::autocompletion::Replacement, inquire::CustomUserError> {
-        let lowercase = input.to_lowercase();
-        let mut separated = lowercase.split_whitespace().collect::<Vec<_>>();
-
-        if separated.len() == 0 {
-            return Ok(None);
-        }
-
         if let Some(s) = highlighted_suggestion {
-            if input.ends_with(' ') {
-                separated.push(s.as_str());
-            }
-
-            if let Some(suggestion) = self
-                .root
-                .iter()
-                .find_map(|r| recurse_navigate(&separated, r.as_ref()))
-            {
-                if separated.len() == 1 {
-                    Ok(Some(suggestion.complete(separated.first().unwrap())))
-                } else {
-                    Ok(Some(format!(
-                        "{} {}",
-                        separated
-                            .iter()
-                            .take(separated.len() - 1)
-                            .fold(String::new(), |a, e| if a.is_empty() {
-                                e.to_string()
-                            } else {
-                                format!("{a} {e}")
-                            }),
-                        suggestion.complete(separated.last().unwrap())
-                    )))
-                }
-            } else {
-                Ok(None)
-            }
+            Ok(Some(
+                s.split_whitespace()
+                    .take_while(|s| !s.ends_with('>'))
+                    .map(|s| s.to_owned() + " ")
+                    .collect(),
+            ))
         } else {
-            Ok(None)
+            let lowercase = input.to_lowercase();
+            let separated = lowercase.split_whitespace().collect::<Vec<_>>();
+
+            Ok(self.complete(&separated, false).first_mut().map(take))
         }
     }
 }
@@ -269,7 +190,9 @@ impl Command {
     pub fn autocompleter() -> CommandCompleter {
         static mut TREE: Option<Arc<[Arc<dyn Node>]>> = None;
         if let Some(root) = unsafe { &TREE } {
-            CommandCompleter { root: root.clone() }
+            CommandCompleter {
+                nodes: root.clone(),
+            }
         } else {
             let empty: Arc<[Arc<dyn Node>]> = [].into();
 
@@ -311,7 +234,7 @@ impl Command {
                 Arc::new(StringCompleter {
                     string: "read",
                     subtree: Arc::new([Arc::new(ArgumentField {
-                        string: "<ADDRESS>",
+                        string: "<address>",
                         subtree: types
                             .iter()
                             .map(|s| -> Arc<dyn Node> {
@@ -329,9 +252,9 @@ impl Command {
                 Arc::new(StringCompleter {
                     string: "write",
                     subtree: Arc::new([Arc::new(ArgumentField {
-                        string: "<ADDRESS>",
+                        string: "<address>",
                         subtree: Arc::new([Arc::new(ArgumentField {
-                            string: "<VALUE>",
+                            string: "<value>",
                             subtree: types
                                 .iter()
                                 .map(|t| -> Arc<dyn Node> { t.clone() })
@@ -342,7 +265,7 @@ impl Command {
                 Arc::new(StringCompleter {
                     string: "volatile-read",
                     subtree: Arc::new([Arc::new(ArgumentField {
-                        string: "<ADDRESS>",
+                        string: "<address>",
                         subtree: types
                             .iter()
                             .map(|s| -> Arc<dyn Node> {
@@ -360,9 +283,9 @@ impl Command {
                 Arc::new(StringCompleter {
                     string: "volatile-write",
                     subtree: Arc::new([Arc::new(ArgumentField {
-                        string: "<ADDRESS>",
+                        string: "<address>",
                         subtree: Arc::new([Arc::new(ArgumentField {
-                            string: "<VALUE>",
+                            string: "<value>",
                             subtree: types
                                 .iter()
                                 .map(|t| -> Arc<dyn Node> { t.clone() })
@@ -376,7 +299,7 @@ impl Command {
                 TREE = Some(root.clone());
             }
 
-            CommandCompleter { root }
+            CommandCompleter { nodes: root }
         }
     }
 }

@@ -12,18 +12,17 @@ use libmem::{
 };
 use libseis::types::{Byte, SByte, SShort, SWord, Short, Word};
 use std::{
-    borrow::Borrow,
     error::Error,
     fs::File,
     io::{BufRead, BufReader},
 };
 
-fn process_input<S: Borrow<str>>(
-    input: S,
+fn process_input(
+    command: Command,
     module: &mut dyn MemoryModule,
     total_clocks: &mut usize,
 ) -> bool {
-    match Command::parse_from(input.borrow().split_whitespace()) {
+    match command {
         Command::Exit => return false,
         Command::Read { sign, ty, address } => match (sign, ty) {
             (Sign::Unsigned, Type::Byte) => {
@@ -205,18 +204,13 @@ fn process_input<S: Borrow<str>>(
         },
         Command::VolatileRead { sign, ty, address } => match (sign, ty) {
             (Sign::Unsigned, Type::Byte) => {
-                match module.read_byte(address) {
-                    Ok(value) => {
-                        println!(
-                            "[{address:#010X} ({sign} {ty})] {} (cache hit)",
-                            value as Byte
-                        )
-                    }
+                match module.read_byte_volatile(address) {
+                    Ok(_) => unreachable!(),
                     Err(Status::Busy(clocks)) => {
                         module.clock(clocks);
                         *total_clocks += clocks;
 
-                        let value = module.read_byte(address).unwrap();
+                        let value = module.read_byte_volatile(address).unwrap();
                         println!(
                             "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
                             value as Byte,
@@ -227,18 +221,13 @@ fn process_input<S: Borrow<str>>(
                 };
             }
             (Sign::Signed, Type::Byte) => {
-                match module.read_byte(address) {
-                    Ok(value) => {
-                        println!(
-                            "[{address:#010X} ({sign} {ty})] {} (cache hit)",
-                            value as SByte,
-                        )
-                    }
+                match module.read_byte_volatile(address) {
+                    Ok(_) => unreachable!(),
                     Err(Status::Busy(clocks)) => {
                         module.clock(clocks);
                         *total_clocks += clocks;
 
-                        let value = module.read_byte(address).unwrap();
+                        let value = module.read_byte_volatile(address).unwrap();
                         println!(
                             "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
                             value as SByte,
@@ -249,18 +238,13 @@ fn process_input<S: Borrow<str>>(
                 };
             }
             (Sign::Signed, Type::Short) => {
-                match module.read_short(address) {
-                    Ok(value) => {
-                        println!(
-                            "[{address:#010X} ({sign} {ty})] {} (cache hit)",
-                            value as Short,
-                        )
-                    }
+                match module.read_short_volatile(address) {
+                    Ok(_) => unreachable!(),
                     Err(Status::Busy(clocks)) => {
                         module.clock(clocks);
                         *total_clocks += clocks;
 
-                        let value = module.read_short(address).unwrap();
+                        let value = module.read_short_volatile(address).unwrap();
                         println!(
                             "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
                             value as Short,
@@ -271,18 +255,13 @@ fn process_input<S: Borrow<str>>(
                 };
             }
             (Sign::Signed, Type::Word) => {
-                match module.read_short(address) {
-                    Ok(value) => {
-                        println!(
-                            "[{address:#010X} ({sign} {ty})] {} (cache hit)",
-                            value as SShort,
-                        )
-                    }
+                match module.read_short_volatile(address) {
+                    Ok(_) => unreachable!(),
                     Err(Status::Busy(clocks)) => {
                         module.clock(clocks);
                         *total_clocks += clocks;
 
-                        let value = module.read_short(address).unwrap();
+                        let value = module.read_short_volatile(address).unwrap();
                         println!(
                             "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
                             value as SShort,
@@ -293,18 +272,13 @@ fn process_input<S: Borrow<str>>(
                 };
             }
             (Sign::Unsigned, Type::Short) => {
-                match module.read_word(address) {
-                    Ok(value) => {
-                        println!(
-                            "[{address:#010X} ({sign} {ty})] {} (cache hit)",
-                            value as Word,
-                        )
-                    }
+                match module.read_word_volatile(address) {
+                    Ok(_) => unreachable!(),
                     Err(Status::Busy(clocks)) => {
                         module.clock(clocks);
                         *total_clocks += clocks;
 
-                        let value = module.read_word(address).unwrap();
+                        let value = module.read_word_volatile(address).unwrap();
                         println!(
                             "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
                             value as Word,
@@ -315,18 +289,13 @@ fn process_input<S: Borrow<str>>(
                 };
             }
             (Sign::Unsigned, Type::Word) => {
-                match module.read_word(address) {
-                    Ok(value) => {
-                        println!(
-                            "[{address:#010X} ({sign} {ty})] {} (cache hit)",
-                            value as SWord,
-                        )
-                    }
+                match module.read_word_volatile(address) {
+                    Ok(_) => unreachable!(),
                     Err(Status::Busy(clocks)) => {
                         module.clock(clocks);
                         *total_clocks += clocks;
 
-                        let value = module.read_word(address).unwrap();
+                        let value = module.read_word_volatile(address).unwrap();
                         println!(
                             "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
                             value as SWord,
@@ -338,7 +307,7 @@ fn process_input<S: Borrow<str>>(
             }
         },
         Command::VolatileWrite { ty, address, value } => match ty {
-            Type::Byte => match module.write_byte(address, value as Byte) {
+            Type::Byte => match module.write_byte_volatile(address, value as Byte) {
                 Status::Busy(clocks) => {
                     module.clock(clocks);
                     *total_clocks += clocks;
@@ -348,11 +317,9 @@ fn process_input<S: Borrow<str>>(
                         if clocks == 1 { "clock" } else { "clocks" }
                     )
                 }
-                Status::Idle => {
-                    println!("Write hit the cache")
-                }
+                Status::Idle => unreachable!(),
             },
-            Type::Short => match module.write_short(address, value as Short) {
+            Type::Short => match module.write_short_volatile(address, value as Short) {
                 Status::Busy(clocks) => {
                     module.clock(clocks);
                     *total_clocks += clocks;
@@ -362,11 +329,9 @@ fn process_input<S: Borrow<str>>(
                         if clocks == 1 { "clock" } else { "clocks" }
                     )
                 }
-                Status::Idle => {
-                    println!("Write hit the cache")
-                }
+                Status::Idle => unreachable!(),
             },
-            Type::Word => match module.write_word(address, value as Word) {
+            Type::Word => match module.write_word_volatile(address, value as Word) {
                 Status::Busy(clocks) => {
                     module.clock(clocks);
                     *total_clocks += clocks;
@@ -376,9 +341,7 @@ fn process_input<S: Borrow<str>>(
                         if clocks == 1 { "clock" } else { "clocks" }
                     )
                 }
-                Status::Idle => {
-                    println!("Write hit the cache")
-                }
+                Status::Idle => unreachable!(),
             },
         },
     }
@@ -422,7 +385,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         let reader = BufReader::new(File::open(file)?);
 
         for line in reader.lines() {
-            process_input(line?, &mut module, &mut total_clocks);
+            process_input(
+                Command::parse_from(line?.split_whitespace()),
+                &mut module,
+                &mut total_clocks,
+            );
         }
     } else {
         loop {
@@ -433,8 +400,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .prompt_skippable()
                 .expect("Could not read input")
             {
-                if !process_input(input, &mut module, &mut total_clocks) {
-                    break;
+                match Command::try_parse_from(input.split_whitespace()) {
+                    Ok(command) => {
+                        if !process_input(command, &mut module, &mut total_clocks) {
+                            break;
+                        }
+                    }
+                    Err(e) => println!("{e}"),
                 }
             }
         }

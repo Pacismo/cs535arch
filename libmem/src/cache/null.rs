@@ -15,9 +15,10 @@ use ReadRegister::*;
 pub struct NullCache(ReadRegister);
 
 impl Cache for NullCache {
-    fn read_byte(&self, address: Word) -> ReadResult<Byte> {
+    fn get_byte(&mut self, address: Word) -> ReadResult<Byte> {
         if let Populated(a, b) = self.0 {
             if a == address {
+                self.0 = Empty;
                 Ok(b.to_be_bytes()[0])
             } else {
                 Err(Status::Disabled)
@@ -27,9 +28,11 @@ impl Cache for NullCache {
         }
     }
 
-    fn read_short(&self, address: Word) -> ReadResult<Short> {
+    fn get_short(&mut self, address: Word) -> ReadResult<Short> {
         if let Populated(a, b) = self.0 {
             if a == address {
+                self.0 = Empty;
+
                 let bytes = b.to_be_bytes();
                 Ok(Short::from_be_bytes([bytes[0], bytes[1]]))
             } else {
@@ -40,9 +43,10 @@ impl Cache for NullCache {
         }
     }
 
-    fn read_word(&self, address: Word) -> ReadResult<Word> {
+    fn get_word(&mut self, address: Word) -> ReadResult<Word> {
         if let Populated(a, b) = self.0 {
             if a == address {
+                self.0 = Empty;
                 Ok(b)
             } else {
                 Err(Status::Disabled)
@@ -50,24 +54,6 @@ impl Cache for NullCache {
         } else {
             Err(Status::Disabled)
         }
-    }
-
-    fn get_byte(&mut self, address: Word) -> ReadResult<Byte> {
-        let value = self.read_byte(address)?;
-        self.0 = Empty;
-        Ok(value)
-    }
-
-    fn get_short(&mut self, address: Word) -> ReadResult<Short> {
-        let value = self.read_short(address)?;
-        self.0 = Empty;
-        Ok(value)
-    }
-
-    fn get_word(&mut self, address: Word) -> ReadResult<Word> {
-        let value = self.read_word(address)?;
-        self.0 = Empty;
-        Ok(value)
     }
 
     fn write_byte(&mut self, _: Word, _: Byte) -> Status {

@@ -21,7 +21,7 @@ pub struct Associative {
 }
 
 impl Cache for Associative {
-    fn read_byte(&self, address: Word) -> ReadResult<Byte> {
+    fn get_byte(&mut self, address: Word) -> ReadResult<Byte> {
         let (tag, set, off) = self.split_address(address);
 
         if let Some(set) = &self.lines[set] {
@@ -35,32 +35,20 @@ impl Cache for Associative {
         }
     }
 
-    fn read_short(&self, address: Word) -> ReadResult<Short> {
-        Ok(Short::from_be_bytes([
-            self.read_byte(address)?,
-            self.read_byte(address + 1)?,
-        ]))
-    }
-
-    fn read_word(&self, address: Word) -> ReadResult<Word> {
-        Ok(Word::from_be_bytes([
-            self.read_byte(address)?,
-            self.read_byte(address + 1)?,
-            self.read_byte(address + 2)?,
-            self.read_byte(address + 3)?,
-        ]))
-    }
-
-    fn get_byte(&mut self, address: Word) -> ReadResult<Byte> {
-        self.read_byte(address)
-    }
-
     fn get_short(&mut self, address: Word) -> ReadResult<Short> {
-        self.read_short(address)
+        Ok(Short::from_be_bytes([
+            self.get_byte(address)?,
+            self.get_byte(address + 1)?,
+        ]))
     }
 
     fn get_word(&mut self, address: Word) -> ReadResult<Word> {
-        self.read_word(address)
+        Ok(Word::from_be_bytes([
+            self.get_byte(address)?,
+            self.get_byte(address + 1)?,
+            self.get_byte(address + 2)?,
+            self.get_byte(address + 3)?,
+        ]))
     }
 
     fn write_byte(&mut self, address: Word, data: Byte) -> Status {

@@ -170,7 +170,7 @@ impl MemoryModule for SingleLevel {
                     self.instruction_cache.write_line(addr, &mut self.memory);
                 }
 
-                _ => (),
+                _ => return,
             }
 
             self.current_transaction = Idle;
@@ -182,7 +182,7 @@ impl MemoryModule for SingleLevel {
             return Err(Busy(self.clocks));
         }
 
-        match self.data_cache.read_byte(addr) {
+        match self.data_cache.get_byte(addr) {
             Ok(value) => {
                 self.accesses += 1;
 
@@ -199,7 +199,7 @@ impl MemoryModule for SingleLevel {
                 Err(self.set_if_idle(ReadByte(addr), self.miss_penalty))
             }
             Err(cache::Status::Disabled) => {
-                Err(self.set_if_idle(ReadByte(addr), self.miss_penalty))
+                Err(self.set_if_idle(ReadByte(addr), self.volatile_penalty))
             }
 
             _ => unreachable!("No hits allowed!"),
@@ -211,7 +211,7 @@ impl MemoryModule for SingleLevel {
             return Err(Busy(self.clocks));
         }
 
-        match self.data_cache.read_short(addr) {
+        match self.data_cache.get_short(addr) {
             Ok(value) => {
                 self.accesses += 1;
 
@@ -257,7 +257,7 @@ impl MemoryModule for SingleLevel {
             return Err(Busy(self.clocks));
         }
 
-        match self.data_cache.read_word(addr) {
+        match self.data_cache.get_word(addr) {
             Ok(value) => {
                 self.accesses += 1;
 
@@ -302,18 +302,20 @@ impl MemoryModule for SingleLevel {
     fn read_byte_volatile(&mut self, addr: Word) -> Result<Byte> {
         if let ReadByteV(addr) = self.current_transaction {
             if self.clocks == 0 {
+                self.current_transaction = Idle;
                 Ok(self.memory.read_byte(addr))
             } else {
                 Err(Busy(self.clocks))
             }
         } else {
-            Err(self.set_if_idle(ReadByteV(addr), self.miss_penalty))
+            Err(self.set_if_idle(ReadByteV(addr), self.volatile_penalty))
         }
     }
 
     fn read_short_volatile(&mut self, addr: Word) -> Result<Short> {
         if let ReadShortV(addr) = self.current_transaction {
             if self.clocks == 0 {
+                self.current_transaction = Idle;
                 Ok(self.memory.read_short(addr))
             } else {
                 Err(Busy(self.clocks))
@@ -331,6 +333,7 @@ impl MemoryModule for SingleLevel {
     fn read_word_volatile(&mut self, addr: Word) -> Result<Word> {
         if let ReadWordV(addr) = self.current_transaction {
             if self.clocks == 0 {
+                self.current_transaction = Idle;
                 Ok(self.memory.read_word(addr))
             } else {
                 Err(Busy(self.clocks))
@@ -350,7 +353,7 @@ impl MemoryModule for SingleLevel {
             return Err(Busy(self.clocks));
         }
 
-        match self.instruction_cache.read_word(addr) {
+        match self.instruction_cache.get_word(addr) {
             Ok(value) => {
                 self.accesses += 1;
 
@@ -367,7 +370,7 @@ impl MemoryModule for SingleLevel {
                 Err(self.set_if_idle(ReadInstruction(addr), self.miss_penalty))
             }
             Err(cache::Status::Disabled) => {
-                Err(self.set_if_idle(ReadInstruction(addr), self.miss_penalty))
+                Err(self.set_if_idle(ReadInstruction(addr), self.volatile_penalty))
             }
 
             _ => unreachable!("No hits allowed!"),

@@ -9,7 +9,7 @@ pub trait Node: Display + Debug + Send + Sync {
 
     fn exact(&self, input: &str) -> bool;
 
-    fn complete(&self, input: &str) -> String;
+    fn complete(&self, input: &[&str], display: bool) -> Vec<String>;
 
     fn subtree(&self) -> &[Arc<dyn Node>];
 }
@@ -23,20 +23,15 @@ impl Node for String {
         self == input
     }
 
-    fn complete(&self, input: &str) -> String {
-        let mut parts = input.split_whitespace().collect::<Vec<_>>();
-        if parts.len() == 0 {
-            self.clone()
+    fn complete(&self, input: &[&str], _: bool) -> Vec<String> {
+        if input.len() == 0 {
+            vec![]
+        } else if input[0].is_empty() {
+            vec![self.clone()]
+        } else if self.matches(input[0]) {
+            vec![self.clone()]
         } else {
-            let last = parts.len() - 1;
-            parts[last] = self.as_str();
-
-            let first = parts[0].to_owned();
-
-            parts
-                .into_iter()
-                .skip(1)
-                .fold(first, |l, r| format!("{l} {r}"))
+            vec![]
         }
     }
 
@@ -54,24 +49,15 @@ impl Node for &'static str {
         *self == input
     }
 
-    fn complete(&self, input: &str) -> String {
-        let mut parts = input.split_whitespace().collect::<Vec<_>>();
-        if parts.len() == 0 {
-            self.to_string()
+    fn complete(&self, input: &[&str], _: bool) -> Vec<String> {
+        if input.len() == 0 {
+            vec![]
+        } else if input[0].len() == 0 {
+            vec![self.to_string()]
+        } else if self.matches(input[0]) {
+            vec![self.to_string()]
         } else {
-            if !input.ends_with(' ') {
-                let last = parts.len() - 1;
-                parts[last] = self;
-            } else {
-                parts.push(&self);
-            }
-
-            let first = parts[0].to_owned();
-
-            parts
-                .into_iter()
-                .skip(1)
-                .fold(first, |l, r| format!("{l} {r}"))
+            vec![]
         }
     }
 
@@ -101,24 +87,26 @@ where
         self.string.deref() == input
     }
 
-    fn complete(&self, input: &str) -> String {
-        let mut parts = input.split_whitespace().collect::<Vec<_>>();
-        if parts.len() == 0 {
-            self.string.to_owned()
-        } else {
-            if !input.ends_with(' ') {
-                let last = parts.len() - 1;
-                parts[last] = self.string.deref();
+    fn complete(&self, input: &[&str], display: bool) -> Vec<String> {
+        if input.len() == 0 {
+            vec![]
+        } else if input[0].len() == 0 {
+            vec![self.string.to_string()]
+        } else if self.matches(input[0]) {
+            if input.len() > 1 {
+                self.subtree
+                    .iter()
+                    .flat_map(|c| {
+                        c.complete(&input[1..], display)
+                            .into_iter()
+                            .map(|s| format!("{} {}", self.string.deref(), s))
+                    })
+                    .collect()
             } else {
-                parts.push(&self.string.deref());
+                vec![self.string.to_string()]
             }
-
-            let first = parts[0].to_owned();
-
-            parts
-                .into_iter()
-                .skip(1)
-                .fold(first, |l, r| format!("{l} {r}"))
+        } else {
+            vec![]
         }
     }
 
@@ -157,18 +145,28 @@ where
         true
     }
 
-    fn complete(&self, input: &str) -> String {
-        if input.ends_with(' ') {
-            let mut parts: Vec<&str> = input.split_whitespace().collect();
-            parts.push(&self.string);
-            let first = parts[0].to_string();
-
-            parts
-                .into_iter()
-                .skip(1)
-                .fold(first, |a, e| format!("{a} {e}"))
+    fn complete(&self, input: &[&str], display: bool) -> Vec<String> {
+        if input.len() == 0 {
+            vec![]
+        } else if input[0].len() == 0 {
+            if display {
+                vec![self.string.to_string()]
+            } else {
+                vec![]
+            }
         } else {
-            input.to_owned()
+            if input.len() > 1 {
+                self.subtree
+                    .iter()
+                    .flat_map(|c| {
+                        c.complete(&input[1..], display)
+                            .into_iter()
+                            .map(|s| format!("{} {}", input[0], s))
+                    })
+                    .collect()
+            } else {
+                vec![input[0].to_string()]
+            }
         }
     }
 
