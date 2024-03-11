@@ -1,4 +1,4 @@
-use super::{Cache, ReadResult, Status};
+use super::{Cache, LineReadStatus, ReadResult, Status};
 use crate::memory::Memory;
 use libseis::types::{Byte, Short, Word};
 use std::mem::{size_of, take};
@@ -214,7 +214,18 @@ impl Cache for Associative {
         }
     }
 
-    fn write_line(&mut self, address: Word, memory: &mut Memory) -> bool {
+    fn invalidate_line(&mut self, address: Word) -> bool {
+        let (tag, set, _) = self.split_address(address);
+
+        if matches!(&self.lines[set], Some(line) if line.tag == tag) {
+            self.lines[set] = None;
+            true
+        } else {
+            false
+        }
+    }
+
+    fn write_line(&mut self, address: Word, memory: &mut Memory) -> LineReadStatus {
         let (tag, set, _) = self.split_address(address);
 
         // Flush a previously-existing line if it is dirty. Otherwise, purge its contents.
@@ -249,7 +260,11 @@ impl Cache for Associative {
             },
         }));
 
-        replaced
+        if replaced {
+            LineReadStatus::Evicted
+        } else {
+            LineReadStatus::Swapped
+        }
     }
 }
 

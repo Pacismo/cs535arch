@@ -1,4 +1,5 @@
-use clap::{Parser, Subcommand};
+use std::path::PathBuf;
+use clap::{Parser, Subcommand, ValueHint::FilePath};
 
 fn ranged<const MIN: usize, const MAX: usize>(val: &str) -> Result<usize, String> {
     let val = val.parse::<usize>().map_err(|e| e.to_string())?;
@@ -41,4 +42,9 @@ pub struct Args {
     /// Whether to have writes go through the cache on miss
     #[arg(short, long)]
     pub writethrough: bool,
+
+    /// The file to read for memory instructions
+    #[arg(short, long)]
+    #[arg(value_hint = FilePath)]
+    pub cmd_file: Option<PathBuf>
 }

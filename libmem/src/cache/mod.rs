@@ -61,10 +61,15 @@ pub trait Cache: Debug {
     /// Returns whether the address' value is contained in the same line up to the length
     fn within_line(&self, address: Word, length: usize) -> bool;
 
+    /// Invalidates a line (say, due to a volatile write)
+    ///
+    /// Returns true if a line *has* been invalidated.
+    fn invalidate_line(&mut self, address: Word) -> bool;
+
     /// Fetches the data to be stored in the cache from main memory.
     ///
     /// Writes any evicted lines back and returns true if an eviction occurred.
-    fn write_line(&mut self, address: Word, memory: &mut Memory) -> bool;
+    fn write_line(&mut self, address: Word, memory: &mut Memory) -> LineReadStatus;
 }
 
 /// The status of a read.
@@ -81,6 +86,30 @@ pub enum Status {
 
     /// Conflict miss (initialized, but wrong tag or address)
     Conflict,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum LineReadStatus {
+    Evicted,
+    Swapped,
+    Disabled,
+}
+
+impl LineReadStatus {
+    #[inline(always)]
+    pub fn evicted(self) -> bool {
+        matches!(self, Self::Evicted)
+    }
+
+    #[inline(always)]
+    pub fn swapped(self) -> bool {
+        matches!(self, Self::Swapped)
+    }
+
+    #[inline(always)]
+    pub fn disabled(self) -> bool {
+        matches!(self, Self::Disabled)
+    }
 }
 
 impl Status {

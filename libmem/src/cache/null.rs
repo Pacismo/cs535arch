@@ -1,34 +1,73 @@
 use super::*;
 
-/// This is a dummy unit type implementing [`Cache`].
+#[derive(Debug, Clone, Copy)]
+enum ReadRegister {
+    Populated(Word, Word),
+    Empty,
+}
+
+use ReadRegister::*;
+
+/// This is a special cache type that only contains a single "read register".
 ///
-/// It exists *only* to act as an absent cache.
+/// It only contains a single register with an address and a value.
 #[derive(Debug)]
-pub struct NullCache;
+pub struct NullCache(ReadRegister);
 
 impl Cache for NullCache {
-    fn read_byte(&self, _: Word) -> ReadResult<Byte> {
-        Err(Status::Disabled)
+    fn read_byte(&self, address: Word) -> ReadResult<Byte> {
+        if let Populated(a, b) = self.0 {
+            if a == address {
+                Ok(b.to_be_bytes()[0])
+            } else {
+                Err(Status::Disabled)
+            }
+        } else {
+            Err(Status::Disabled)
+        }
     }
 
-    fn read_short(&self, _: Word) -> ReadResult<Short> {
-        Err(Status::Disabled)
+    fn read_short(&self, address: Word) -> ReadResult<Short> {
+        if let Populated(a, b) = self.0 {
+            if a == address {
+                let bytes = b.to_be_bytes();
+                Ok(Short::from_be_bytes([bytes[0], bytes[1]]))
+            } else {
+                Err(Status::Disabled)
+            }
+        } else {
+            Err(Status::Disabled)
+        }
     }
 
-    fn read_word(&self, _: Word) -> ReadResult<Word> {
-        Err(Status::Disabled)
+    fn read_word(&self, address: Word) -> ReadResult<Word> {
+        if let Populated(a, b) = self.0 {
+            if a == address {
+                Ok(b)
+            } else {
+                Err(Status::Disabled)
+            }
+        } else {
+            Err(Status::Disabled)
+        }
     }
 
-    fn get_byte(&mut self, _: Word) -> ReadResult<Byte> {
-        Err(Status::Disabled)
+    fn get_byte(&mut self, address: Word) -> ReadResult<Byte> {
+        let value = self.read_byte(address)?;
+        self.0 = Empty;
+        Ok(value)
     }
 
-    fn get_short(&mut self, _: Word) -> ReadResult<Short> {
-        Err(Status::Disabled)
+    fn get_short(&mut self, address: Word) -> ReadResult<Short> {
+        let value = self.read_short(address)?;
+        self.0 = Empty;
+        Ok(value)
     }
 
-    fn get_word(&mut self, _: Word) -> ReadResult<Word> {
-        Err(Status::Disabled)
+    fn get_word(&mut self, address: Word) -> ReadResult<Word> {
+        let value = self.read_word(address)?;
+        self.0 = Empty;
+        Ok(value)
     }
 
     fn write_byte(&mut self, _: Word, _: Byte) -> Status {
@@ -55,20 +94,23 @@ impl Cache for NullCache {
         false
     }
 
-    fn write_line(&mut self, _: Word, _: &mut Memory) -> bool {
+    fn invalidate_line(&mut self, _: Word) -> bool {
         false
+    }
+
+    fn write_line(&mut self, address: Word, memory: &mut Memory) -> LineReadStatus {
+        self.0 = Populated(address, memory.read_word(address));
+        LineReadStatus::Disabled
     }
 }
 
 impl NullCache {
     #[inline(always)]
-    #[track_caller]
     pub fn new() -> Self {
-        Self
+        Self(ReadRegister::Empty)
     }
 
     #[inline(always)]
-    #[track_caller]
     pub fn boxed(self) -> Box<dyn Cache> {
         Box::new(self)
     }

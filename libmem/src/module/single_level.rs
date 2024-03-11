@@ -6,28 +6,47 @@ use crate::{
 use libseis::types::{Byte, Short, Word};
 use Transaction::*;
 
+/// Represents a memory transaction.
 #[derive(Debug, Clone)]
-pub enum Transaction {
+enum Transaction {
+    /// No transactions are occurring at this time
     Idle,
 
+    /// The memory unit is reading a byte of memory.
     ReadByte(Word),
+    /// The memory unit is reading two bytes of memory.
     ReadShort(Word),
+    /// The memory unit is reading four bytes of memory.
     ReadWord(Word),
+    /// The memory unit is reading an instruction.
+    ReadInstruction(Word),
 
+    /// The memory unit is writeing a byte.
     WriteByte(Word, Byte),
+    /// The memory unit is writeing two bytes.
     WriteShort(Word, Short),
+    /// The memory unit is writeing four bytes.
     WriteWord(Word, Word),
 }
 
 impl Transaction {
+    pub fn busy_data(&self) -> bool {
+        !matches!(self, Idle | ReadInstruction(_))
+    }
+
+    pub fn busy_instruction(&self) -> bool {
+        matches!(self, ReadInstruction(_))
+    }
+
     pub fn is_busy(&self) -> bool {
-        !matches!(self, Self::Idle)
+        !matches!(self, Idle)
     }
 }
 
 /// Represents a memory module with a single level of cache.
 pub struct SingleLevel {
-    cache: Box<dyn Cache>,
+    data_cache: Box<dyn Cache>,
+    instruction_cache: Box<dyn Cache>,
     memory: Memory,
 
     miss_penalty: usize,
@@ -38,7 +57,7 @@ pub struct SingleLevel {
 
     cold_misses: usize,
     misses: usize,
-    hits: usize,
+    accesses: usize,
     evictions: usize,
 }
 
@@ -50,72 +69,91 @@ impl MemoryModule for SingleLevel {
             match self.current_transaction {
                 WriteByte(addr, value) => {
                     if self.writethrough {
+                        // This is required for the null cache. However, this does nothing for other caches.
+                        self.data_cache.invalidate_line(addr);
                         self.memory.write_byte(addr, value);
                     } else {
-                        if self.cache.write_line(addr, &mut self.memory) {
+                        if self.data_cache.write_line(addr, &mut self.memory).evicted() {
                             self.evictions += 1;
                         }
 
-                        self.cache.write_byte(addr, value);
+                        self.data_cache.write_byte(addr, value);
                     }
                 }
                 WriteShort(addr, value) => {
                     if self.writethrough {
+                        self.data_cache.invalidate_line(addr);
                         self.memory.write_short(addr, value);
                     } else {
-                        if self.cache.write_line(addr, &mut self.memory) {
+                        if self.data_cache.write_line(addr, &mut self.memory).evicted() {
                             self.evictions += 1;
                         }
-                        if self.cache.within_line(addr, 2) {
-                            if self.cache.write_line(addr + 1, &mut self.memory) {
+                        if self.data_cache.within_line(addr, 2) {
+                            if self
+                                .data_cache
+                                .write_line(addr + 1, &mut self.memory)
+                                .evicted()
+                            {
                                 self.evictions += 1;
                             }
                         }
 
-                        self.cache.write_short(addr, value);
+                        self.data_cache.write_short(addr, value);
                     }
                 }
                 WriteWord(addr, value) => {
                     if self.writethrough {
+                        self.data_cache.invalidate_line(addr);
                         self.memory.write_word(addr, value);
                     } else {
-                        if self.cache.write_line(addr, &mut self.memory) {
+                        if self.data_cache.write_line(addr, &mut self.memory).evicted() {
                             self.evictions += 1;
                         }
-                        if self.cache.within_line(addr, 2) {
-                            if self.cache.write_line(addr + 3, &mut self.memory) {
+                        if self.data_cache.within_line(addr, 2) {
+                            if self
+                                .data_cache
+                                .write_line(addr + 3, &mut self.memory)
+                                .evicted()
+                            {
                                 self.evictions += 1;
                             }
                         }
 
-                        self.cache.write_word(addr, value);
+                        self.data_cache.write_word(addr, value);
                     }
                 }
 
                 ReadByte(addr) => {
-                    if self.cache.write_line(addr, &mut self.memory) {
+                    if self.data_cache.write_line(addr, &mut self.memory).evicted() {
                         self.evictions += 1;
                     }
                 }
                 ReadShort(addr) => {
-                    if self.cache.write_line(addr, &mut self.memory) {
+                    if self.data_cache.write_line(addr, &mut self.memory).evicted() {
                         self.evictions += 1;
                     }
-                    if self.cache.within_line(addr, 2) {
-                        if self.cache.write_line(addr + 1, &mut self.memory) {
+                    if self.data_cache.within_line(addr, 2) {
+                        if self
+                            .data_cache
+                            .write_line(addr + 1, &mut self.memory)
+                            .evicted()
+                        {
                             self.evictions += 1;
                         }
                     }
                 }
                 ReadWord(addr) => {
-                    if self.cache.write_line(addr, &mut self.memory) {
+                    if self.data_cache.write_line(addr, &mut self.memory).evicted() {
                         self.evictions += 1;
                     }
-                    if self.cache.within_line(addr, 4) {
-                        if self.cache.write_line(addr, &mut self.memory) {
+                    if self.data_cache.within_line(addr, 4) {
+                        if self.data_cache.write_line(addr, &mut self.memory).evicted() {
                             self.evictions += 1;
                         }
                     }
+                }
+                ReadInstruction(addr) => {
+                    self.instruction_cache.write_line(addr, &mut self.memory);
                 }
 
                 _ => (),
@@ -126,32 +164,29 @@ impl MemoryModule for SingleLevel {
     }
 
     fn read_byte(&mut self, addr: Word) -> Result<Byte> {
-        if self.current_transaction.is_busy() {
+        if self.current_transaction.busy_data() {
             return Err(Status::Busy(self.clocks));
         }
 
-        match self.cache.read_byte(addr) {
+        match self.data_cache.read_byte(addr) {
             Ok(value) => {
-                self.hits += 1;
+                self.accesses += 1;
 
                 Ok(value)
             }
             Err(cache::Status::Cold) => {
                 self.cold_misses += 1;
                 self.clocks = self.miss_penalty;
-                self.current_transaction = ReadByte(addr);
-                Err(Status::Busy(self.clocks))
+                Err(self.set_if_idle(ReadByte(addr)))
             }
             Err(cache::Status::Conflict) => {
                 self.misses += 1;
                 self.clocks = self.miss_penalty;
-                self.current_transaction = ReadByte(addr);
-                Err(Status::Busy(self.clocks))
+                Err(self.set_if_idle(ReadByte(addr)))
             }
             Err(cache::Status::Disabled) => {
                 self.clocks = self.miss_penalty;
-                self.current_transaction = ReadByte(addr);
-                Err(Status::Busy(self.clocks))
+                Err(self.set_if_idle(ReadByte(addr)))
             }
 
             _ => unreachable!("No hits allowed!"),
@@ -159,32 +194,29 @@ impl MemoryModule for SingleLevel {
     }
 
     fn read_short(&mut self, addr: Word) -> Result<Short> {
-        if self.current_transaction.is_busy() {
+        if self.current_transaction.busy_data() {
             return Err(Status::Busy(self.clocks));
         }
 
-        match self.cache.read_short(addr) {
+        match self.data_cache.read_short(addr) {
             Ok(value) => {
-                self.hits += 1;
+                self.accesses += 1;
 
                 Ok(value)
             }
             Err(cache::Status::Cold) => {
                 self.cold_misses += 1;
                 self.clocks = self.miss_penalty;
-                self.current_transaction = ReadShort(addr);
-                Err(Status::Busy(self.clocks))
+                Err(self.set_if_idle(ReadShort(addr)))
             }
             Err(cache::Status::Conflict) => {
                 self.misses += 1;
                 self.clocks = self.miss_penalty;
-                self.current_transaction = ReadShort(addr);
-                Err(Status::Busy(self.clocks))
+                Err(self.set_if_idle(ReadShort(addr)))
             }
             Err(cache::Status::Disabled) => {
                 self.clocks = self.miss_penalty;
-                self.current_transaction = ReadShort(addr);
-                Err(Status::Busy(self.clocks))
+                Err(self.set_if_idle(ReadShort(addr)))
             }
 
             _ => unreachable!("No hits allowed!"),
@@ -192,32 +224,59 @@ impl MemoryModule for SingleLevel {
     }
 
     fn read_word(&mut self, addr: Word) -> Result<Word> {
-        if self.current_transaction.is_busy() {
+        if self.current_transaction.busy_data() {
             return Err(Status::Busy(self.clocks));
         }
 
-        match self.cache.read_word(addr) {
+        match self.data_cache.read_word(addr) {
             Ok(value) => {
-                self.hits += 1;
+                self.accesses += 1;
 
                 Ok(value)
             }
             Err(cache::Status::Cold) => {
                 self.cold_misses += 1;
                 self.clocks = self.miss_penalty;
-                self.current_transaction = ReadWord(addr);
-                Err(Status::Busy(self.clocks))
+                Err(self.set_if_idle(ReadWord(addr)))
             }
             Err(cache::Status::Conflict) => {
                 self.misses += 1;
                 self.clocks = self.miss_penalty;
-                self.current_transaction = ReadWord(addr);
-                Err(Status::Busy(self.clocks))
+                Err(self.set_if_idle(ReadWord(addr)))
             }
             Err(cache::Status::Disabled) => {
                 self.clocks = self.miss_penalty;
-                self.current_transaction = ReadWord(addr);
-                Err(Status::Busy(self.clocks))
+                Err(self.set_if_idle(ReadWord(addr)))
+            }
+
+            _ => unreachable!("No hits allowed!"),
+        }
+    }
+
+    fn read_instruction(&mut self, addr: Word) -> Result<Word> {
+        if self.current_transaction.busy_instruction() {
+            return Err(Status::Busy(self.clocks));
+        }
+
+        match self.instruction_cache.read_word(addr) {
+            Ok(value) => {
+                self.accesses += 1;
+
+                Ok(value)
+            }
+            Err(cache::Status::Cold) => {
+                self.cold_misses += 1;
+                self.clocks = self.miss_penalty;
+                Err(self.set_if_idle(ReadInstruction(addr)))
+            }
+            Err(cache::Status::Conflict) => {
+                self.misses += 1;
+                self.clocks = self.miss_penalty;
+                Err(self.set_if_idle(ReadInstruction(addr)))
+            }
+            Err(cache::Status::Disabled) => {
+                self.clocks = self.miss_penalty;
+                Err(self.set_if_idle(ReadInstruction(addr)))
             }
 
             _ => unreachable!("No hits allowed!"),
@@ -225,12 +284,12 @@ impl MemoryModule for SingleLevel {
     }
 
     fn write_byte(&mut self, addr: Word, value: Byte) -> Status {
-        if self.current_transaction.is_busy() {
+        if self.current_transaction.busy_data() {
             Status::Busy(self.clocks)
         } else {
-            match self.cache.write_byte(addr, value) {
+            match self.data_cache.write_byte(addr, value) {
                 cache::Status::Hit => {
-                    self.hits += 1;
+                    self.accesses += 1;
 
                     Status::Idle
                 }
@@ -238,33 +297,30 @@ impl MemoryModule for SingleLevel {
                     self.misses += 1;
                     self.clocks = self.miss_penalty;
 
-                    self.current_transaction = WriteByte(addr, value);
-                    Status::Busy(self.clocks)
+                    self.set_if_idle(WriteByte(addr, value))
                 }
                 cache::Status::Cold => {
                     self.cold_misses += 1;
                     self.clocks = self.miss_penalty;
 
-                    self.current_transaction = WriteByte(addr, value);
-                    Status::Busy(self.clocks)
+                    self.set_if_idle(WriteByte(addr, value))
                 }
                 cache::Status::Disabled => {
                     self.clocks = self.miss_penalty;
 
-                    self.current_transaction = WriteByte(addr, value);
-                    Status::Busy(self.clocks)
+                    self.set_if_idle(WriteByte(addr, value))
                 }
             }
         }
     }
 
     fn write_short(&mut self, addr: Word, value: Short) -> Status {
-        if self.current_transaction.is_busy() {
+        if self.current_transaction.busy_data() {
             Status::Busy(self.clocks)
         } else {
-            match self.cache.write_short(addr, value) {
+            match self.data_cache.write_short(addr, value) {
                 cache::Status::Hit => {
-                    self.hits += 1;
+                    self.accesses += 1;
 
                     Status::Idle
                 }
@@ -275,8 +331,7 @@ impl MemoryModule for SingleLevel {
                         self.clocks += 1 + self.miss_penalty;
                     }
 
-                    self.current_transaction = WriteShort(addr, value);
-                    Status::Busy(self.clocks)
+                    self.set_if_idle(WriteShort(addr, value))
                 }
                 cache::Status::Cold => {
                     self.cold_misses += 1;
@@ -285,8 +340,7 @@ impl MemoryModule for SingleLevel {
                         self.clocks += 1 + self.miss_penalty;
                     }
 
-                    self.current_transaction = WriteShort(addr, value);
-                    Status::Busy(self.clocks)
+                    self.set_if_idle(WriteShort(addr, value))
                 }
                 cache::Status::Disabled => {
                     self.clocks = self.miss_penalty;
@@ -294,20 +348,19 @@ impl MemoryModule for SingleLevel {
                         self.clocks += 1 + self.miss_penalty;
                     }
 
-                    self.current_transaction = WriteShort(addr, value);
-                    Status::Busy(self.clocks)
+                    self.set_if_idle(WriteShort(addr, value))
                 }
             }
         }
     }
 
     fn write_word(&mut self, addr: Word, value: Word) -> Status {
-        if self.current_transaction.is_busy() {
+        if self.current_transaction.busy_data() {
             Status::Busy(self.clocks)
         } else {
-            match self.cache.write_word(addr, value) {
+            match self.data_cache.write_word(addr, value) {
                 cache::Status::Hit => {
-                    self.hits += 1;
+                    self.accesses += 1;
 
                     Status::Idle
                 }
@@ -318,8 +371,7 @@ impl MemoryModule for SingleLevel {
                         self.clocks += 1 + self.miss_penalty;
                     }
 
-                    self.current_transaction = WriteWord(addr, value);
-                    Status::Busy(self.clocks)
+                    self.set_if_idle(WriteWord(addr, value))
                 }
                 cache::Status::Cold => {
                     self.cold_misses += 1;
@@ -328,8 +380,7 @@ impl MemoryModule for SingleLevel {
                         self.clocks += 1 + self.miss_penalty;
                     }
 
-                    self.current_transaction = WriteWord(addr, value);
-                    Status::Busy(self.clocks)
+                    self.set_if_idle(WriteWord(addr, value))
                 }
                 cache::Status::Disabled => {
                     self.clocks = self.miss_penalty;
@@ -337,8 +388,7 @@ impl MemoryModule for SingleLevel {
                         self.clocks += 1 + self.miss_penalty;
                     }
 
-                    self.current_transaction = WriteWord(addr, value);
-                    Status::Busy(self.clocks)
+                    self.set_if_idle(WriteWord(addr, value))
                 }
             }
         }
@@ -353,11 +403,11 @@ impl MemoryModule for SingleLevel {
     }
 
     fn cache_hits(&self) -> usize {
-        self.hits
+        self.accesses - (self.cold_misses + self.misses)
     }
 
     fn accesses(&self) -> usize {
-        self.cold_misses + self.misses + self.hits
+        self.cold_misses + self.misses + self.accesses
     }
 }
 
@@ -366,7 +416,8 @@ impl SingleLevel {
     ///
     /// # Arguments
     ///
-    /// - `cache` -- the cache to use
+    /// - `data_cache` -- the cache to use for data
+    /// - `instruction_cache` -- the cache to use for instructions
     /// - `memory` -- the memoryspace to use
     /// - `miss_penalty` -- the penalty of a cache miss
     /// - `writethrough` -- whether the cache is *writethrough*, meaning uncached writes go straight to memory
@@ -374,23 +425,32 @@ impl SingleLevel {
     /// # Notes
     ///
     /// - A misaligned access has a clock penalty of 1 plus another miss penalty (multiple accesses)
-    pub fn new<T: Cache + 'static>(
-        cache: T,
+    pub fn new<T: Cache + 'static, U: Cache + 'static>(
+        data_cache: U,
+        instruction_cache: T,
         memory: Memory,
         miss_penalty: usize,
         writethrough: bool,
     ) -> Self {
-        Self::new_with_boxed(Box::new(cache), memory, miss_penalty, writethrough)
+        Self::new_with_boxed(
+            Box::new(data_cache),
+            Box::new(instruction_cache),
+            memory,
+            miss_penalty,
+            writethrough,
+        )
     }
 
     pub fn new_with_boxed(
-        cache: Box<dyn Cache>,
+        data_cache: Box<dyn Cache>,
+        instruction_cache: Box<dyn Cache>,
         memory: Memory,
         miss_penalty: usize,
         writethrough: bool,
     ) -> Self {
         Self {
-            cache,
+            data_cache,
+            instruction_cache,
             memory,
 
             miss_penalty,
@@ -401,8 +461,16 @@ impl SingleLevel {
 
             cold_misses: 0,
             misses: 0,
-            hits: 0,
+            accesses: 0,
             evictions: 0,
         }
+    }
+
+    /// Sets the transaction if idle
+    fn set_if_idle(&mut self, transaction: Transaction) -> Status {
+        if !self.current_transaction.is_busy() {
+            self.current_transaction = transaction;
+        }
+        Status::Busy(self.clocks)
     }
 }

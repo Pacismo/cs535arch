@@ -41,7 +41,7 @@ impl Memory {
     }
 
     pub fn max_address(&self) -> Word {
-        (self.pages.len() as Word) << 16
+        ((self.pages.len() as Word) << 16) - 1
     }
 
     pub fn read_byte(&self, address: Word) -> Byte {

@@ -27,6 +27,8 @@ pub trait MemoryModule {
     fn read_short(&mut self, addr: Word) -> Result<Short>;
     /// Reads a word from memory. Returns value on cache hit
     fn read_word(&mut self, addr: Word) -> Result<Word>;
+    /// Reads an instruction from memory. Returns value on cache hit
+    fn read_instruction(&mut self, addr: Word) -> Result<Word>;
 
     /// Writes a byte to memory
     fn write_byte(&mut self, addr: Word, value: Byte) -> Status;
