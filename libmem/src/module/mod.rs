@@ -12,11 +12,6 @@ pub enum Status {
     ///
     /// The contained value represents the number of remaining clocks for completion.
     Busy(usize),
-
-    /// The module is busy reading data.
-    ///
-    /// The contained value represents the number of remaining clocks for completion.
-    Reading(usize),
 }
 
 pub type Result<T> = std::result::Result<T, Status>;
@@ -26,18 +21,18 @@ pub trait MemoryModule {
     /// Clocks the module, decrementing any counters.
     fn clock(&mut self, amount: usize);
 
-    /// Reads a byte from memory.
+    /// Reads a byte from memory. Returns value on cache hit
     fn read_byte(&mut self, addr: Word) -> Result<Byte>;
-    /// Reads a short from memory.
+    /// Reads a short from memory. Returns value on cache hit
     fn read_short(&mut self, addr: Word) -> Result<Short>;
-    /// Reads a word from memory.
+    /// Reads a word from memory. Returns value on cache hit
     fn read_word(&mut self, addr: Word) -> Result<Word>;
 
-    /// Writes a byte to memory.
+    /// Writes a byte to memory
     fn write_byte(&mut self, addr: Word, value: Byte) -> Status;
-    /// Writes a short to memory.
+    /// Writes a short to memory
     fn write_short(&mut self, addr: Word, value: Short) -> Status;
-    /// Writes a word to memory.
+    /// Writes a word to memory
     fn write_word(&mut self, addr: Word, value: Word) -> Status;
 
     /// Returns the total number of *cold* cache misses that have occurred for the duration of the runtime.

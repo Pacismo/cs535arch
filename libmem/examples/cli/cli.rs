@@ -12,16 +12,21 @@ fn ranged<const MIN: usize, const MAX: usize>(val: &str) -> Result<usize, String
 
 #[derive(Subcommand, Clone)]
 pub enum CacheMode {
+    /// Use no cache
     None,
+    /// Use an associative cache
     Associative {
+        /// How many bits to reserve for the set
         #[arg(value_parser = ranged::<0, 32>)]
         set_bits: usize,
+        /// How many bits to reserve for the byte offset
         #[arg(value_parser = ranged::<2, 32>)]
         off_bits: usize,
     },
 }
 
 #[derive(Parser)]
+#[clap(author, version, about)]
 pub struct Args {
     /// How many pages to allocate
     #[arg(value_parser = ranged::<3, 65536>)]

@@ -21,7 +21,7 @@ pub enum Transaction {
 
 impl Transaction {
     pub fn is_busy(&self) -> bool {
-        matches!(self, Self::Idle)
+        !matches!(self, Self::Idle)
     }
 }
 
@@ -92,168 +92,135 @@ impl MemoryModule for SingleLevel {
                     }
                 }
 
+                ReadByte(addr) => {
+                    if self.cache.write_line(addr, &mut self.memory) {
+                        self.evictions += 1;
+                    }
+                }
+                ReadShort(addr) => {
+                    if self.cache.write_line(addr, &mut self.memory) {
+                        self.evictions += 1;
+                    }
+                    if self.cache.within_line(addr, 2) {
+                        if self.cache.write_line(addr + 1, &mut self.memory) {
+                            self.evictions += 1;
+                        }
+                    }
+                }
+                ReadWord(addr) => {
+                    if self.cache.write_line(addr, &mut self.memory) {
+                        self.evictions += 1;
+                    }
+                    if self.cache.within_line(addr, 4) {
+                        if self.cache.write_line(addr, &mut self.memory) {
+                            self.evictions += 1;
+                        }
+                    }
+                }
+
                 _ => (),
             }
+
+            self.current_transaction = Idle;
         }
     }
 
     fn read_byte(&mut self, addr: Word) -> Result<Byte> {
-        if let ReadByte(address) = self.current_transaction {
-            if address == addr {
-                if self.clocks > 0 {
-                    Err(Status::Reading(self.clocks))
-                } else {
-                    if self.cache.write_line(addr, &mut self.memory) {
-                        self.evictions += 1;
-                    }
-                    self.current_transaction = Idle;
-                    Ok(self.cache.read_byte(addr).unwrap())
-                }
-            } else {
+        if self.current_transaction.is_busy() {
+            return Err(Status::Busy(self.clocks));
+        }
+
+        match self.cache.read_byte(addr) {
+            Ok(value) => {
+                self.hits += 1;
+
+                Ok(value)
+            }
+            Err(cache::Status::Cold) => {
+                self.cold_misses += 1;
+                self.clocks = self.miss_penalty;
+                self.current_transaction = ReadByte(addr);
                 Err(Status::Busy(self.clocks))
             }
-        } else {
-            match self.cache.read_byte(addr) {
-                Ok(value) => {
-                    self.hits += 1;
-
-                    Ok(value)
-                }
-                Err(cache::Status::Cold) => {
-                    self.cold_misses += 1;
-                    self.clocks = self.miss_penalty;
-                    self.current_transaction = ReadByte(addr);
-                    Err(Status::Reading(self.clocks))
-                }
-                Err(cache::Status::Conflict) => {
-                    self.misses += 1;
-                    self.clocks = self.miss_penalty;
-                    self.current_transaction = ReadByte(addr);
-                    Err(Status::Reading(self.clocks))
-                }
-                Err(cache::Status::Disabled) => {
-                    self.clocks = self.miss_penalty;
-                    self.current_transaction = ReadByte(addr);
-                    Err(Status::Reading(self.clocks))
-                }
-                _ => unreachable!("No hits allowed!"),
+            Err(cache::Status::Conflict) => {
+                self.misses += 1;
+                self.clocks = self.miss_penalty;
+                self.current_transaction = ReadByte(addr);
+                Err(Status::Busy(self.clocks))
             }
+            Err(cache::Status::Disabled) => {
+                self.clocks = self.miss_penalty;
+                self.current_transaction = ReadByte(addr);
+                Err(Status::Busy(self.clocks))
+            }
+
+            _ => unreachable!("No hits allowed!"),
         }
     }
 
     fn read_short(&mut self, addr: Word) -> Result<Short> {
-        if let ReadShort(address) = self.current_transaction {
-            if address == addr {
-                if self.clocks > 0 {
-                    Err(Status::Reading(self.clocks))
-                } else {
-                    if self.cache.write_line(addr, &mut self.memory) {
-                        self.evictions += 1;
-                    }
-                    self.current_transaction = Idle;
-                    Ok(self.cache.read_short(addr).unwrap())
-                }
-            } else {
+        if self.current_transaction.is_busy() {
+            return Err(Status::Busy(self.clocks));
+        }
+
+        match self.cache.read_short(addr) {
+            Ok(value) => {
+                self.hits += 1;
+
+                Ok(value)
+            }
+            Err(cache::Status::Cold) => {
+                self.cold_misses += 1;
+                self.clocks = self.miss_penalty;
+                self.current_transaction = ReadShort(addr);
                 Err(Status::Busy(self.clocks))
             }
-        } else {
-            match self.cache.read_short(addr) {
-                Ok(value) => {
-                    self.hits += 1;
-
-                    Ok(value)
-                }
-                Err(cache::Status::Cold) => {
-                    self.cold_misses += 1;
-
-                    self.clocks = self.miss_penalty;
-                    if addr % 2 != 0 {
-                        self.clocks += 1 + self.miss_penalty;
-                    }
-
-                    self.current_transaction = ReadShort(addr);
-                    Err(Status::Reading(self.clocks))
-                }
-                Err(cache::Status::Conflict) => {
-                    self.misses += 1;
-
-                    self.clocks = self.miss_penalty;
-                    if addr % 2 != 0 {
-                        self.clocks += 1 + self.miss_penalty;
-                    }
-
-                    self.current_transaction = ReadShort(addr);
-                    Err(Status::Reading(self.clocks))
-                }
-                Err(cache::Status::Disabled) => {
-                    self.clocks = self.miss_penalty;
-                    if addr % 2 != 0 {
-                        self.clocks += 1 + self.miss_penalty;
-                    }
-
-                    self.current_transaction = ReadShort(addr);
-                    Err(Status::Reading(self.clocks))
-                }
-                _ => unreachable!("No hits allowed!"),
+            Err(cache::Status::Conflict) => {
+                self.misses += 1;
+                self.clocks = self.miss_penalty;
+                self.current_transaction = ReadShort(addr);
+                Err(Status::Busy(self.clocks))
             }
+            Err(cache::Status::Disabled) => {
+                self.clocks = self.miss_penalty;
+                self.current_transaction = ReadShort(addr);
+                Err(Status::Busy(self.clocks))
+            }
+
+            _ => unreachable!("No hits allowed!"),
         }
     }
 
     fn read_word(&mut self, addr: Word) -> Result<Word> {
-        if let ReadWord(address) = self.current_transaction {
-            if address == addr {
-                if self.clocks > 0 {
-                    Err(Status::Reading(self.clocks))
-                } else {
-                    if self.cache.write_line(addr, &mut self.memory) {
-                        self.evictions += 1;
-                    }
-                    self.current_transaction = Idle;
-                    Ok(self.cache.read_word(addr).unwrap())
-                }
-            } else {
+        if self.current_transaction.is_busy() {
+            return Err(Status::Busy(self.clocks));
+        }
+
+        match self.cache.read_word(addr) {
+            Ok(value) => {
+                self.hits += 1;
+
+                Ok(value)
+            }
+            Err(cache::Status::Cold) => {
+                self.cold_misses += 1;
+                self.clocks = self.miss_penalty;
+                self.current_transaction = ReadWord(addr);
                 Err(Status::Busy(self.clocks))
             }
-        } else {
-            match self.cache.read_word(addr) {
-                Ok(value) => {
-                    self.hits += 1;
-
-                    Ok(value)
-                }
-                Err(cache::Status::Cold) => {
-                    self.cold_misses += 1;
-
-                    self.clocks = self.miss_penalty;
-                    if addr % 4 != 0 {
-                        self.clocks += 1 + self.miss_penalty;
-                    }
-
-                    self.current_transaction = ReadWord(addr);
-                    Err(Status::Reading(self.clocks))
-                }
-                Err(cache::Status::Conflict) => {
-                    self.misses += 1;
-
-                    self.clocks = self.miss_penalty;
-                    if addr % 4 != 0 {
-                        self.clocks += 1 + self.miss_penalty;
-                    }
-
-                    self.current_transaction = ReadWord(addr);
-                    Err(Status::Reading(self.clocks))
-                }
-                Err(cache::Status::Disabled) => {
-                    self.clocks = self.miss_penalty;
-                    if addr % 4 != 0 {
-                        self.clocks += 1 + self.miss_penalty;
-                    }
-
-                    self.current_transaction = ReadWord(addr);
-                    Err(Status::Reading(self.clocks))
-                }
-                _ => unreachable!("No hits allowed!"),
+            Err(cache::Status::Conflict) => {
+                self.misses += 1;
+                self.clocks = self.miss_penalty;
+                self.current_transaction = ReadWord(addr);
+                Err(Status::Busy(self.clocks))
             }
+            Err(cache::Status::Disabled) => {
+                self.clocks = self.miss_penalty;
+                self.current_transaction = ReadWord(addr);
+                Err(Status::Busy(self.clocks))
+            }
+
+            _ => unreachable!("No hits allowed!"),
         }
     }
 

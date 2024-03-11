@@ -5,16 +5,20 @@ use autocomplete::Node;
 use clap::{Parser, ValueEnum};
 use inquire::Autocomplete;
 use libseis::types::{SWord, Word};
-use std::fmt::Display;
+use std::{fmt::Display, rc::Rc};
 
+/// This represents the auto-completion for the interactive console as a forest of node trees.
+///
+/// Each node is capable of providing a suggestion and completing the suggestion.
+/// Nodes have branches that are navigated to provide a complete suggestion or completion.
 #[derive(Debug, Clone)]
 pub struct CommandCompleter {
-    root: Vec<Box<dyn Node>>,
+    root: Vec<Rc<dyn Node>>,
 }
 
 fn recurse_suggestions<'a>(
     path: &[&str],
-    node: &'a [Box<dyn Node>],
+    node: &'a [Rc<dyn Node>],
     next_level: bool,
 ) -> Vec<&'a dyn Node> {
     if node.len() == 0 {
@@ -37,7 +41,7 @@ fn recurse_suggestions<'a>(
     } else {
         node.iter()
             .filter_map(|r| {
-                r.matches(path[0])
+                r.exact(path[0])
                     .then(|| recurse_suggestions(&path[1..], r.subtree(), next_level))
             })
             .reduce(|mut a, e| {
@@ -198,98 +202,106 @@ fn memval_parser(value: &str) -> Result<Word, String> {
 }
 
 #[derive(Parser, Debug)]
-#[clap(multicall = true)]
+#[clap(multicall = true, disable_help_flag = true)]
 pub enum Command {
+    /// Read values from memory
     Read {
+        /// The address to read from
         #[clap(value_parser = address_parser)]
         address: Word,
 
-        #[clap(default_value_t = Sign::Unsigned)]
-        sign: Sign,
+        /// Specify the width of the type
         #[clap(name = "TYPE", default_value_t = Type::Byte)]
         ty: Type,
+        /// Specify whether the type is signed or unsigned
+        #[clap(default_value_t = Sign::Unsigned)]
+        sign: Sign,
     },
+    /// Write values to memory
     Write {
+        /// The address to write to
         #[clap(value_parser = address_parser)]
         address: Word,
+
+        /// The value to write to the address
         #[clap(value_parser = memval_parser)]
         #[arg(allow_hyphen_values = true)]
         value: Word,
 
+        /// Specify the width of the type
         #[clap(name = "TYPE", default_value_t = Type::Byte)]
         ty: Type,
     },
+    /// Stop the runtime
     Exit,
 }
 
 impl Command {
     pub fn autocompleter() -> CommandCompleter {
         let types = vec![
-            StringCompleter {
+            Rc::new(StringCompleter {
                 string: "byte".to_owned(),
                 subtree: vec![],
-            },
-            StringCompleter {
+            }),
+            Rc::new(StringCompleter {
                 string: "short".to_owned(),
                 subtree: vec![],
-            },
-            StringCompleter {
+            }),
+            Rc::new(StringCompleter {
                 string: "word".to_owned(),
                 subtree: vec![],
-            },
+            }),
         ];
-        let signed = vec![
-            StringCompleter {
+        let signs = vec![
+            Rc::new(StringCompleter {
                 string: "signed".to_owned(),
                 subtree: vec![],
-            },
-            StringCompleter {
+            }),
+            Rc::new(StringCompleter {
                 string: "unsigned".to_owned(),
                 subtree: vec![],
-            },
+            }),
         ];
         CommandCompleter {
             root: vec![
-                Box::new(StringCompleter {
+                Rc::new(StringCompleter {
                     string: "exit".to_owned(),
                     subtree: vec![],
                 }),
-                Box::new(StringCompleter {
+                Rc::new(StringCompleter {
                     string: "read".to_owned(),
-                    subtree: vec![Box::new(ArgumentField {
+                    subtree: vec![Rc::new(ArgumentField {
                         string: "<ADDRESS>".to_owned(),
-                        subtree: signed
+                        subtree: types
                             .iter()
-                            .map(|s| -> Box<dyn Node> {
-                                Box::new(StringCompleter {
+                            .map(|s| -> Rc<dyn Node> {
+                                Rc::new(StringCompleter {
                                     string: s.string.clone(),
-                                    subtree: types.iter().map(|t| t.box_clone()).collect(),
+                                    subtree: signs
+                                        .iter()
+                                        .map(|t| -> Rc<dyn Node> { t.clone() })
+                                        .collect(),
                                 })
                             })
                             .collect(),
                     })],
                 }),
-                Box::new(StringCompleter {
+                Rc::new(StringCompleter {
                     string: "write".to_owned(),
-                    subtree: vec![Box::new(ArgumentField {
+                    subtree: vec![Rc::new(ArgumentField {
                         string: "<ADDRESS>".to_owned(),
-                        subtree: vec![Box::new(ArgumentField {
+                        subtree: vec![Rc::new(ArgumentField {
                             string: "<VALUE>".to_owned(),
                             subtree: types
                                 .iter()
-                                .map(|s| -> Box<dyn Node> {
-                                    Box::new(StringCompleter {
-                                        string: s.string.clone(),
-                                        subtree: vec![],
-                                    })
-                                })
+                                .map(|t| -> Rc<dyn Node> { t.clone() })
                                 .collect(),
                         })],
                     })],
                 }),
-                Box::new(StringCompleter {
+                Rc::new(StringCompleter {
                     string: "help".to_owned(),
-                    subtree: vec![Box::new("read"), Box::new("write"), Box::new("exit")],
+                    subtree: vec![Rc::new("read"), Rc::new("write"), Rc::new("exit")],
                 }),
             ],
         }

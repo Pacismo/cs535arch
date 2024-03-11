@@ -1,4 +1,7 @@
-use std::fmt::{Debug, Display};
+use std::{
+    fmt::{Debug, Display},
+    rc::Rc,
+};
 
 pub trait Node: Display + Debug {
     fn matches(&self, input: &str) -> bool;
@@ -7,15 +10,7 @@ pub trait Node: Display + Debug {
 
     fn complete(&self, input: &str) -> String;
 
-    fn subtree(&self) -> &[Box<dyn Node>];
-
-    fn box_clone(&self) -> Box<dyn Node>;
-}
-
-impl Clone for Box<dyn Node> {
-    fn clone(&self) -> Self {
-        self.box_clone()
-    }
+    fn subtree(&self) -> &[Rc<dyn Node>];
 }
 
 impl Node for String {
@@ -44,12 +39,8 @@ impl Node for String {
         }
     }
 
-    fn subtree(&self) -> &[Box<dyn Node>] {
+    fn subtree(&self) -> &[Rc<dyn Node>] {
         &[]
-    }
-
-    fn box_clone(&self) -> Box<dyn Node> {
-        Box::new(self.to_owned())
     }
 }
 
@@ -83,19 +74,15 @@ impl Node for &'static str {
         }
     }
 
-    fn subtree(&self) -> &[Box<dyn Node>] {
+    fn subtree(&self) -> &[Rc<dyn Node>] {
         &[]
-    }
-
-    fn box_clone(&self) -> Box<dyn Node> {
-        Box::new(*self)
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct StringCompleter {
     pub string: String,
-    pub subtree: Vec<Box<dyn Node>>,
+    pub subtree: Vec<Rc<dyn Node>>,
 }
 
 impl Node for StringCompleter {
@@ -128,15 +115,8 @@ impl Node for StringCompleter {
         }
     }
 
-    fn subtree(&self) -> &[Box<dyn Node>] {
+    fn subtree(&self) -> &[Rc<dyn Node>] {
         &self.subtree
-    }
-
-    fn box_clone(&self) -> Box<dyn Node> {
-        Box::new(Self {
-            string: self.string.clone(),
-            subtree: self.subtree.clone(),
-        })
     }
 }
 
@@ -149,7 +129,7 @@ impl Display for StringCompleter {
 #[derive(Debug, Clone)]
 pub struct ArgumentField {
     pub string: String,
-    pub subtree: Vec<Box<dyn Node>>,
+    pub subtree: Vec<Rc<dyn Node>>,
 }
 
 impl Node for ArgumentField {
@@ -162,18 +142,22 @@ impl Node for ArgumentField {
     }
 
     fn complete(&self, input: &str) -> String {
-        input.to_owned()
+        if input.ends_with(' ') {
+            let mut parts: Vec<&str> = input.split_whitespace().collect();
+            parts.push(&self.string);
+            let first = parts[0].to_string();
+
+            parts
+                .into_iter()
+                .skip(1)
+                .fold(first, |a, e| format!("{a} {e}"))
+        } else {
+            input.to_owned()
+        }
     }
 
-    fn subtree(&self) -> &[Box<dyn Node>] {
+    fn subtree(&self) -> &[Rc<dyn Node>] {
         &self.subtree
-    }
-
-    fn box_clone(&self) -> Box<dyn Node> {
-        Box::new(Self {
-            string: self.string.clone(),
-            subtree: self.subtree.clone(),
-        })
     }
 }
 

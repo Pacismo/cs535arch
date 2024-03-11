@@ -45,104 +45,128 @@ fn main() -> Result<(), Box<dyn Error>> {
                 Ok(Command::Exit) => break,
                 Ok(Command::Read { sign, ty, address }) => match (sign, ty) {
                     (Sign::Unsigned, Type::Byte) => {
-                        let (value, clocks) = match module.read_byte(address) {
-                            Ok(value) => (value, 0),
-                            Err(Status::Reading(clocks)) => {
+                        match module.read_byte(address) {
+                            Ok(value) => {
+                                println!(
+                                    "[{address:#010X} ({sign} {ty})] {} (cache hit)",
+                                    value as Byte
+                                )
+                            }
+                            Err(Status::Busy(clocks)) => {
                                 module.clock(clocks);
-                                (module.read_byte(address).unwrap(), clocks)
+                                let value = module.read_byte(address).unwrap();
+                                println!(
+                                    "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
+                                    value as Byte,
+                                    if clocks == 1 { "clock" } else { "clocks" }
+                                )
                             }
                             _ => unreachable!(),
                         };
-
-                        println!(
-                            "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
-                            value as Byte,
-                            if clocks == 1 { "clock" } else { "clocks" }
-                        )
                     }
                     (Sign::Signed, Type::Byte) => {
-                        let (value, clocks) = match module.read_byte(address) {
-                            Ok(value) => (value, 0),
-                            Err(Status::Reading(clocks)) => {
+                        match module.read_byte(address) {
+                            Ok(value) => {
+                                println!(
+                                    "[{address:#010X} ({sign} {ty})] {} (cache hit)",
+                                    value as SByte,
+                                )
+                            }
+                            Err(Status::Busy(clocks)) => {
                                 module.clock(clocks);
-                                (module.read_byte(address).unwrap(), clocks)
+                                let value = module.read_byte(address).unwrap();
+                                println!(
+                                    "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
+                                    value as SByte,
+                                    if clocks == 1 { "clock" } else { "clocks" }
+                                )
                             }
                             _ => unreachable!(),
                         };
-
-                        println!(
-                            "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
-                            value as SByte,
-                            if clocks == 1 { "clock" } else { "clocks" }
-                        )
                     }
                     (Sign::Signed, Type::Short) => {
-                        let (value, clocks) = match module.read_short(address) {
-                            Ok(value) => (value, 0),
-                            Err(Status::Reading(clocks)) => {
+                        match module.read_short(address) {
+                            Ok(value) => {
+                                println!(
+                                    "[{address:#010X} ({sign} {ty})] {} (cache hit)",
+                                    value as Short,
+                                )
+                            }
+                            Err(Status::Busy(clocks)) => {
                                 module.clock(clocks);
-                                (module.read_short(address).unwrap(), clocks)
+                                let value = module.read_short(address).unwrap();
+                                println!(
+                                    "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
+                                    value as Short,
+                                    if clocks == 1 { "clock" } else { "clocks" }
+                                )
                             }
                             _ => unreachable!(),
                         };
-
-                        println!(
-                            "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
-                            value as Short,
-                            if clocks == 1 { "clock" } else { "clocks" }
-                        )
                     }
                     (Sign::Signed, Type::Word) => {
-                        let (value, clocks) = match module.read_short(address) {
-                            Ok(value) => (value, 0),
-                            Err(Status::Reading(clocks)) => {
+                        match module.read_short(address) {
+                            Ok(value) => {
+                                println!(
+                                    "[{address:#010X} ({sign} {ty})] {} (cache hit)",
+                                    value as SShort,
+                                )
+                            }
+                            Err(Status::Busy(clocks)) => {
                                 module.clock(clocks);
-                                (module.read_short(address).unwrap(), clocks)
+                                let value = module.read_short(address).unwrap();
+                                println!(
+                                    "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
+                                    value as SShort,
+                                    if clocks == 1 { "clock" } else { "clocks" }
+                                )
                             }
                             _ => unreachable!(),
                         };
-
-                        println!(
-                            "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
-                            value as SShort,
-                            if clocks == 1 { "clock" } else { "clocks" }
-                        )
                     }
                     (Sign::Unsigned, Type::Short) => {
-                        let (value, clocks) = match module.read_word(address) {
-                            Ok(value) => (value, 0),
-                            Err(Status::Reading(clocks)) => {
+                        match module.read_word(address) {
+                            Ok(value) => {
+                                println!(
+                                    "[{address:#010X} ({sign} {ty})] {} (cache hit)",
+                                    value as Word,
+                                )
+                            }
+                            Err(Status::Busy(clocks)) => {
                                 module.clock(clocks);
-                                (module.read_word(address).unwrap(), clocks)
+                                let value = module.read_word(address).unwrap();
+                                println!(
+                                    "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
+                                    value as Word,
+                                    if clocks == 1 { "clock" } else { "clocks" }
+                                )
                             }
                             _ => unreachable!(),
                         };
-
-                        println!(
-                            "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
-                            value as Word,
-                            if clocks == 1 { "clock" } else { "clocks" }
-                        )
                     }
                     (Sign::Unsigned, Type::Word) => {
-                        let (value, clocks) = match module.read_word(address) {
-                            Ok(value) => (value, 0),
-                            Err(Status::Reading(clocks)) => {
+                        match module.read_word(address) {
+                            Ok(value) => {
+                                println!(
+                                    "[{address:#010X} ({sign} {ty})] {} (cache hit)",
+                                    value as SWord,
+                                )
+                            }
+                            Err(Status::Busy(clocks)) => {
                                 module.clock(clocks);
-                                (module.read_word(address).unwrap(), clocks)
+                                let value = module.read_word(address).unwrap();
+                                println!(
+                                    "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
+                                    value as SWord,
+                                    if clocks == 1 { "clock" } else { "clocks" }
+                                )
                             }
                             _ => unreachable!(),
                         };
-
-                        println!(
-                            "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
-                            value as SWord,
-                            if clocks == 1 { "clock" } else { "clocks" }
-                        )
                     }
                 },
                 Ok(Command::Write { ty, address, value }) => match ty {
-                    Type::Word => match module.write_byte(address, value as Byte) {
+                    Type::Byte => match module.write_byte(address, value as Byte) {
                         Status::Busy(clocks) => {
                             module.clock(clocks);
                             println!(
@@ -153,8 +177,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                         Status::Idle => {
                             println!("Write hit the cache")
                         }
-
-                        _ => unreachable!(),
                     },
                     Type::Short => match module.write_short(address, value as Short) {
                         Status::Busy(clocks) => {
@@ -167,10 +189,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                         Status::Idle => {
                             println!("Write hit the cache")
                         }
-
-                        _ => unreachable!(),
                     },
-                    Type::Byte => match module.write_word(address, value as Word) {
+                    Type::Word => match module.write_word(address, value as Word) {
                         Status::Busy(clocks) => {
                             module.clock(clocks);
                             println!(
@@ -181,8 +201,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                         Status::Idle => {
                             println!("Write hit the cache")
                         }
-
-                        _ => unreachable!(),
                     },
                 },
                 Err(e) => println!("{e}"),
