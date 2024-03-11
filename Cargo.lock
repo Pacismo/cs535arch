@@ -288,15 +288,6 @@ name = "libseis"
 version = "0.1.0"
 
 [[package]]
-name = "libseis-macros"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "lock_api"
 version = "0.4.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
