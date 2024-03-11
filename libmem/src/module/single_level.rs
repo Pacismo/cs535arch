@@ -58,6 +58,7 @@ pub struct SingleLevel {
     memory: Memory,
 
     miss_penalty: usize,
+    volatile_penalty: usize,
     writethrough: bool,
 
     current_transaction: Transaction,
@@ -219,8 +220,9 @@ impl MemoryModule for SingleLevel {
             Err(cache::Status::Conflict) => {
                 self.misses += 1;
                 let mut penalty = self.miss_penalty;
-                if addr % 2 != 0 {
-                    penalty += 1 + self.miss_penalty;
+
+                if !self.data_cache.within_line(addr, 2) {
+                    penalty += self.miss_penalty;
                 }
 
                 Err(self.set_if_idle(ReadShort(addr), penalty))
@@ -228,16 +230,19 @@ impl MemoryModule for SingleLevel {
             Err(cache::Status::Cold) => {
                 self.cold_misses += 1;
                 let mut penalty = self.miss_penalty;
-                if addr % 2 != 0 {
-                    penalty += 1 + self.miss_penalty;
+                if addr % 4 != 0 {
+                    penalty += 1;
+                }
+                if !self.data_cache.within_line(addr, 2) {
+                    penalty += self.miss_penalty;
                 }
 
                 Err(self.set_if_idle(ReadShort(addr), penalty))
             }
             Err(cache::Status::Disabled) => {
-                let mut penalty = self.miss_penalty;
+                let mut penalty = self.volatile_penalty;
                 if addr % 2 != 0 {
-                    penalty += 1 + self.miss_penalty;
+                    penalty += self.volatile_penalty;
                 }
 
                 Err(self.set_if_idle(ReadShort(addr), penalty))
@@ -260,26 +265,31 @@ impl MemoryModule for SingleLevel {
             }
             Err(cache::Status::Conflict) => {
                 self.misses += 1;
+
                 let mut penalty = self.miss_penalty;
-                if addr % 4 != 0 {
-                    penalty += 1 + self.miss_penalty;
+                if !self.data_cache.within_line(addr, 4) {
+                    penalty += self.miss_penalty
                 }
 
                 Err(self.set_if_idle(ReadWord(addr), penalty))
             }
             Err(cache::Status::Cold) => {
                 self.cold_misses += 1;
+
                 let mut penalty = self.miss_penalty;
                 if addr % 4 != 0 {
-                    penalty += 1 + self.miss_penalty;
+                    penalty += 1;
+                }
+                if !self.data_cache.within_line(addr, 4) {
+                    penalty += self.miss_penalty
                 }
 
                 Err(self.set_if_idle(ReadWord(addr), penalty))
             }
             Err(cache::Status::Disabled) => {
-                let mut penalty = self.miss_penalty;
+                let mut penalty = self.volatile_penalty;
                 if addr % 4 != 0 {
-                    penalty += 1 + self.miss_penalty;
+                    penalty += self.volatile_penalty * 3;
                 }
 
                 Err(self.set_if_idle(ReadWord(addr), penalty))
@@ -309,9 +319,9 @@ impl MemoryModule for SingleLevel {
                 Err(Busy(self.clocks))
             }
         } else {
-            let mut penalty = self.miss_penalty;
-            if addr % 4 != 0 {
-                penalty += self.miss_penalty;
+            let mut penalty = self.volatile_penalty;
+            if addr % 2 != 0 {
+                penalty += self.volatile_penalty;
             }
 
             Err(self.set_if_idle(ReadShortV(addr), penalty))
@@ -326,9 +336,9 @@ impl MemoryModule for SingleLevel {
                 Err(Busy(self.clocks))
             }
         } else {
-            let mut penalty = self.miss_penalty;
+            let mut penalty = self.volatile_penalty;
             if addr % 4 != 0 {
-                penalty += self.miss_penalty;
+                penalty += self.volatile_penalty * 3;
             }
 
             Err(self.set_if_idle(ReadWordV(addr), penalty))
@@ -405,7 +415,10 @@ impl MemoryModule for SingleLevel {
                     self.misses += 1;
                     let mut penalty = self.miss_penalty;
                     if addr % 2 != 0 {
-                        penalty += 1 + self.miss_penalty;
+                        penalty += 1;
+                    }
+                    if !self.data_cache.within_line(addr, 2) {
+                        penalty += self.miss_penalty;
                     }
 
                     self.set_if_idle(WriteShort(addr, value, false), penalty)
@@ -413,16 +426,16 @@ impl MemoryModule for SingleLevel {
                 cache::Status::Cold => {
                     self.cold_misses += 1;
                     let mut penalty = self.miss_penalty;
-                    if addr % 2 != 0 {
-                        penalty += 1 + self.miss_penalty;
+                    if !self.data_cache.within_line(addr, 2) {
+                        penalty += self.miss_penalty;
                     }
 
                     self.set_if_idle(WriteShort(addr, value, false), penalty)
                 }
                 cache::Status::Disabled => {
                     let mut penalty = self.miss_penalty;
-                    if addr % 2 != 0 {
-                        penalty += 1 + self.miss_penalty;
+                    if !self.data_cache.within_line(addr, 2) {
+                        penalty += self.miss_penalty;
                     }
 
                     self.set_if_idle(WriteShort(addr, value, false), penalty)
@@ -471,6 +484,40 @@ impl MemoryModule for SingleLevel {
         }
     }
 
+    fn write_byte_volatile(&mut self, addr: Word, value: Byte) -> Status {
+        if self.current_transaction.is_busy() {
+            Busy(self.clocks)
+        } else {
+            self.set_if_idle(WriteByte(addr, value, true), self.volatile_penalty)
+        }
+    }
+
+    fn write_short_volatile(&mut self, addr: Word, value: Short) -> Status {
+        if self.current_transaction.is_busy() {
+            Busy(self.clocks)
+        } else {
+            let mut penalty = self.volatile_penalty;
+            if addr % 2 == 0 {
+                penalty += self.volatile_penalty;
+            }
+
+            self.set_if_idle(WriteShort(addr, value, true), penalty)
+        }
+    }
+
+    fn write_word_volatile(&mut self, addr: Word, value: Word) -> Status {
+        if self.current_transaction.is_busy() {
+            Busy(self.clocks)
+        } else {
+            let mut penalty = self.volatile_penalty;
+            if addr % 4 == 0 {
+                penalty += self.volatile_penalty * 3;
+            }
+
+            self.set_if_idle(WriteWord(addr, value, true), penalty)
+        }
+    }
+
     fn cold_misses(&self) -> usize {
         self.cold_misses
     }
@@ -507,6 +554,7 @@ impl SingleLevel {
         instruction_cache: T,
         memory: Memory,
         miss_penalty: usize,
+        volatile_penalty: usize,
         writethrough: bool,
     ) -> Self {
         Self::new_with_boxed(
@@ -514,6 +562,7 @@ impl SingleLevel {
             Box::new(instruction_cache),
             memory,
             miss_penalty,
+            volatile_penalty,
             writethrough,
         )
     }
@@ -523,6 +572,7 @@ impl SingleLevel {
         instruction_cache: Box<dyn Cache>,
         memory: Memory,
         miss_penalty: usize,
+        volatile_penalty: usize,
         writethrough: bool,
     ) -> Self {
         Self {
@@ -531,6 +581,7 @@ impl SingleLevel {
             memory,
 
             miss_penalty,
+            volatile_penalty,
             writethrough,
 
             current_transaction: Idle,

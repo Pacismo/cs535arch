@@ -408,8 +408,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     let memory = Memory::new(args.pages);
 
     // TODO: use the module to simulate memory
-    let mut module =
-        SingleLevel::new_with_boxed(dcache, icache, memory, args.miss_penalty, args.writethrough);
+    let mut module = SingleLevel::new_with_boxed(
+        dcache,
+        icache,
+        memory,
+        args.miss_penalty,
+        args.volatile_penalty,
+        args.writethrough,
+    );
     let mut total_clocks = 0;
 
     if let Some(file) = args.cmd_file {

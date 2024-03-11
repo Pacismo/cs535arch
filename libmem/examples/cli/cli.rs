@@ -39,6 +39,9 @@ pub struct Args {
     /// The penalty for a miss, in clocks
     #[arg(default_value_t = 100, value_parser = ranged::<1, { usize::MAX }>)]
     pub miss_penalty: usize,
+    /// The penalty for a volatile access, in clocks
+    #[arg(default_value_t = 100, value_parser = ranged::<1, { usize::MAX }>)]
+    pub volatile_penalty: usize,
     /// Whether to have writes go through the cache on miss
     #[arg(short, long)]
     pub writethrough: bool,
