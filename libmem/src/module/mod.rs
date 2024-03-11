@@ -27,6 +27,14 @@ pub trait MemoryModule {
     fn read_short(&mut self, addr: Word) -> Result<Short>;
     /// Reads a word from memory. Returns value on cache hit
     fn read_word(&mut self, addr: Word) -> Result<Word>;
+
+    /// Reads a byte from memory, bypassing the cache
+    fn read_byte_volatile(&mut self, addr: Word) -> Result<Byte>;
+    /// Reads a short from memory, bypassing the cache
+    fn read_short_volatile(&mut self, addr: Word) -> Result<Short>;
+    /// Reads a word from memory, bypassing the cache
+    fn read_word_volatile(&mut self, addr: Word) -> Result<Word>;
+
     /// Reads an instruction from memory. Returns value on cache hit
     fn read_instruction(&mut self, addr: Word) -> Result<Word>;
 
@@ -36,6 +44,13 @@ pub trait MemoryModule {
     fn write_short(&mut self, addr: Word, value: Short) -> Status;
     /// Writes a word to memory
     fn write_word(&mut self, addr: Word, value: Word) -> Status;
+
+    /// Writes a byte to memory, bypassing the cache
+    fn write_byte_volatile(&mut self, addr: Word, value: Byte) -> Status;
+    /// Writes a short to memory, bypassing the cache
+    fn write_short_volatile(&mut self, addr: Word, value: Short) -> Status;
+    /// Writes a word to memory, bypassing the cache
+    fn write_word_volatile(&mut self, addr: Word, value: Word) -> Status;
 
     /// Returns the total number of *cold* cache misses that have occurred for the duration of the runtime.
     fn cold_misses(&self) -> usize;

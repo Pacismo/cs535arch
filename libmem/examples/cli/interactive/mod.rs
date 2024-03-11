@@ -5,7 +5,7 @@ use autocomplete::Node;
 use clap::{Parser, ValueEnum};
 use inquire::Autocomplete;
 use libseis::types::{SWord, Word};
-use std::{fmt::Display, rc::Rc};
+use std::{fmt::Display, sync::Arc};
 
 /// This represents the auto-completion for the interactive console as a forest of node trees.
 ///
@@ -13,12 +13,12 @@ use std::{fmt::Display, rc::Rc};
 /// Nodes have branches that are navigated to provide a complete suggestion or completion.
 #[derive(Debug, Clone)]
 pub struct CommandCompleter {
-    root: Vec<Rc<dyn Node>>,
+    root: Arc<[Arc<dyn Node>]>,
 }
 
 fn recurse_suggestions<'a>(
     path: &[&str],
-    node: &'a [Rc<dyn Node>],
+    node: &'a [Arc<dyn Node>],
     next_level: bool,
 ) -> Vec<&'a dyn Node> {
     if node.len() == 0 {
@@ -232,78 +232,151 @@ pub enum Command {
         #[clap(name = "TYPE", default_value_t = Type::Byte)]
         ty: Type,
     },
+    /// Read values from memory, bypassing the cache
+    VolatileRead {
+        /// The address to read from
+        #[clap(value_parser = address_parser)]
+        address: Word,
+
+        /// Specify the width of the type
+        #[clap(name = "TYPE", default_value_t = Type::Byte)]
+        ty: Type,
+        /// Specify whether the type is signed or unsigned
+        #[clap(default_value_t = Sign::Unsigned)]
+        sign: Sign,
+    },
+    /// Write values to memory, bypassing the cache
+    VolatileWrite {
+        /// The address to write to
+        #[clap(value_parser = address_parser)]
+        address: Word,
+
+        /// The value to write to the address
+        #[clap(value_parser = memval_parser)]
+        #[arg(allow_hyphen_values = true)]
+        value: Word,
+
+        /// Specify the width of the type
+        #[clap(name = "TYPE", default_value_t = Type::Byte)]
+        ty: Type,
+    },
     /// Stop the runtime
     Exit,
 }
 
 impl Command {
+    /// Constructs a completer tree and returns a CommandCompleter
     pub fn autocompleter() -> CommandCompleter {
-        let types = vec![
-            Rc::new(StringCompleter {
-                string: "byte".to_owned(),
-                subtree: vec![],
-            }),
-            Rc::new(StringCompleter {
-                string: "short".to_owned(),
-                subtree: vec![],
-            }),
-            Rc::new(StringCompleter {
-                string: "word".to_owned(),
-                subtree: vec![],
-            }),
-        ];
-        let signs = vec![
-            Rc::new(StringCompleter {
-                string: "signed".to_owned(),
-                subtree: vec![],
-            }),
-            Rc::new(StringCompleter {
-                string: "unsigned".to_owned(),
-                subtree: vec![],
-            }),
-        ];
-        CommandCompleter {
-            root: vec![
-                Rc::new(StringCompleter {
-                    string: "exit".to_owned(),
-                    subtree: vec![],
+        static mut TREE: Option<Arc<[Arc<dyn Node>]>> = None;
+        if let Some(root) = unsafe { &TREE } {
+            CommandCompleter { root: root.clone() }
+        } else {
+            let empty: Arc<[Arc<dyn Node>]> = [].into();
+
+            let types = Arc::new([
+                Arc::new(StringCompleter {
+                    string: "byte",
+                    subtree: empty.clone(),
                 }),
-                Rc::new(StringCompleter {
-                    string: "read".to_owned(),
-                    subtree: vec![Rc::new(ArgumentField {
-                        string: "<ADDRESS>".to_owned(),
+                Arc::new(StringCompleter {
+                    string: "short",
+                    subtree: empty.clone(),
+                }),
+                Arc::new(StringCompleter {
+                    string: "word",
+                    subtree: empty.clone(),
+                }),
+            ]);
+
+            let signs = Arc::new([
+                Arc::new(StringCompleter {
+                    string: "signed",
+                    subtree: empty.clone(),
+                }),
+                Arc::new(StringCompleter {
+                    string: "unsigned",
+                    subtree: empty.clone(),
+                }),
+            ]);
+
+            let root: Arc<[Arc<dyn Node>]> = Arc::new([
+                Arc::new(StringCompleter {
+                    string: "exit",
+                    subtree: empty.clone(),
+                }),
+                Arc::new(StringCompleter {
+                    string: "help",
+                    subtree: Arc::new([Arc::new("read"), Arc::new("write"), Arc::new("exit")]),
+                }),
+                Arc::new(StringCompleter {
+                    string: "read",
+                    subtree: Arc::new([Arc::new(ArgumentField {
+                        string: "<ADDRESS>",
                         subtree: types
                             .iter()
-                            .map(|s| -> Rc<dyn Node> {
-                                Rc::new(StringCompleter {
-                                    string: s.string.clone(),
+                            .map(|s| -> Arc<dyn Node> {
+                                Arc::new(StringCompleter {
+                                    string: s.string,
                                     subtree: signs
                                         .iter()
-                                        .map(|t| -> Rc<dyn Node> { t.clone() })
+                                        .map(|t| -> Arc<dyn Node> { t.clone() })
                                         .collect(),
                                 })
                             })
                             .collect(),
-                    })],
+                    })]),
                 }),
-                Rc::new(StringCompleter {
-                    string: "write".to_owned(),
-                    subtree: vec![Rc::new(ArgumentField {
-                        string: "<ADDRESS>".to_owned(),
-                        subtree: vec![Rc::new(ArgumentField {
-                            string: "<VALUE>".to_owned(),
+                Arc::new(StringCompleter {
+                    string: "write",
+                    subtree: Arc::new([Arc::new(ArgumentField {
+                        string: "<ADDRESS>",
+                        subtree: Arc::new([Arc::new(ArgumentField {
+                            string: "<VALUE>",
                             subtree: types
                                 .iter()
-                                .map(|t| -> Rc<dyn Node> { t.clone() })
+                                .map(|t| -> Arc<dyn Node> { t.clone() })
                                 .collect(),
-                        })],
-                    })],
+                        })]),
+                    })]),
                 }),
-                Rc::new(StringCompleter {
-                    string: "help".to_owned(),
-                    subtree: vec![Rc::new("read"), Rc::new("write"), Rc::new("exit")],
+                Arc::new(StringCompleter {
+                    string: "volatile-read",
+                    subtree: Arc::new([Arc::new(ArgumentField {
+                        string: "<ADDRESS>",
+                        subtree: types
+                            .iter()
+                            .map(|s| -> Arc<dyn Node> {
+                                Arc::new(StringCompleter {
+                                    string: s.string,
+                                    subtree: signs
+                                        .iter()
+                                        .map(|t| -> Arc<dyn Node> { t.clone() })
+                                        .collect(),
+                                })
+                            })
+                            .collect(),
+                    })]),
                 }),
-            ],
+                Arc::new(StringCompleter {
+                    string: "volatile-write",
+                    subtree: Arc::new([Arc::new(ArgumentField {
+                        string: "<ADDRESS>",
+                        subtree: Arc::new([Arc::new(ArgumentField {
+                            string: "<VALUE>",
+                            subtree: types
+                                .iter()
+                                .map(|t| -> Arc<dyn Node> { t.clone() })
+                                .collect(),
+                        })]),
+                    })]),
+                }),
+            ]);
+
+            unsafe {
+                TREE = Some(root.clone());
+            }
+
+            CommandCompleter { root }
         }
     }
 }

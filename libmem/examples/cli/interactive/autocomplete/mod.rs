@@ -1,16 +1,17 @@
 use std::{
     fmt::{Debug, Display},
-    rc::Rc,
+    ops::Deref,
+    sync::Arc,
 };
 
-pub trait Node: Display + Debug {
+pub trait Node: Display + Debug + Send + Sync {
     fn matches(&self, input: &str) -> bool;
 
     fn exact(&self, input: &str) -> bool;
 
     fn complete(&self, input: &str) -> String;
 
-    fn subtree(&self) -> &[Rc<dyn Node>];
+    fn subtree(&self) -> &[Arc<dyn Node>];
 }
 
 impl Node for String {
@@ -39,7 +40,7 @@ impl Node for String {
         }
     }
 
-    fn subtree(&self) -> &[Rc<dyn Node>] {
+    fn subtree(&self) -> &[Arc<dyn Node>] {
         &[]
     }
 }
@@ -74,36 +75,42 @@ impl Node for &'static str {
         }
     }
 
-    fn subtree(&self) -> &[Rc<dyn Node>] {
+    fn subtree(&self) -> &[Arc<dyn Node>] {
         &[]
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct StringCompleter {
-    pub string: String,
-    pub subtree: Vec<Rc<dyn Node>>,
+pub struct StringCompleter<T>
+where
+    T: Deref<Target = str> + Sized + Send + Sync + Debug,
+{
+    pub string: T,
+    pub subtree: Arc<[Arc<dyn Node>]>,
 }
 
-impl Node for StringCompleter {
+impl<T> Node for StringCompleter<T>
+where
+    T: Deref<Target = str> + Sized + Send + Sync + Debug,
+{
     fn matches(&self, input: &str) -> bool {
         self.string.contains(input)
     }
 
     fn exact(&self, input: &str) -> bool {
-        self.string == input
+        self.string.deref() == input
     }
 
     fn complete(&self, input: &str) -> String {
         let mut parts = input.split_whitespace().collect::<Vec<_>>();
         if parts.len() == 0 {
-            self.string.clone()
+            self.string.to_owned()
         } else {
             if !input.ends_with(' ') {
                 let last = parts.len() - 1;
-                parts[last] = self.string.as_str();
+                parts[last] = self.string.deref();
             } else {
-                parts.push(&self.string.as_str());
+                parts.push(&self.string.deref());
             }
 
             let first = parts[0].to_owned();
@@ -115,24 +122,33 @@ impl Node for StringCompleter {
         }
     }
 
-    fn subtree(&self) -> &[Rc<dyn Node>] {
+    fn subtree(&self) -> &[Arc<dyn Node>] {
         &self.subtree
     }
 }
 
-impl Display for StringCompleter {
+impl<T> Display for StringCompleter<T>
+where
+    T: Deref<Target = str> + Sized + Send + Sync + Debug,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.string)
+        write!(f, "{}", self.string.deref())
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct ArgumentField {
-    pub string: String,
-    pub subtree: Vec<Rc<dyn Node>>,
+pub struct ArgumentField<T>
+where
+    T: Deref<Target = str> + Sized + Send + Sync + Debug,
+{
+    pub string: T,
+    pub subtree: Arc<[Arc<dyn Node>]>,
 }
 
-impl Node for ArgumentField {
+impl<T> Node for ArgumentField<T>
+where
+    T: Deref<Target = str> + Sized + Send + Sync + Debug,
+{
     fn matches(&self, _: &str) -> bool {
         true
     }
@@ -156,13 +172,16 @@ impl Node for ArgumentField {
         }
     }
 
-    fn subtree(&self) -> &[Rc<dyn Node>] {
+    fn subtree(&self) -> &[Arc<dyn Node>] {
         &self.subtree
     }
 }
 
-impl Display for ArgumentField {
+impl<T> Display for ArgumentField<T>
+where
+    T: Deref<Target = str> + Sized + Send + Sync + Debug,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(&self.string, f)
+        Display::fmt(self.string.deref(), f)
     }
 }
