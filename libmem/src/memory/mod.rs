@@ -361,10 +361,9 @@ impl Memory {
         }
     }
 
-    pub fn read_words(&self, address: Word, amount: usize) -> Box<[Word]> {
+    pub fn read_words(&self, address: Word, amount: usize) -> Box<[u8]> {
         (address..(address + amount as Word))
-            .step_by(4)
-            .map(|a| self.read_word(a))
+            .map(|a| self.read_byte(a))
             .collect()
     }
 

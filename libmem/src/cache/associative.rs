@@ -1,7 +1,7 @@
 use super::{Cache, LineReadStatus, ReadResult, Status};
 use crate::memory::Memory;
 use libseis::types::{Byte, Short, Word};
-use std::mem::{size_of, take};
+use std::mem::take;
 
 #[derive(Debug)]
 pub struct Line {
@@ -220,12 +220,9 @@ impl Cache for Associative {
         let replaced = if let Some(line) = take(&mut self.lines[set]) {
             if line.dirty {
                 line.data
-                    .chunks_exact(4)
-                    .zip((self.construct_address(line.tag, set as Word, 0)..).step_by(4))
-                    .for_each(|(b, a)| {
-                        // The cache stores values as bytes -- reconstruct words using chunks
-                        memory.write_word(a, Word::from_be_bytes([b[0], b[1], b[2], b[3]]))
-                    });
+                    .into_iter()
+                    .zip(self.construct_address(line.tag, set as Word, 0)..)
+                    .for_each(|(&b, a)| memory.write_byte(a, b));
                 true
             } else {
                 false
@@ -237,15 +234,7 @@ impl Cache for Associative {
         self.lines[set] = Some(Box::new(Line {
             dirty: false,
             tag,
-            data: unsafe {
-                // The data comes in as words. I have to transform it into a pointer to an array of bytes of equivalent length
-                let boxed = memory.read_words(address, 2usize.pow(self.off_bits as u32));
-                let len = boxed.len() * size_of::<Word>();
-                let ptr = Box::into_raw(boxed) as *mut u8;
-                let sptr = std::slice::from_raw_parts_mut(ptr, len) as *mut [u8];
-
-                Box::from_raw(sptr)
-            },
+            data: memory.read_words(address, 2usize.pow(self.off_bits as u32)),
         }));
 
         if replaced {
