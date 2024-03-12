@@ -49,8 +49,13 @@ impl Cache for Associative {
                 None => Err(Status::Cold),
             }
         } else {
-            match (&self.lines[set], &self.lines[set + 1]) {
-                (Some(set1), Some(set2)) if set1.tag == tag && set2.tag == tag => {
+            let (otag, oset) = if set + 1 < self.lines.len() {
+                (tag, set + 1)
+            } else {
+                (tag + 1, 0)
+            };
+            match (&self.lines[set], &self.lines[oset]) {
+                (Some(set1), Some(set2)) if set1.tag == tag && set2.tag == otag => {
                     Ok(Short::from_be_bytes([set1[set1.len() - 1], set2[0]]))
                 }
                 (Some(_), Some(_)) => Err(Status::Conflict),
@@ -74,10 +79,15 @@ impl Cache for Associative {
                 None => Err(Status::Cold),
             }
         } else {
+            let (otag, oset) = if set + 1 < self.lines.len() {
+                (tag, set + 1)
+            } else {
+                (tag + 1, 0)
+            };
             let former = (self.off_bits << 16) - off;
 
-            match (&self.lines[set], &self.lines[set + 1]) {
-                (Some(set1), Some(set2)) if set1.tag == tag && set2.tag == tag => {
+            match (&self.lines[set], &self.lines[oset]) {
+                (Some(set1), Some(set2)) if set1.tag == tag && set2.tag == otag => {
                     let mut bytes = [0; 4];
                     for i in 0..4 {
                         if i > former {
@@ -237,8 +247,8 @@ impl Cache for Associative {
     fn within_line(&self, address: Word, length: usize) -> bool {
         let (_, _, off) = self.split_address(address);
 
-        // Asserts that adding `length` to the offset will not overflow to the next set.
-        if (off + length) & !(2usize.pow(length as u32)) != 0 {
+        // Asserts that a read of length bytes from the address will not overflow to the next set.
+        if (off + length - 1) & !(2usize.pow(length as u32)) != 0 {
             false
         } else {
             true
@@ -316,8 +326,13 @@ impl Cache for Associative {
                 _ => None,
             }
         } else {
-            match self.lines[set].as_ref().zip(self.lines[set + 1].as_ref()) {
-                Some((set1, set2)) if set1.tag == tag && set2.tag == tag => {
+            let (otag, oset) = if set + 1 < self.lines.len() {
+                (tag, set + 1)
+            } else {
+                (tag + 1, 0)
+            };
+            match self.lines[set].as_ref().zip(self.lines[oset].as_ref()) {
+                Some((set1, set2)) if set1.tag == tag && set2.tag == otag => {
                     Some(Short::from_be_bytes([set1[off], set2[0]]))
                 }
                 _ => None,
@@ -339,10 +354,15 @@ impl Cache for Associative {
                 _ => None,
             }
         } else {
+            let (otag, oset) = if set + 1 < self.lines.len() {
+                (tag, set + 1)
+            } else {
+                (tag + 1, 0)
+            };
             let former = (self.off_bits << 16) - off;
 
-            match self.lines[set].as_ref().zip(self.lines[set + 1].as_ref()) {
-                Some((set1, set2)) if set1.tag == tag && set2.tag == tag => {
+            match self.lines[set].as_ref().zip(self.lines[oset].as_ref()) {
+                Some((set1, set2)) if set1.tag == tag && set2.tag == otag => {
                     let mut bytes = [0; 4];
                     for i in 0..4 {
                         if i > former {
