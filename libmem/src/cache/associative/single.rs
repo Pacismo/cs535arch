@@ -233,20 +233,17 @@ impl Cache for Associative {
     }
 
     fn within_line(&self, address: Word, length: usize) -> bool {
-        let (_, _, off) = self.split_address(address);
+        let (.., off) = self.split_address(address);
 
         // Asserts that a read of length bytes from the address will not overflow to the next set.
-        if (off + length - 1) & !(2usize.pow(length as u32)) != 0 {
-            false
-        } else {
-            true
-        }
+        off + length - 1 < 2usize.pow(self.off_bits as u32)
     }
 
     fn invalidate_line(&mut self, address: Word) -> bool {
         let (tag, set, _) = self.split_address(address);
 
         if matches!(&self.lines[set], Some(line) if line.tag == tag) {
+            // Delete the line in question
             self.lines[set] = None;
             true
         } else {
