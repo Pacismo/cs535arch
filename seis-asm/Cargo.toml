@@ -8,11 +8,8 @@ edition = "2021"
 [dependencies.libseis]
 path = "../libseis/"
 
-[dependencies.regex]
-version = "1.10.3"
-
 [dependencies.clap]
-version = "4.5.1"
+version = "4.5.2"
 features = ["derive"]
 
 [dependencies.pest]
