@@ -13,7 +13,7 @@ mod single_level;
 use libseis::types::{Byte, Short, Word};
 pub use single_level::SingleLevel;
 
-use crate::memory::Memory;
+use crate::{cache::LineData, memory::Memory};
 
 #[derive(Debug, Clone, Copy)]
 pub enum Status {
@@ -79,5 +79,5 @@ pub trait MemoryModule {
     /// Get the state of the cache structures
     ///
     /// Provides the names of the caches as well
-    fn cache_state(&self) -> Vec<(&'static str, Vec<Option<(Word, &[u8])>>)>;
+    fn cache_state(&self) -> Vec<(&'static str, Vec<Option<LineData>>)>;
 }

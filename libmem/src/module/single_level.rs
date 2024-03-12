@@ -1,6 +1,6 @@
 use super::{MemoryModule, Result, Status};
 use crate::{
-    cache::{self, Cache},
+    cache::{self, Cache, LineData},
     memory::Memory,
 };
 use libseis::types::{Byte, Short, Word};
@@ -537,7 +537,7 @@ impl MemoryModule for SingleLevel {
         self.cold_misses + self.misses + self.accesses
     }
 
-    fn cache_state(&self) -> Vec<(&'static str, Vec<Option<(Word, &[u8])>>)> {
+    fn cache_state(&self) -> Vec<(&'static str, Vec<Option<LineData>>)> {
         vec![
             ("data cache", self.data_cache.get_lines()),
             ("instruction cache", self.instruction_cache.get_lines()),
