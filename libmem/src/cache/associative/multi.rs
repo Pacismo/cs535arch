@@ -71,11 +71,26 @@ impl Cache for MultiAssociative {
     }
 
     fn within_line(&self, address: Word, length: usize) -> bool {
-        todo!()
+        let (.., off) = self.split_address(address);
+        off + length - 1 < 2usize.pow(self.off_bits as u32)
     }
 
     fn invalidate_line(&mut self, address: Word) -> bool {
-        todo!()
+        let (tag, set, _) = self.split_address(address);
+        let sets = self.set_mut(set);
+
+        if let Some(i) = sets.iter_mut().enumerate().find_map(|(i, s)| match s {
+            Some(s) if s.tag == tag => Some(i),
+            _ => None,
+        }) {
+            // Delete the boxed data (Rust drop semantics de-allocate the memory)
+            sets[i] = None;
+            // Rotate the slice from the index onward left, such that the deallocated pointer is at the end
+            sets[i..].rotate_left(1);
+            true
+        } else {
+            false
+        }
     }
 
     fn write_line(
@@ -103,7 +118,12 @@ impl Cache for MultiAssociative {
     }
 
     fn byte_at(&self, address: Word) -> Option<Byte> {
-        todo!()
+        let (tag, set, off) = self.split_address(address);
+
+        self.set(set).iter().find_map(|s| match s {
+            Some(s) if s.tag == tag => Some(s[off]),
+            _ => None,
+        })
     }
 
     fn short_at(&self, address: Word) -> Option<Short> {
