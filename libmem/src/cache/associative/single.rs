@@ -1,22 +1,10 @@
-use super::{Cache, LineReadStatus, ReadResult, Status};
-use crate::memory::Memory;
+use super::Line;
+use crate::{
+    cache::{Cache, LineData, LineReadStatus, ReadResult, Status},
+    memory::Memory,
+};
 use libseis::types::{Byte, Short, Word};
-use std::{mem::take, ops::Deref};
-
-#[derive(Debug)]
-pub struct Line {
-    dirty: bool,
-    tag: Word,
-    data: Box<[u8]>,
-}
-
-impl Deref for Line {
-    type Target = [u8];
-
-    fn deref(&self) -> &Self::Target {
-        &self.data
-    }
-}
+use std::mem::take;
 
 /// Represents a one-way set-associative cache.
 ///
@@ -297,13 +285,16 @@ impl Cache for Associative {
         }
     }
 
-    fn get_lines(&self) -> Vec<Option<(Word, &[u8])>> {
+    fn get_lines(&self) -> Vec<Option<LineData>> {
         self.lines
             .iter()
             .zip(0..)
-            .map(|(l, set)| {
-                l.as_ref()
-                    .map(|l| (self.construct_address(l.tag, set, 0), l.data.as_ref()))
+            .map(|(line, set)| {
+                line.as_ref().map(|line| LineData {
+                    address_base: self.construct_address(line.tag, set, 0),
+                    dirty: line.dirty,
+                    data: line.data.as_ref(),
+                })
             })
             .collect()
     }
@@ -380,7 +371,7 @@ impl Cache for Associative {
 }
 
 impl Associative {
-    /// Creates a new [`MappedLru`] with an offset bitfield width and a set bitfield width set at runtime.
+    /// Creates a new [`Associative`] with an offset bitfield width and a set bitfield width set at runtime.
     ///
     /// `off_bits` must be between 2 and 32, inclusive.
     ///
