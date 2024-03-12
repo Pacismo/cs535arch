@@ -87,10 +87,10 @@ impl Cache for NullCache {
         LineReadStatus::Disabled
     }
 
-    fn get_lines(&self) -> Vec<Option<(Word, &[u8])>> {
+    fn get_lines(&self) -> Vec<Option<LineData>> {
         match &self.0 {
             Populated(addr, val) => {
-                vec![Some((*addr, val))]
+                vec![Some((*addr, false, val.as_ref()).into())]
             }
             Empty => vec![None],
         }

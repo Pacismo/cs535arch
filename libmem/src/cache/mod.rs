@@ -13,10 +13,26 @@ mod associative;
 mod null;
 
 use crate::memory::Memory;
-pub use associative::Associative;
+pub use associative::*;
 use libseis::types::{Byte, Short, Word};
 pub use null::NullCache;
 use std::fmt::Debug;
+
+pub struct LineData<'a> {
+    pub address_base: Word,
+    pub dirty: bool,
+    pub data: &'a [u8],
+}
+
+impl<'a> From<(Word, bool, &'a [u8])> for LineData<'a> {
+    fn from((address_base, dirty, data): (Word, bool, &'a [u8])) -> Self {
+        Self {
+            address_base,
+            dirty,
+            data,
+        }
+    }
+}
 
 /// Interface for a cache.
 ///
@@ -72,7 +88,7 @@ pub trait Cache: Debug {
     /// Gets all the lines available in the cache.
     ///
     /// The data stored is useful to provide information about what the cache is doing.
-    fn get_lines(&self) -> Vec<Option<(Word,&[u8])>>;
+    fn get_lines(&self) -> Vec<Option<LineData>>;
 
     /// Read a byte at an address, if available
     fn byte_at(&self, address: Word) -> Option<Byte>;
