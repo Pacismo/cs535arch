@@ -1,12 +1,11 @@
 use super::*;
+use ReadRegister::*;
 
 #[derive(Debug, Clone, Copy)]
 enum ReadRegister {
-    Populated(Word, Word),
+    Populated(Word, [u8; 4]),
     Empty,
 }
-
-use ReadRegister::*;
 
 /// This is a special cache type that only contains a single "read register".
 ///
@@ -19,7 +18,7 @@ impl Cache for NullCache {
         if let Populated(a, b) = self.0 {
             if a == address {
                 self.0 = Empty;
-                Ok(b.to_be_bytes()[0])
+                Ok(b[0])
             } else {
                 Err(Status::Disabled)
             }
@@ -33,8 +32,7 @@ impl Cache for NullCache {
             if a == address {
                 self.0 = Empty;
 
-                let bytes = b.to_be_bytes();
-                Ok(Short::from_be_bytes([bytes[0], bytes[1]]))
+                Ok(Short::from_be_bytes([b[0], b[1]]))
             } else {
                 Err(Status::Disabled)
             }
@@ -47,7 +45,7 @@ impl Cache for NullCache {
         if let Populated(a, b) = self.0 {
             if a == address {
                 self.0 = Empty;
-                Ok(b)
+                Ok(Word::from_be_bytes(b))
             } else {
                 Err(Status::Disabled)
             }
@@ -85,8 +83,29 @@ impl Cache for NullCache {
     }
 
     fn write_line(&mut self, address: Word, memory: &mut Memory) -> LineReadStatus {
-        self.0 = Populated(address, memory.read_word(address));
+        self.0 = Populated(address, memory.read_word(address).to_be_bytes());
         LineReadStatus::Disabled
+    }
+
+    fn get_lines(&self) -> Vec<Option<(Word, &[u8])>> {
+        match &self.0 {
+            Populated(addr, val) => {
+                vec![Some((*addr, val))]
+            }
+            Empty => vec![None],
+        }
+    }
+
+    fn byte_at(&self, _: Word) -> Option<Byte> {
+        None
+    }
+
+    fn short_at(&self, _: Word) -> Option<Short> {
+        None
+    }
+
+    fn word_at(&self, _: Word) -> Option<Word> {
+        None
     }
 }
 

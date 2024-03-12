@@ -1,7 +1,19 @@
+//! The representation of a memory heirarchy.
+//!
+//! The [`MemoryModule`] trait to allow different memory configurations,
+//! including numerous levels of cache.
+//!
+//! [`SingleLevel`] represents a memory hierarchy containing a single
+//! level of cache.
+//!
+//! See [`cache`](crate::cache) for information about creating the cache.
+
 mod single_level;
 
 use libseis::types::{Byte, Short, Word};
 pub use single_level::SingleLevel;
+
+use crate::memory::Memory;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Status {
@@ -60,4 +72,12 @@ pub trait MemoryModule {
     fn cache_hits(&self) -> usize;
     /// Returns the total number of memory accesses that have occurred in the duration of the runtime.
     fn accesses(&self) -> usize;
+
+    /// Get the memory structure
+    fn memory(&self) -> &Memory;
+
+    /// Get the state of the cache structures
+    ///
+    /// Provides the names of the caches as well
+    fn cache_state(&self) -> Vec<(&'static str, Vec<Option<(Word, &[u8])>>)>;
 }

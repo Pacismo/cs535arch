@@ -1,13 +1,21 @@
 use super::{Cache, LineReadStatus, ReadResult, Status};
 use crate::memory::Memory;
 use libseis::types::{Byte, Short, Word};
-use std::mem::take;
+use std::{mem::take, ops::Deref};
 
 #[derive(Debug)]
 pub struct Line {
     dirty: bool,
     tag: Word,
     data: Box<[u8]>,
+}
+
+impl Deref for Line {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        &self.data
+    }
 }
 
 /// Represents a one-way set-associative cache.
@@ -24,31 +32,66 @@ impl Cache for Associative {
     fn get_byte(&mut self, address: Word) -> ReadResult<Byte> {
         let (tag, set, off) = self.split_address(address);
 
-        if let Some(set) = &self.lines[set] {
-            if set.tag == tag {
-                Ok(set.data[off])
-            } else {
-                Err(Status::Conflict)
-            }
-        } else {
-            Err(Status::Cold)
+        match &self.lines[set] {
+            Some(set) if set.tag == tag => Ok(set[off]),
+            Some(_) => Err(Status::Conflict),
+            None => Err(Status::Cold),
         }
     }
 
     fn get_short(&mut self, address: Word) -> ReadResult<Short> {
-        Ok(Short::from_be_bytes([
-            self.get_byte(address)?,
-            self.get_byte(address + 1)?,
-        ]))
+        let (tag, set, off) = self.split_address(address);
+
+        if off < (self.off_bits << 16) - 1 {
+            match &self.lines[set] {
+                Some(set) if set.tag == tag => Ok(Short::from_be_bytes([set[off], set[off + 1]])),
+                Some(_) => Err(Status::Conflict),
+                None => Err(Status::Cold),
+            }
+        } else {
+            match (&self.lines[set], &self.lines[set + 1]) {
+                (Some(set1), Some(set2)) if set1.tag == tag && set2.tag == tag => {
+                    Ok(Short::from_be_bytes([set1[set1.len() - 1], set2[0]]))
+                }
+                (Some(_), Some(_)) => Err(Status::Conflict),
+                _ => Err(Status::Cold),
+            }
+        }
     }
 
     fn get_word(&mut self, address: Word) -> ReadResult<Word> {
-        Ok(Word::from_be_bytes([
-            self.get_byte(address)?,
-            self.get_byte(address + 1)?,
-            self.get_byte(address + 2)?,
-            self.get_byte(address + 3)?,
-        ]))
+        let (tag, set, off) = self.split_address(address);
+
+        if off < (self.off_bits << 16) - 3 {
+            match &self.lines[set] {
+                Some(set) if set.tag == tag => Ok(Word::from_be_bytes([
+                    set[off],
+                    set[off + 1],
+                    set[off + 2],
+                    set[off + 3],
+                ])),
+                Some(_) => Err(Status::Conflict),
+                None => Err(Status::Cold),
+            }
+        } else {
+            let former = (self.off_bits << 16) - off;
+
+            match (&self.lines[set], &self.lines[set + 1]) {
+                (Some(set1), Some(set2)) if set1.tag == tag && set2.tag == tag => {
+                    let mut bytes = [0; 4];
+                    for i in 0..4 {
+                        if i > former {
+                            bytes[i] = set2[i - former];
+                        } else {
+                            bytes[i] = set1[i];
+                        }
+                    }
+                    Ok(Word::from_be_bytes(bytes))
+                }
+                (Some(_), Some(_)) => Err(Status::Conflict),
+                _ => Err(Status::Cold),
+            }
+        }
     }
 
     fn write_byte(&mut self, address: Word, data: Byte) -> Status {
@@ -241,6 +284,77 @@ impl Cache for Associative {
             LineReadStatus::Evicted
         } else {
             LineReadStatus::Swapped
+        }
+    }
+
+    fn get_lines(&self) -> Vec<Option<(Word, &[u8])>> {
+        self.lines
+            .iter()
+            .zip(0..)
+            .map(|(l, set)| {
+                l.as_ref()
+                    .map(|l| (self.construct_address(l.tag, set, 0), l.data.as_ref()))
+            })
+            .collect()
+    }
+
+    fn byte_at(&self, address: Word) -> Option<Byte> {
+        let (tag, set, off) = self.split_address(address);
+
+        match &self.lines[set] {
+            Some(line) if line.tag == tag => Some(line.data[off]),
+            _ => None,
+        }
+    }
+
+    fn short_at(&self, address: Word) -> Option<Short> {
+        let (tag, set, off) = self.split_address(address);
+
+        if off < (self.off_bits << 16) - 1 {
+            match &self.lines[set] {
+                Some(set) if set.tag == tag => Some(Short::from_be_bytes([set[off], set[off + 1]])),
+                _ => None,
+            }
+        } else {
+            match self.lines[set].as_ref().zip(self.lines[set + 1].as_ref()) {
+                Some((set1, set2)) if set1.tag == tag && set2.tag == tag => {
+                    Some(Short::from_be_bytes([set1[off], set2[0]]))
+                }
+                _ => None,
+            }
+        }
+    }
+
+    fn word_at(&self, address: Word) -> Option<Word> {
+        let (tag, set, off) = self.split_address(address);
+
+        if off < (self.off_bits << 16) - 3 {
+            match &self.lines[set] {
+                Some(set) if set.tag == tag => Some(Word::from_be_bytes([
+                    set[off],
+                    set[off + 1],
+                    set[off + 2],
+                    set[off + 3],
+                ])),
+                _ => None,
+            }
+        } else {
+            let former = (self.off_bits << 16) - off;
+
+            match self.lines[set].as_ref().zip(self.lines[set + 1].as_ref()) {
+                Some((set1, set2)) if set1.tag == tag && set2.tag == tag => {
+                    let mut bytes = [0; 4];
+                    for i in 0..4 {
+                        if i > former {
+                            bytes[i] = set2[i - former];
+                        } else {
+                            bytes[i] = set1[i];
+                        }
+                    }
+                    Some(Word::from_be_bytes(bytes))
+                }
+                _ => None,
+            }
         }
     }
 }

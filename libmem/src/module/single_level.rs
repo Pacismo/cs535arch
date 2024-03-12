@@ -536,6 +536,17 @@ impl MemoryModule for SingleLevel {
     fn accesses(&self) -> usize {
         self.cold_misses + self.misses + self.accesses
     }
+
+    fn cache_state(&self) -> Vec<(&'static str, Vec<Option<(Word, &[u8])>>)> {
+        vec![
+            ("data cache", self.data_cache.get_lines()),
+            ("instruction cache", self.instruction_cache.get_lines()),
+        ]
+    }
+
+    fn memory(&self) -> &Memory {
+        &self.memory
+    }
 }
 
 impl SingleLevel {

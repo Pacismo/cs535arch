@@ -1,3 +1,8 @@
+//! The memory module, [`Memory`], for use with the memory module.
+//!
+//! The datastructure in this module contains a set of dynamically-allocated pages,
+//! which are allocated on write.
+
 use std::mem::{size_of, take, transmute};
 
 use libseis::{

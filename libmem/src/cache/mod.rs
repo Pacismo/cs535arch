@@ -1,3 +1,14 @@
+//! Caches for use in the memory module.
+//!
+//! The [`Cache`] trait is an abstract representation of the cache.
+//!
+//! There are a handful of datastructures that implement the trait:
+//!
+//! - [`NullCache`], which always directs memory accesses to the
+//! main memory
+//! - [`Associative`], which represents a one-way set-associative
+//! cache.
+
 mod associative;
 mod null;
 
@@ -57,6 +68,18 @@ pub trait Cache: Debug {
     ///
     /// Writes any evicted lines back and returns true if an eviction occurred.
     fn write_line(&mut self, address: Word, memory: &mut Memory) -> LineReadStatus;
+
+    /// Gets all the lines available in the cache.
+    ///
+    /// The data stored is useful to provide information about what the cache is doing.
+    fn get_lines(&self) -> Vec<Option<(Word,&[u8])>>;
+
+    /// Read a byte at an address, if available
+    fn byte_at(&self, address: Word) -> Option<Byte>;
+    /// Read a short at an address, if available
+    fn short_at(&self, address: Word) -> Option<Short>;
+    /// Read a word at an address if available
+    fn word_at(&self, address: Word) -> Option<Word>;
 }
 
 /// The status of a read.
