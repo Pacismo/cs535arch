@@ -16,8 +16,10 @@ use crate::memory::Memory;
 pub use associative::*;
 use libseis::types::{Byte, Short, Word};
 pub use null::NullCache;
+use serde::Serialize;
 use std::fmt::Debug;
 
+#[derive(Serialize)]
 pub struct LineData<'a> {
     pub address_base: Word,
     pub dirty: bool,
@@ -68,7 +70,7 @@ pub trait Cache: Debug {
     fn write_word(&mut self, address: Word, data: Word) -> Status;
 
     /// Returns `true` if the cache contains the provided address.
-    fn has_address(&self, address: Word) -> bool;
+    fn check_address(&self, address: Word) -> Status;
     /// Returns the length of a line, in bits.
     fn line_len(&self) -> usize;
 
@@ -84,6 +86,14 @@ pub trait Cache: Debug {
     ///
     /// Writes any evicted lines back and returns true if an eviction occurred.
     fn write_line(&mut self, address: Word, memory: &mut Memory) -> LineReadStatus;
+
+    /// Flushes all dirty lines to memory.
+    ///
+    /// Returns the number of lines written back to memory.
+    fn flush(&mut self, memory: &mut Memory) -> usize;
+
+    /// Returns the number of dirty lines.
+    fn dirty_lines(&self) -> usize;
 
     /// Gets all the lines available in the cache.
     ///

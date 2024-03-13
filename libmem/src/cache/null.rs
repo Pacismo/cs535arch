@@ -66,8 +66,8 @@ impl Cache for NullCache {
         Status::Disabled
     }
 
-    fn has_address(&self, _: Word) -> bool {
-        false
+    fn check_address(&self, _: Word) -> Status {
+        Status::Disabled
     }
 
     fn line_len(&self) -> usize {
@@ -85,6 +85,14 @@ impl Cache for NullCache {
     fn write_line(&mut self, address: Word, memory: &mut Memory) -> LineReadStatus {
         self.0 = Populated(address, memory.read_word(address).to_be_bytes());
         LineReadStatus::Disabled
+    }
+
+    fn flush(&mut self, _: &mut Memory) -> usize {
+        0
+    }
+
+    fn dirty_lines(&self) -> usize {
+        0
     }
 
     fn get_lines(&self) -> Vec<Option<LineData>> {
