@@ -36,6 +36,21 @@ fn process_input(
             *total_clocks += amount;
             Some(false)
         }
+        Command::FlushCache => {
+            match module.flush_cache() {
+                Status::Idle => println!("No cache lines were flushed"),
+                Status::Busy(clocks) => {
+                    module.clock(clocks);
+                    *total_clocks += clocks;
+
+                    println!(
+                        "Flushed all dirty lines in the cache, taking {clocks} {}",
+                        if clocks == 1 { "clock" } else { "clocks" }
+                    )
+                }
+            }
+            Some(true)
+        }
         Command::Read { sign, ty, address } => {
             match (sign, ty) {
                 (Sign::Unsigned, Type::Byte) => {
@@ -500,7 +515,7 @@ fn process_input(
                 }
 
                 if i % 256 == 0 {
-                    print!("{i:#>010X}:\n\t")
+                    print!("{i:#010X}:\n\t")
                 }
 
                 print!("{:>02X} ", module.memory().read_byte(i));
@@ -511,6 +526,9 @@ fn process_input(
                     if i % 256 == 255 {
                         println!();
                     } else {
+                        if i % 128 == 127 {
+                            println!()
+                        }
                         print!("\n\t");
                     }
                 }
@@ -589,7 +607,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             if let Some(input) = Text::new("")
                 .with_placeholder("enter command")
                 .with_autocomplete(Command::autocompleter())
-                .with_help_message("Provide a command using the list above for guidance")
                 .prompt_skippable()
                 .expect("Could not read input")
             {
