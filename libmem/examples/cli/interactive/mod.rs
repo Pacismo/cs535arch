@@ -123,7 +123,7 @@ fn memval_parser(value: &str) -> Result<Word, String> {
 }
 
 #[derive(Parser, Debug)]
-#[clap(multicall = true, disable_help_flag = true)]
+#[clap(multicall = true, disable_help_flag = true, name = "")]
 pub enum Command {
     /// Read values from memory
     Read {
@@ -181,6 +181,8 @@ pub enum Command {
         #[clap(name = "TYPE", default_value_t = Type::Byte)]
         ty: Type,
     },
+    /// Flush the contents of cache into memory
+    FlushCache,
     /// Show the contents of the cache
     ShowCache,
     /// Shows the statistics of the cache
@@ -301,6 +303,7 @@ impl Command {
                         })]),
                     })]),
                 }),
+                Arc::new("flush-cache"),
                 Arc::new("show-cache"),
                 Arc::new("statistics"),
                 Arc::new(StringCompleter {
