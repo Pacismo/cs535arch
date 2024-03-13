@@ -83,7 +83,7 @@ impl Cache for MultiAssociative {
                     None
                 }
             }) {
-                bytes[0] = s[s.len() - 1];
+                bytes[0] = s[off];
                 set[0..=i].rotate_right(1);
             } else if nulls == 0 {
                 return Err(Status::Conflict);
@@ -102,7 +102,7 @@ impl Cache for MultiAssociative {
                     None
                 }
             }) {
-                bytes[1] = s[s.len() - 1];
+                bytes[1] = s[0];
                 set[0..=i].rotate_right(1);
             } else if nulls == 0 {
                 return Err(Status::Conflict);
@@ -282,8 +282,7 @@ impl Cache for MultiAssociative {
                 let (i, mut s) = first.unwrap();
                 let (j, mut t) = second.unwrap();
 
-                let last = s.len() - 1;
-                s[last] = bytes[0];
+                s[off] = bytes[0];
                 t[0] = bytes[1];
 
                 let mut sets = self.set_mut(set);
@@ -440,6 +439,10 @@ impl Cache for MultiAssociative {
     }
 
     fn write_line(&mut self, address: Word, memory: &mut crate::memory::Memory) -> LineReadStatus {
+        if self.has_address(address) {
+            return LineReadStatus::Skipped;
+        }
+
         let set_bits = self.set_bits;
         let off_bits = self.off_bits;
 
@@ -480,7 +483,7 @@ impl Cache for MultiAssociative {
 
             sets.rotate_right(1);
 
-            LineReadStatus::Swapped
+            LineReadStatus::Inserted
         }
     }
 
@@ -536,7 +539,7 @@ impl Cache for MultiAssociative {
                 Some(s) if s.tag == tag => Some(s),
                 _ => None,
             }) {
-                bytes[0] = s[s.len() - 1];
+                bytes[0] = s[off];
             } else {
                 return None;
             }
@@ -545,7 +548,7 @@ impl Cache for MultiAssociative {
                 Some(s) if s.tag == otag => Some(s),
                 _ => None,
             }) {
-                bytes[1] = s[s.len() - 1];
+                bytes[1] = s[0];
             } else {
                 return None;
             }

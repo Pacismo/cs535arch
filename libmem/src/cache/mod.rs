@@ -116,9 +116,14 @@ pub enum Status {
 
 #[derive(Debug, Clone, Copy)]
 pub enum LineReadStatus {
+    /// An eviction ocurred
     Evicted,
-    Swapped,
+    /// The cache is disabled
     Disabled,
+    /// The operation was skipped
+    Skipped,
+    /// No eviction ocurred
+    Inserted,
 }
 
 impl LineReadStatus {
@@ -128,13 +133,18 @@ impl LineReadStatus {
     }
 
     #[inline(always)]
-    pub fn swapped(self) -> bool {
-        matches!(self, Self::Swapped)
+    pub fn disabled(self) -> bool {
+        matches!(self, Self::Disabled)
     }
 
     #[inline(always)]
-    pub fn disabled(self) -> bool {
-        matches!(self, Self::Disabled)
+    pub fn skipped(self) -> bool {
+        matches!(self, Self::Skipped)
+    }
+
+    #[inline(always)]
+    pub fn inserted(self) -> bool {
+        matches!(self, Self::Inserted)
     }
 }
 

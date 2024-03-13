@@ -30,7 +30,7 @@ impl Cache for Associative {
     fn get_short(&mut self, address: Word) -> ReadResult<Short> {
         let (tag, set, off) = self.split_address(address);
 
-        if off < (self.off_bits << 16) - 1 {
+        if off < self.line_len() - 1 {
             match &self.lines[set] {
                 Some(set) if set.tag == tag => Ok(Short::from_be_bytes([set[off], set[off + 1]])),
                 Some(_) => Err(Status::Conflict),
@@ -55,7 +55,7 @@ impl Cache for Associative {
     fn get_word(&mut self, address: Word) -> ReadResult<Word> {
         let (tag, set, off) = self.split_address(address);
 
-        if off < (self.off_bits << 16) - 3 {
+        if off < self.line_len() - 3 {
             match &self.lines[set] {
                 Some(set) if set.tag == tag => Ok(Word::from_be_bytes([
                     set[off],
@@ -110,9 +110,8 @@ impl Cache for Associative {
 
     fn write_short(&mut self, address: Word, data: Short) -> Status {
         let (tag, set, off) = self.split_address(address);
-        let off_mask = (1 << self.off_bits) - 1;
 
-        if off != off_mask {
+        if off < self.line_len() - 1 {
             if let Some(set) = &mut self.lines[set] {
                 if set.tag == tag {
                     let bytes = data.to_be_bytes();
@@ -139,8 +138,8 @@ impl Cache for Associative {
             let status = if let Some((first, second)) = first.as_mut().zip(second.as_mut()) {
                 if first.tag == tag && second.tag == otag {
                     let bytes = data.to_be_bytes();
-                    first.data[off_mask as usize] = bytes[0];
-                    second.data[off_mask as usize] = bytes[1];
+                    first.data[off] = bytes[0];
+                    second.data[0] = bytes[1];
 
                     first.dirty = true;
                     second.dirty = true;
@@ -252,6 +251,10 @@ impl Cache for Associative {
     }
 
     fn write_line(&mut self, address: Word, memory: &mut Memory) -> LineReadStatus {
+        if self.has_address(address) {
+            return LineReadStatus::Skipped;
+        }
+
         let (tag, set, _) = self.split_address(address);
 
         // Flush a previously-existing line if it is dirty. Otherwise, purge its contents.
@@ -281,7 +284,7 @@ impl Cache for Associative {
 
             self.lines[set] = Some(new_line);
 
-            LineReadStatus::Swapped
+            LineReadStatus::Inserted
         }
     }
 
@@ -311,7 +314,7 @@ impl Cache for Associative {
     fn short_at(&self, address: Word) -> Option<Short> {
         let (tag, set, off) = self.split_address(address);
 
-        if off < (self.off_bits << 16) - 1 {
+        if off < self.line_len() - 1 {
             match &self.lines[set] {
                 Some(set) if set.tag == tag => Some(Short::from_be_bytes([set[off], set[off + 1]])),
                 _ => None,
@@ -334,7 +337,7 @@ impl Cache for Associative {
     fn word_at(&self, address: Word) -> Option<Word> {
         let (tag, set, off) = self.split_address(address);
 
-        if off < (self.off_bits << 16) - 3 {
+        if off < self.line_len() - 3 {
             match &self.lines[set] {
                 Some(set) if set.tag == tag => Some(Word::from_be_bytes([
                     set[off],

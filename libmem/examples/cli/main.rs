@@ -389,7 +389,7 @@ fn process_input(
         Command::Statistics => {
             let hits = module.cache_hits();
             let cold = module.cold_misses();
-            let miss = module.cache_misses() + cold;
+            let miss = module.total_misses();
 
             println!(
                 "The cache was hit {hits} {} and missed {miss} {} (where {cold} {} cold)\nThe clock was ticked {total_clocks} {}",

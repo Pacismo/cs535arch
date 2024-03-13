@@ -64,10 +64,14 @@ pub trait MemoryModule {
     /// Writes a word to memory, bypassing the cache
     fn write_word_volatile(&mut self, addr: Word, value: Word) -> Status;
 
-    /// Returns the total number of *cold* cache misses that have occurred for the duration of the runtime.
+    /// Returns the number of cold misses that have occurred for the duration of the runtime.
     fn cold_misses(&self) -> usize;
-    /// Returns the number of cache misses that have occurred for the duration of the runtime.
-    fn cache_misses(&self) -> usize;
+    /// Returns the number of conflict misses that have occurred for the duration of the runtime.
+    fn conflict_misses(&self) -> usize;
+    /// Returns the total number of cache misses.
+    fn total_misses(&self) -> usize {
+        self.cold_misses() + self.conflict_misses()
+    }
     /// Returns the number of cache hits that have occurred for the duration of the runtime.
     fn cache_hits(&self) -> usize;
     /// Returns the total number of memory accesses that have occurred in the duration of the runtime.
