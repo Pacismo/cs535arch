@@ -21,331 +21,386 @@ fn process_input(
     command: Command,
     module: &mut dyn MemoryModule,
     total_clocks: &mut usize,
-) -> bool {
+) -> Option<bool> {
     match command {
-        Command::Exit => return false,
-        Command::Read { sign, ty, address } => match (sign, ty) {
-            (Sign::Unsigned, Type::Byte) => {
-                match module.read_byte(address) {
-                    Ok(value) => {
-                        println!(
-                            "[{address:#010X} ({sign} {ty})] {} (cache hit)",
-                            value as Byte
-                        )
-                    }
-                    Err(Status::Busy(clocks)) => {
-                        module.clock(clocks);
-                        *total_clocks += clocks;
+        Command::Exit => None,
+        Command::Read { sign, ty, address } => {
+            match (sign, ty) {
+                (Sign::Unsigned, Type::Byte) => {
+                    match module.read_byte(address) {
+                        Ok(value) => {
+                            println!(
+                                "[{address:#010X} ({sign} {ty})] {} (cache hit)",
+                                value as Byte
+                            )
+                        }
+                        Err(Status::Busy(clocks)) => {
+                            module.clock(clocks);
+                            *total_clocks += clocks;
 
-                        let value = module.read_byte(address).unwrap();
-                        println!(
-                            "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
-                            value as Byte,
-                            if clocks == 1 { "clock" } else { "clocks" }
-                        )
-                    }
-                    _ => unreachable!(),
-                };
-            }
-            (Sign::Signed, Type::Byte) => {
-                match module.read_byte(address) {
-                    Ok(value) => {
-                        println!(
-                            "[{address:#010X} ({sign} {ty})] {} (cache hit)",
-                            value as SByte,
-                        )
-                    }
-                    Err(Status::Busy(clocks)) => {
-                        module.clock(clocks);
-                        *total_clocks += clocks;
-
-                        let value = module.read_byte(address).unwrap();
-                        println!(
-                            "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
-                            value as SByte,
-                            if clocks == 1 { "clock" } else { "clocks" }
-                        )
-                    }
-                    _ => unreachable!(),
-                };
-            }
-            (Sign::Signed, Type::Short) => {
-                match module.read_short(address) {
-                    Ok(value) => {
-                        println!(
-                            "[{address:#010X} ({sign} {ty})] {} (cache hit)",
-                            value as Short,
-                        )
-                    }
-                    Err(Status::Busy(clocks)) => {
-                        module.clock(clocks);
-                        *total_clocks += clocks;
-
-                        let value = module.read_short(address).unwrap();
-                        println!(
-                            "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
-                            value as Short,
-                            if clocks == 1 { "clock" } else { "clocks" }
-                        )
-                    }
-                    _ => unreachable!(),
-                };
-            }
-            (Sign::Signed, Type::Word) => {
-                match module.read_short(address) {
-                    Ok(value) => {
-                        println!(
-                            "[{address:#010X} ({sign} {ty})] {} (cache hit)",
-                            value as SShort,
-                        )
-                    }
-                    Err(Status::Busy(clocks)) => {
-                        module.clock(clocks);
-                        *total_clocks += clocks;
-
-                        let value = module.read_short(address).unwrap();
-                        println!(
-                            "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
-                            value as SShort,
-                            if clocks == 1 { "clock" } else { "clocks" }
-                        )
-                    }
-                    _ => unreachable!(),
-                };
-            }
-            (Sign::Unsigned, Type::Short) => {
-                match module.read_word(address) {
-                    Ok(value) => {
-                        println!(
-                            "[{address:#010X} ({sign} {ty})] {} (cache hit)",
-                            value as Word,
-                        )
-                    }
-                    Err(Status::Busy(clocks)) => {
-                        module.clock(clocks);
-                        *total_clocks += clocks;
-
-                        let value = module.read_word(address).unwrap();
-                        println!(
-                            "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
-                            value as Word,
-                            if clocks == 1 { "clock" } else { "clocks" }
-                        )
-                    }
-                    _ => unreachable!(),
-                };
-            }
-            (Sign::Unsigned, Type::Word) => {
-                match module.read_word(address) {
-                    Ok(value) => {
-                        println!(
-                            "[{address:#010X} ({sign} {ty})] {} (cache hit)",
-                            value as SWord,
-                        )
-                    }
-                    Err(Status::Busy(clocks)) => {
-                        module.clock(clocks);
-                        *total_clocks += clocks;
-
-                        let value = module.read_word(address).unwrap();
-                        println!(
-                            "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
-                            value as SWord,
-                            if clocks == 1 { "clock" } else { "clocks" }
-                        )
-                    }
-                    _ => unreachable!(),
-                };
-            }
-        },
-        Command::Write { ty, address, value } => match ty {
-            Type::Byte => match module.write_byte(address, value as Byte) {
-                Status::Busy(clocks) => {
-                    module.clock(clocks);
-                    *total_clocks += clocks;
-
-                    println!(
-                        "Write took {clocks} {}",
-                        if clocks == 1 { "clock" } else { "clocks" }
-                    )
+                            let value = module.read_byte(address).unwrap();
+                            println!(
+                                "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
+                                value as Byte,
+                                if clocks == 1 { "clock" } else { "clocks" }
+                            )
+                        }
+                        _ => unreachable!(),
+                    };
                 }
-                Status::Idle => {
-                    println!("Write hit the cache")
-                }
-            },
-            Type::Short => match module.write_short(address, value as Short) {
-                Status::Busy(clocks) => {
-                    module.clock(clocks);
-                    *total_clocks += clocks;
+                (Sign::Signed, Type::Byte) => {
+                    match module.read_byte(address) {
+                        Ok(value) => {
+                            println!(
+                                "[{address:#010X} ({sign} {ty})] {} (cache hit)",
+                                value as SByte,
+                            )
+                        }
+                        Err(Status::Busy(clocks)) => {
+                            module.clock(clocks);
+                            *total_clocks += clocks;
 
-                    println!(
-                        "Write took {clocks} {}",
-                        if clocks == 1 { "clock" } else { "clocks" }
-                    )
+                            let value = module.read_byte(address).unwrap();
+                            println!(
+                                "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
+                                value as SByte,
+                                if clocks == 1 { "clock" } else { "clocks" }
+                            )
+                        }
+                        _ => unreachable!(),
+                    };
                 }
-                Status::Idle => {
-                    println!("Write hit the cache")
-                }
-            },
-            Type::Word => match module.write_word(address, value as Word) {
-                Status::Busy(clocks) => {
-                    module.clock(clocks);
-                    *total_clocks += clocks;
+                (Sign::Signed, Type::Short) => {
+                    match module.read_short(address) {
+                        Ok(value) => {
+                            println!(
+                                "[{address:#010X} ({sign} {ty})] {} (cache hit)",
+                                value as Short,
+                            )
+                        }
+                        Err(Status::Busy(clocks)) => {
+                            module.clock(clocks);
+                            *total_clocks += clocks;
 
-                    println!(
-                        "Write took {clocks} {}",
-                        if clocks == 1 { "clock" } else { "clocks" }
-                    )
+                            let value = module.read_short(address).unwrap();
+                            println!(
+                                "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
+                                value as Short,
+                                if clocks == 1 { "clock" } else { "clocks" }
+                            )
+                        }
+                        _ => unreachable!(),
+                    };
                 }
-                Status::Idle => {
-                    println!("Write hit the cache")
+                (Sign::Signed, Type::Word) => {
+                    match module.read_short(address) {
+                        Ok(value) => {
+                            println!(
+                                "[{address:#010X} ({sign} {ty})] {} (cache hit)",
+                                value as SShort,
+                            )
+                        }
+                        Err(Status::Busy(clocks)) => {
+                            module.clock(clocks);
+                            *total_clocks += clocks;
+
+                            let value = module.read_short(address).unwrap();
+                            println!(
+                                "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
+                                value as SShort,
+                                if clocks == 1 { "clock" } else { "clocks" }
+                            )
+                        }
+                        _ => unreachable!(),
+                    };
                 }
-            },
-        },
-        Command::VolatileRead { sign, ty, address } => match (sign, ty) {
-            (Sign::Unsigned, Type::Byte) => {
-                match module.read_byte_volatile(address) {
-                    Ok(_) => unreachable!(),
-                    Err(Status::Busy(clocks)) => {
+                (Sign::Unsigned, Type::Short) => {
+                    match module.read_word(address) {
+                        Ok(value) => {
+                            println!(
+                                "[{address:#010X} ({sign} {ty})] {} (cache hit)",
+                                value as Word,
+                            )
+                        }
+                        Err(Status::Busy(clocks)) => {
+                            module.clock(clocks);
+                            *total_clocks += clocks;
+
+                            let value = module.read_word(address).unwrap();
+                            println!(
+                                "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
+                                value as Word,
+                                if clocks == 1 { "clock" } else { "clocks" }
+                            )
+                        }
+                        _ => unreachable!(),
+                    };
+                }
+                (Sign::Unsigned, Type::Word) => {
+                    match module.read_word(address) {
+                        Ok(value) => {
+                            println!(
+                                "[{address:#010X} ({sign} {ty})] {} (cache hit)",
+                                value as SWord,
+                            )
+                        }
+                        Err(Status::Busy(clocks)) => {
+                            module.clock(clocks);
+                            *total_clocks += clocks;
+
+                            let value = module.read_word(address).unwrap();
+                            println!(
+                                "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
+                                value as SWord,
+                                if clocks == 1 { "clock" } else { "clocks" }
+                            )
+                        }
+                        _ => unreachable!(),
+                    };
+                }
+            }
+            Some(true)
+        }
+        Command::Write { ty, address, value } => {
+            match ty {
+                Type::Byte => match module.write_byte(address, value as Byte) {
+                    Status::Busy(clocks) => {
                         module.clock(clocks);
                         *total_clocks += clocks;
 
-                        let value = module.read_byte_volatile(address).unwrap();
                         println!(
-                            "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
-                            value as Byte,
+                            "Write took {clocks} {}",
                             if clocks == 1 { "clock" } else { "clocks" }
                         )
                     }
-                    _ => unreachable!(),
-                };
-            }
-            (Sign::Signed, Type::Byte) => {
-                match module.read_byte_volatile(address) {
-                    Ok(_) => unreachable!(),
-                    Err(Status::Busy(clocks)) => {
+                    Status::Idle => {
+                        println!("Write hit the cache")
+                    }
+                },
+                Type::Short => match module.write_short(address, value as Short) {
+                    Status::Busy(clocks) => {
                         module.clock(clocks);
                         *total_clocks += clocks;
 
-                        let value = module.read_byte_volatile(address).unwrap();
                         println!(
-                            "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
-                            value as SByte,
+                            "Write took {clocks} {}",
                             if clocks == 1 { "clock" } else { "clocks" }
                         )
                     }
-                    _ => unreachable!(),
-                };
-            }
-            (Sign::Signed, Type::Short) => {
-                match module.read_short_volatile(address) {
-                    Ok(_) => unreachable!(),
-                    Err(Status::Busy(clocks)) => {
+                    Status::Idle => {
+                        println!("Write hit the cache")
+                    }
+                },
+                Type::Word => match module.write_word(address, value as Word) {
+                    Status::Busy(clocks) => {
                         module.clock(clocks);
                         *total_clocks += clocks;
 
-                        let value = module.read_short_volatile(address).unwrap();
                         println!(
-                            "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
-                            value as Short,
+                            "Write took {clocks} {}",
                             if clocks == 1 { "clock" } else { "clocks" }
                         )
                     }
-                    _ => unreachable!(),
-                };
-            }
-            (Sign::Signed, Type::Word) => {
-                match module.read_short_volatile(address) {
-                    Ok(_) => unreachable!(),
-                    Err(Status::Busy(clocks)) => {
-                        module.clock(clocks);
-                        *total_clocks += clocks;
-
-                        let value = module.read_short_volatile(address).unwrap();
-                        println!(
-                            "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
-                            value as SShort,
-                            if clocks == 1 { "clock" } else { "clocks" }
-                        )
+                    Status::Idle => {
+                        println!("Write hit the cache")
                     }
-                    _ => unreachable!(),
-                };
+                },
             }
-            (Sign::Unsigned, Type::Short) => {
-                match module.read_word_volatile(address) {
-                    Ok(_) => unreachable!(),
-                    Err(Status::Busy(clocks)) => {
-                        module.clock(clocks);
-                        *total_clocks += clocks;
+            Some(true)
+        }
+        Command::VolatileRead { sign, ty, address } => {
+            match (sign, ty) {
+                (Sign::Unsigned, Type::Byte) => {
+                    match module.read_byte_volatile(address) {
+                        Ok(_) => unreachable!(),
+                        Err(Status::Busy(clocks)) => {
+                            module.clock(clocks);
+                            *total_clocks += clocks;
 
-                        let value = module.read_word_volatile(address).unwrap();
-                        println!(
-                            "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
-                            value as Word,
-                            if clocks == 1 { "clock" } else { "clocks" }
-                        )
-                    }
-                    _ => unreachable!(),
-                };
-            }
-            (Sign::Unsigned, Type::Word) => {
-                match module.read_word_volatile(address) {
-                    Ok(_) => unreachable!(),
-                    Err(Status::Busy(clocks)) => {
-                        module.clock(clocks);
-                        *total_clocks += clocks;
-
-                        let value = module.read_word_volatile(address).unwrap();
-                        println!(
-                            "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
-                            value as SWord,
-                            if clocks == 1 { "clock" } else { "clocks" }
-                        )
-                    }
-                    _ => unreachable!(),
-                };
-            }
-        },
-        Command::VolatileWrite { ty, address, value } => match ty {
-            Type::Byte => match module.write_byte_volatile(address, value as Byte) {
-                Status::Busy(clocks) => {
-                    module.clock(clocks);
-                    *total_clocks += clocks;
-
-                    println!(
-                        "Write took {clocks} {}",
-                        if clocks == 1 { "clock" } else { "clocks" }
-                    )
+                            let value = module.read_byte_volatile(address).unwrap();
+                            println!(
+                                "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
+                                value as Byte,
+                                if clocks == 1 { "clock" } else { "clocks" }
+                            )
+                        }
+                        _ => unreachable!(),
+                    };
                 }
-                Status::Idle => unreachable!(),
-            },
-            Type::Short => match module.write_short_volatile(address, value as Short) {
-                Status::Busy(clocks) => {
-                    module.clock(clocks);
-                    *total_clocks += clocks;
+                (Sign::Signed, Type::Byte) => {
+                    match module.read_byte_volatile(address) {
+                        Ok(_) => unreachable!(),
+                        Err(Status::Busy(clocks)) => {
+                            module.clock(clocks);
+                            *total_clocks += clocks;
 
-                    println!(
-                        "Write took {clocks} {}",
-                        if clocks == 1 { "clock" } else { "clocks" }
-                    )
+                            let value = module.read_byte_volatile(address).unwrap();
+                            println!(
+                                "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
+                                value as SByte,
+                                if clocks == 1 { "clock" } else { "clocks" }
+                            )
+                        }
+                        _ => unreachable!(),
+                    };
                 }
-                Status::Idle => unreachable!(),
-            },
-            Type::Word => match module.write_word_volatile(address, value as Word) {
-                Status::Busy(clocks) => {
-                    module.clock(clocks);
-                    *total_clocks += clocks;
+                (Sign::Signed, Type::Short) => {
+                    match module.read_short_volatile(address) {
+                        Ok(_) => unreachable!(),
+                        Err(Status::Busy(clocks)) => {
+                            module.clock(clocks);
+                            *total_clocks += clocks;
 
-                    println!(
-                        "Write took {clocks} {}",
-                        if clocks == 1 { "clock" } else { "clocks" }
-                    )
+                            let value = module.read_short_volatile(address).unwrap();
+                            println!(
+                                "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
+                                value as Short,
+                                if clocks == 1 { "clock" } else { "clocks" }
+                            )
+                        }
+                        _ => unreachable!(),
+                    };
                 }
-                Status::Idle => unreachable!(),
-            },
-        },
+                (Sign::Signed, Type::Word) => {
+                    match module.read_short_volatile(address) {
+                        Ok(_) => unreachable!(),
+                        Err(Status::Busy(clocks)) => {
+                            module.clock(clocks);
+                            *total_clocks += clocks;
+
+                            let value = module.read_short_volatile(address).unwrap();
+                            println!(
+                                "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
+                                value as SShort,
+                                if clocks == 1 { "clock" } else { "clocks" }
+                            )
+                        }
+                        _ => unreachable!(),
+                    };
+                }
+                (Sign::Unsigned, Type::Short) => {
+                    match module.read_word_volatile(address) {
+                        Ok(_) => unreachable!(),
+                        Err(Status::Busy(clocks)) => {
+                            module.clock(clocks);
+                            *total_clocks += clocks;
+
+                            let value = module.read_word_volatile(address).unwrap();
+                            println!(
+                                "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
+                                value as Word,
+                                if clocks == 1 { "clock" } else { "clocks" }
+                            )
+                        }
+                        _ => unreachable!(),
+                    };
+                }
+                (Sign::Unsigned, Type::Word) => {
+                    match module.read_word_volatile(address) {
+                        Ok(_) => unreachable!(),
+                        Err(Status::Busy(clocks)) => {
+                            module.clock(clocks);
+                            *total_clocks += clocks;
+
+                            let value = module.read_word_volatile(address).unwrap();
+                            println!(
+                                "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
+                                value as SWord,
+                                if clocks == 1 { "clock" } else { "clocks" }
+                            )
+                        }
+                        _ => unreachable!(),
+                    };
+                }
+            }
+            Some(true)
+        }
+        Command::VolatileWrite { ty, address, value } => {
+            match ty {
+                Type::Byte => match module.write_byte_volatile(address, value as Byte) {
+                    Status::Busy(clocks) => {
+                        module.clock(clocks);
+                        *total_clocks += clocks;
+
+                        println!(
+                            "Write took {clocks} {}",
+                            if clocks == 1 { "clock" } else { "clocks" }
+                        )
+                    }
+                    Status::Idle => unreachable!(),
+                },
+                Type::Short => match module.write_short_volatile(address, value as Short) {
+                    Status::Busy(clocks) => {
+                        module.clock(clocks);
+                        *total_clocks += clocks;
+
+                        println!(
+                            "Write took {clocks} {}",
+                            if clocks == 1 { "clock" } else { "clocks" }
+                        )
+                    }
+                    Status::Idle => unreachable!(),
+                },
+                Type::Word => match module.write_word_volatile(address, value as Word) {
+                    Status::Busy(clocks) => {
+                        module.clock(clocks);
+                        *total_clocks += clocks;
+
+                        println!(
+                            "Write took {clocks} {}",
+                            if clocks == 1 { "clock" } else { "clocks" }
+                        )
+                    }
+                    Status::Idle => unreachable!(),
+                },
+            }
+            Some(true)
+        }
+        Command::ShowCache => {
+            for (name, state) in module.cache_state() {
+                println!("{name}: ");
+
+                for (i, line) in state.iter().enumerate() {
+                    match line {
+                        Some(data) => {
+                            println!(
+                                "\t[{i:>4}] {:#010X}{}:",
+                                data.address_base,
+                                if data.dirty { " (dirty)" } else { "" }
+                            );
+                            for bytes in data.data.chunks(8) {
+                                print!("\t\t");
+                                for (i, byte) in bytes.iter().enumerate() {
+                                    if i % 4 == 0 && i != 0 {
+                                        print!(" {byte:02X} ");
+                                    } else {
+                                        print!("{byte:02X} ");
+                                    }
+                                }
+                                println!();
+                            }
+                        }
+                        None => println!("\t[{i:>4}] Invalid"),
+                    }
+                }
+            }
+            Some(false)
+        }
+        Command::Statistics => {
+            let hits = module.cache_hits();
+            let cold = module.cold_misses();
+            let miss = module.cache_misses() + cold;
+
+            println!(
+                "The cache was hit {hits} {} and missed {miss} {} (where {cold} {} cold)\nThe clock was ticked {total_clocks} {}",
+                if hits == 1 { "time" } else { "times" },
+                if miss == 1 { "time" } else { "times" },
+                if cold == 1 { "was" } else { "were" },
+                if *total_clocks == 1 { "time" } else { "times" },
+            );
+            Some(false)
+        }
     }
-    true
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -356,13 +411,22 @@ fn main() -> Result<(), Box<dyn Error>> {
             args.writethrough = true;
             (NullCache::new().boxed(), NullCache::new().boxed())
         }
-        cli::CacheMode::Associative { set_bits, off_bits } => {
+        cli::CacheMode::Associative {
+            set_bits,
+            off_bits,
+            ways,
+        } => {
             if set_bits + off_bits > 32 {
                 return Err("set_bits + off_bits must sum up to 32".into());
-            } else {
+            } else if ways == 1 {
                 (
                     Associative::new(off_bits, set_bits).boxed(),
                     Associative::new(off_bits, set_bits).boxed(),
+                )
+            } else {
+                (
+                    MultiAssociative::new(off_bits, set_bits, ways).boxed(),
+                    MultiAssociative::new(off_bits, set_bits, ways).boxed(),
                 )
             }
         }
@@ -370,7 +434,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let memory = Memory::new(args.pages);
 
-    // TODO: use the module to simulate memory
     let mut module = SingleLevel::new_with_boxed(
         dcache,
         icache,
@@ -384,12 +447,22 @@ fn main() -> Result<(), Box<dyn Error>> {
     if let Some(file) = args.cmd_file {
         let reader = BufReader::new(File::open(file)?);
 
-        for line in reader.lines() {
-            process_input(
-                Command::parse_from(line?.split_whitespace()),
-                &mut module,
-                &mut total_clocks,
-            );
+        for (i, line) in reader
+            .lines()
+            .map(|l| l.expect("Failed to read line"))
+            .enumerate()
+        {
+            print!("{:>3} > ", i + 1);
+            if line.is_empty() {
+                println!();
+            } else {
+                process_input(
+                    Command::parse_from(line.split_whitespace()),
+                    &mut module,
+                    &mut total_clocks,
+                );
+                total_clocks += 1;
+            }
         }
     } else {
         loop {
@@ -401,11 +474,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .expect("Could not read input")
             {
                 match Command::try_parse_from(input.split_whitespace()) {
-                    Ok(command) => {
-                        if !process_input(command, &mut module, &mut total_clocks) {
-                            break;
-                        }
-                    }
+                    Ok(command) => match process_input(command, &mut module, &mut total_clocks) {
+                        Some(true) => total_clocks += 1,
+                        Some(false) => (),
+                        None => break,
+                    },
                     Err(e) => println!("{e}"),
                 }
             }

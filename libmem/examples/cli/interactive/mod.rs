@@ -181,6 +181,10 @@ pub enum Command {
         #[clap(name = "TYPE", default_value_t = Type::Byte)]
         ty: Type,
     },
+    /// Show the contents of the cache
+    ShowCache,
+    /// Shows the statistics of the cache
+    Statistics,
     /// Stop the runtime
     Exit,
 }
@@ -293,6 +297,8 @@ impl Command {
                         })]),
                     })]),
                 }),
+                Arc::new("show-cache"),
+                Arc::new("statistics"),
             ]);
 
             unsafe {

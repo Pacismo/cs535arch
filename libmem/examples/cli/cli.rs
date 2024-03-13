@@ -23,6 +23,9 @@ pub enum CacheMode {
         /// How many bits to reserve for the byte offset
         #[arg(value_parser = ranged::<2, 32>)]
         off_bits: usize,
+        /// How many ways a set can have
+        #[arg(value_parser = ranged::<1, 32>, default_value_t = 1)]
+        ways: usize
     },
 }
 
