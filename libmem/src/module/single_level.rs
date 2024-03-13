@@ -526,7 +526,7 @@ impl MemoryModule for SingleLevel {
     }
 
     fn cache_misses(&self) -> usize {
-        self.misses
+        self.misses + self.cold_misses
     }
 
     fn cache_hits(&self) -> usize {
