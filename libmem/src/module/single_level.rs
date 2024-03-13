@@ -35,6 +35,8 @@ enum Transaction {
     ReadShortV(Word),
     /// The memory unit is reading a word, bypassing cache
     ReadWordV(Word),
+    /// The cache is being flushed to memory
+    FlushCache,
 }
 
 impl Transaction {
@@ -100,7 +102,7 @@ impl MemoryModule for SingleLevel {
                         if self.data_cache.write_line(addr, &mut self.memory).evicted() {
                             self.evictions += 1;
                         }
-                        if !self.data_cache.has_address(addr + 1) {
+                        if self.data_cache.check_address(addr + 1).is_miss() {
                             if self
                                 .data_cache
                                 .write_line(addr + 1, &mut self.memory)
@@ -123,7 +125,7 @@ impl MemoryModule for SingleLevel {
                         if self.data_cache.write_line(addr, &mut self.memory).evicted() {
                             self.evictions += 1;
                         }
-                        if !self.data_cache.has_address(addr + 3) {
+                        if self.data_cache.check_address(addr + 3).is_miss() {
                             if self
                                 .data_cache
                                 .write_line(addr + 3, &mut self.memory)
@@ -146,7 +148,7 @@ impl MemoryModule for SingleLevel {
                     if self.data_cache.write_line(addr, &mut self.memory).evicted() {
                         self.evictions += 1;
                     }
-                    if !self.data_cache.has_address(addr + 1) {
+                    if self.data_cache.check_address(addr + 1).is_miss() {
                         if self
                             .data_cache
                             .write_line(addr + 1, &mut self.memory)
@@ -160,7 +162,7 @@ impl MemoryModule for SingleLevel {
                     if self.data_cache.write_line(addr, &mut self.memory).evicted() {
                         self.evictions += 1;
                     }
-                    if !self.data_cache.has_address(addr + 3) {
+                    if self.data_cache.check_address(addr + 3).is_miss() {
                         if self
                             .data_cache
                             .write_line(addr + 3, &mut self.memory)
@@ -172,6 +174,10 @@ impl MemoryModule for SingleLevel {
                 }
                 ReadInstruction(addr) => {
                     self.instruction_cache.write_line(addr, &mut self.memory);
+                }
+
+                FlushCache => {
+                    self.data_cache.flush(&mut self.memory);
                 }
 
                 _ => return,
@@ -218,7 +224,7 @@ impl MemoryModule for SingleLevel {
         match self.data_cache.get_short(addr) {
             Ok(value) => {
                 self.accesses += 1;
-                if !self.data_cache.within_line(addr, 2) {
+                if addr % 2 != 0 {
                     self.accesses += 1;
                 }
 
@@ -229,10 +235,18 @@ impl MemoryModule for SingleLevel {
                 let mut penalty = self.miss_penalty;
                 if addr % 4 != 0 {
                     penalty += 1;
+                    self.accesses += 1;
                 }
-                if !self.data_cache.has_address(addr + 1) {
-                    self.conflict_misses += 1;
-                    penalty += self.miss_penalty;
+                match self.data_cache.check_address(addr + 1) {
+                    cache::Status::Conflict => {
+                        self.conflict_misses += 1;
+                        penalty += self.miss_penalty;
+                    }
+                    cache::Status::Cold => {
+                        self.cold_misses += 1;
+                        penalty += self.miss_penalty;
+                    }
+                    _ => (),
                 }
 
                 Err(self.set_if_idle(ReadShort(addr), penalty))
@@ -242,10 +256,18 @@ impl MemoryModule for SingleLevel {
                 let mut penalty = self.miss_penalty;
                 if addr % 4 != 0 {
                     penalty += 1;
+                    self.accesses += 1;
                 }
-                if !self.data_cache.has_address(addr + 1) {
-                    self.cold_misses += 1;
-                    penalty += self.miss_penalty;
+                match self.data_cache.check_address(addr + 1) {
+                    cache::Status::Conflict => {
+                        self.conflict_misses += 1;
+                        penalty += self.miss_penalty;
+                    }
+                    cache::Status::Cold => {
+                        self.cold_misses += 1;
+                        penalty += self.miss_penalty;
+                    }
+                    _ => (),
                 }
 
                 Err(self.set_if_idle(ReadShort(addr), penalty))
@@ -271,7 +293,7 @@ impl MemoryModule for SingleLevel {
         match self.data_cache.get_word(addr) {
             Ok(value) => {
                 self.accesses += 1;
-                if !self.data_cache.within_line(addr, 4) {
+                if addr % 4 != 0 {
                     self.accesses += 1;
                 }
 
@@ -283,10 +305,18 @@ impl MemoryModule for SingleLevel {
                 let mut penalty = self.miss_penalty;
                 if addr % 4 != 0 {
                     penalty += 1;
+                    self.accesses += 1;
                 }
-                if !self.data_cache.has_address(addr + 3) {
-                    self.conflict_misses += 1;
-                    penalty += self.miss_penalty
+                match self.data_cache.check_address(addr + 3) {
+                    cache::Status::Conflict => {
+                        self.conflict_misses += 1;
+                        penalty += self.miss_penalty;
+                    }
+                    cache::Status::Cold => {
+                        self.cold_misses += 1;
+                        penalty += self.miss_penalty;
+                    }
+                    _ => (),
                 }
 
                 Err(self.set_if_idle(ReadWord(addr), penalty))
@@ -297,10 +327,18 @@ impl MemoryModule for SingleLevel {
                 let mut penalty = self.miss_penalty;
                 if addr % 4 != 0 {
                     penalty += 1;
+                    self.accesses += 1;
                 }
-                if !self.data_cache.has_address(addr + 3) {
-                    self.cold_misses += 1;
-                    penalty += self.miss_penalty
+                match self.data_cache.check_address(addr + 3) {
+                    cache::Status::Conflict => {
+                        self.conflict_misses += 1;
+                        penalty += self.miss_penalty;
+                    }
+                    cache::Status::Cold => {
+                        self.cold_misses += 1;
+                        penalty += self.miss_penalty;
+                    }
+                    _ => (),
                 }
 
                 Err(self.set_if_idle(ReadWord(addr), penalty))
@@ -308,6 +346,7 @@ impl MemoryModule for SingleLevel {
             Err(cache::Status::Disabled) => {
                 let mut penalty = self.volatile_penalty;
                 if addr % 4 != 0 {
+                    self.accesses += 1;
                     penalty += self.volatile_penalty;
                 }
 
@@ -441,10 +480,26 @@ impl MemoryModule for SingleLevel {
                     let mut penalty = self.miss_penalty;
                     if addr % 2 != 0 {
                         penalty += 1;
+                        self.accesses += 1;
                     }
-                    if !self.data_cache.within_line(addr, 2) {
-                        self.conflict_misses += 1;
-                        penalty += self.miss_penalty;
+                    match self.data_cache.check_address(addr + 1) {
+                        cache::Status::Conflict => {
+                            self.conflict_misses += 1;
+                            if !self.writethrough {
+                                penalty += self.miss_penalty;
+                            } else {
+                                penalty += self.volatile_penalty
+                            }
+                        }
+                        cache::Status::Cold => {
+                            self.cold_misses += 1;
+                            if !self.writethrough {
+                                penalty += self.miss_penalty;
+                            } else {
+                                penalty += self.volatile_penalty
+                            }
+                        }
+                        _ => (),
                     }
 
                     self.set_if_idle(WriteShort(addr, value, false), penalty)
@@ -454,17 +509,33 @@ impl MemoryModule for SingleLevel {
                     let mut penalty = self.miss_penalty;
                     if addr % 2 != 0 {
                         penalty += 1;
+                        self.accesses += 1;
                     }
-                    if !self.data_cache.within_line(addr, 2) {
-                        self.cold_misses += 1;
-                        penalty += self.miss_penalty;
+                    match self.data_cache.check_address(addr + 1) {
+                        cache::Status::Conflict => {
+                            self.conflict_misses += 1;
+                            if !self.writethrough {
+                                penalty += self.miss_penalty;
+                            } else {
+                                penalty += self.volatile_penalty
+                            }
+                        }
+                        cache::Status::Cold => {
+                            self.cold_misses += 1;
+                            if !self.writethrough {
+                                penalty += self.miss_penalty;
+                            } else {
+                                penalty += self.volatile_penalty
+                            }
+                        }
+                        _ => (),
                     }
 
                     self.set_if_idle(WriteShort(addr, value, false), penalty)
                 }
                 cache::Status::Disabled => {
                     let mut penalty = self.volatile_penalty;
-                    if !self.data_cache.within_line(addr, 2) {
+                    if addr % 2 != 0 {
                         penalty += self.volatile_penalty;
                     }
 
@@ -492,10 +563,26 @@ impl MemoryModule for SingleLevel {
                     let mut penalty = self.miss_penalty;
                     if addr % 4 != 0 {
                         penalty += 1;
-                    }
-                    if !self.data_cache.within_line(addr, 4) {
-                        penalty += self.miss_penalty;
                         self.accesses += 1;
+                    }
+                    match self.data_cache.check_address(addr + 3) {
+                        cache::Status::Conflict => {
+                            self.conflict_misses += 1;
+                            if !self.writethrough {
+                                penalty += self.miss_penalty;
+                            } else {
+                                penalty += self.volatile_penalty
+                            }
+                        }
+                        cache::Status::Cold => {
+                            self.cold_misses += 1;
+                            if !self.writethrough {
+                                penalty += self.miss_penalty;
+                            } else {
+                                penalty += self.volatile_penalty
+                            }
+                        }
+                        _ => (),
                     }
 
                     self.set_if_idle(WriteWord(addr, value, false), penalty)
@@ -505,10 +592,26 @@ impl MemoryModule for SingleLevel {
                     let mut penalty = self.miss_penalty;
                     if addr % 4 != 0 {
                         penalty += 1;
-                    }
-                    if !self.data_cache.within_line(addr, 4) {
-                        penalty += self.miss_penalty;
                         self.accesses += 1;
+                    }
+                    match self.data_cache.check_address(addr + 3) {
+                        cache::Status::Conflict => {
+                            self.conflict_misses += 1;
+                            if !self.writethrough {
+                                penalty += self.miss_penalty;
+                            } else {
+                                penalty += self.volatile_penalty
+                            }
+                        }
+                        cache::Status::Cold => {
+                            self.cold_misses += 1;
+                            if !self.writethrough {
+                                penalty += self.miss_penalty;
+                            } else {
+                                penalty += self.volatile_penalty
+                            }
+                        }
+                        _ => (),
                     }
 
                     self.set_if_idle(WriteWord(addr, value, false), penalty)
@@ -584,6 +687,22 @@ impl MemoryModule for SingleLevel {
 
     fn memory(&self) -> &Memory {
         &self.memory
+    }
+
+    fn flush_cache(&mut self) -> Status {
+        if self.current_transaction.is_busy() {
+            Busy(self.clocks)
+        } else {
+            let count = self.data_cache.dirty_lines();
+
+            if count == 0 {
+                Status::Idle
+            } else {
+                self.clocks = self.miss_penalty;
+                self.current_transaction = FlushCache;
+                Busy(self.miss_penalty)
+            }
+        }
     }
 }
 

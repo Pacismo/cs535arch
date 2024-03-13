@@ -84,4 +84,7 @@ pub trait MemoryModule {
     ///
     /// Provides the names of the caches as well
     fn cache_state(&self) -> Vec<(&'static str, Vec<Option<LineData>>)>;
+
+    /// Flush the contents of cache into memory
+    fn flush_cache(&mut self) -> Status;
 }
