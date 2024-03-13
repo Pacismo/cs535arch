@@ -209,7 +209,8 @@ impl Cache for MultiAssociative {
                 None
             }
         }) {
-            s.data[off] = data;
+            s[off] = data;
+            s.dirty = true;
             sets[..=i].rotate_right(1);
             Status::Hit
         } else if nulls == 0 {
@@ -237,6 +238,7 @@ impl Cache for MultiAssociative {
             }) {
                 s[off] = bytes[0];
                 s[off + 1] = bytes[1];
+                s.dirty = true;
                 set[0..=i].rotate_right(1);
                 Status::Hit
             } else if nulls == 0 {
@@ -283,7 +285,9 @@ impl Cache for MultiAssociative {
                 let (j, mut t) = second.unwrap();
 
                 s[off] = bytes[0];
+                s.dirty = true;
                 t[0] = bytes[1];
+                t.dirty = true;
 
                 let mut sets = self.set_mut(set);
                 sets[..=i].rotate_right(1);
@@ -328,6 +332,7 @@ impl Cache for MultiAssociative {
                 }
             }) {
                 s[off..off + 4].copy_from_slice(&bytes);
+                s.dirty = true;
 
                 set[0..=i].rotate_right(1);
                 Status::Hit
@@ -381,6 +386,9 @@ impl Cache for MultiAssociative {
                 }
 
                 t[..4 - index].copy_from_slice(&bytes[index..]);
+
+                s.dirty = true;
+                t.dirty = true;
 
                 self.set_mut(set)[..=i].rotate_right(1);
                 self.set_mut(oset)[..=j].rotate_right(1);
