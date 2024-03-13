@@ -9,7 +9,6 @@ use std::{
     ops::Deref,
     slice::Iter,
 };
-
 use libseis::{
     pages::PAGE_SIZE,
     types::{Byte, Short, Word},
@@ -17,11 +16,10 @@ use libseis::{
 use serde::{ser::SerializeSeq, Serialize};
 
 type Page = [Byte; PAGE_SIZE];
-
-pub type PageIterator<'a> =
-    Map<Iter<'a, Option<Box<Page>>>, fn(&'a Option<Box<Page>>) -> Option<&'a [u8]>>;
-
 /// An iterator over the pages of the [`Memory`] datastructure
+pub type PageIterator<'a> =
+Map<Iter<'a, Option<Box<Page>>>, fn(&'a Option<Box<Page>>) -> Option<&'a [u8]>>;
+/// An iterator over the allocated pages of the [`Memory`] datastructure
 pub type AllocatedPageIterator<'a> = FlatMap<
     Enumerate<PageIterator<'a>>,
     Option<(usize, &'a [u8])>,

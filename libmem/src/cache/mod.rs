@@ -19,7 +19,7 @@ pub use null::NullCache;
 use serde::Serialize;
 use std::fmt::Debug;
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct LineData<'a> {
     pub address_base: Word,
     pub dirty: bool,

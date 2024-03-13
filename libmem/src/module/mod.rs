@@ -10,10 +10,25 @@
 
 mod single_level;
 
+use crate::{cache::LineData, memory::Memory};
 use libseis::types::{Byte, Short, Word};
+use serde::Serialize;
 pub use single_level::SingleLevel;
 
-use crate::{cache::LineData, memory::Memory};
+#[derive(Debug, Serialize)]
+pub struct CacheData<'a> {
+    pub name: String,
+    pub lines: Vec<Option<LineData<'a>>>,
+}
+
+impl<'a, T: ToString + 'a> From<(T, Vec<Option<LineData<'a>>>)> for CacheData<'a> {
+    fn from((name, lines): (T, Vec<Option<LineData<'a>>>)) -> Self {
+        Self {
+            name: name.to_string(),
+            lines,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub enum Status {
@@ -83,7 +98,7 @@ pub trait MemoryModule {
     /// Get the state of the cache structures
     ///
     /// Provides the names of the caches as well
-    fn cache_state(&self) -> Vec<(&'static str, Vec<Option<LineData>>)>;
+    fn cache_state(&self) -> Vec<CacheData>;
 
     /// Flush the contents of cache into memory
     fn flush_cache(&mut self) -> Status;

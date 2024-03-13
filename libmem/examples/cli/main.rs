@@ -11,7 +11,7 @@ use interactive::{Command, Sign, Type};
 use libmem::{
     cache::*,
     memory::Memory,
-    module::{MemoryModule, SingleLevel, Status},
+    module::{CacheData, MemoryModule, SingleLevel, Status},
 };
 use libseis::{
     pages::PAGE_SIZE,
@@ -438,10 +438,10 @@ fn process_input(
             Some(true)
         }
         Command::ShowCache => {
-            for (name, state) in module.cache_state() {
+            for CacheData { name, lines } in module.cache_state() {
                 println!("{name}: ");
 
-                for (i, line) in state.iter().enumerate() {
+                for (i, line) in lines.iter().enumerate() {
                     match line {
                         Some(data) => {
                             println!(
