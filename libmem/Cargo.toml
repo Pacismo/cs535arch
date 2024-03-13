@@ -22,3 +22,7 @@ features = ["derive"]
 
 [dev-dependencies.inquire]
 version = "0.7.0"
+
+[dependencies.serde]
+version = "1.0.197"
+features = ["derive"]
