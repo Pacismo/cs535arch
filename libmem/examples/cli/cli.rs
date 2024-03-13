@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use clap::{Parser, Subcommand, ValueHint::FilePath};
+use std::path::PathBuf;
 
 fn ranged<const MIN: usize, const MAX: usize>(val: &str) -> Result<usize, String> {
     let val = val.parse::<usize>().map_err(|e| e.to_string())?;
@@ -25,7 +25,7 @@ pub enum CacheMode {
         off_bits: usize,
         /// How many ways a set can have
         #[arg(value_parser = ranged::<1, 32>, default_value_t = 1)]
-        ways: usize
+        ways: usize,
     },
 }
 
@@ -48,9 +48,14 @@ pub struct Args {
     /// Whether to have writes go through the cache on miss
     #[arg(short, long)]
     pub writethrough: bool,
+    /// Whether you need to clock the memory subsystem manually for non-volatile operations
+    ///
+    /// This is not available when the cache mode is none or when using a command file
+    #[arg(short, long)]
+    pub manual_clock: bool,
 
     /// The file to read for memory instructions
     #[arg(short, long)]
     #[arg(value_hint = FilePath)]
-    pub cmd_file: Option<PathBuf>
+    pub cmd_file: Option<PathBuf>,
 }

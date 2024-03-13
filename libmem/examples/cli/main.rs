@@ -3,14 +3,20 @@ mod interactive;
 
 use clap::Parser;
 use cli::Args;
-use inquire::Text;
+use inquire::{
+    ui::{Attributes, Color, StyleSheet},
+    Text,
+};
 use interactive::{Command, Sign, Type};
 use libmem::{
     cache::*,
     memory::Memory,
     module::{MemoryModule, SingleLevel, Status},
 };
-use libseis::types::{Byte, SByte, SShort, SWord, Short, Word};
+use libseis::{
+    pages::PAGE_SIZE,
+    types::{Byte, SByte, SShort, SWord, Short, Word},
+};
 use std::{
     error::Error,
     fs::File,
@@ -21,9 +27,15 @@ fn process_input(
     command: Command,
     module: &mut dyn MemoryModule,
     total_clocks: &mut usize,
+    manual: bool,
 ) -> Option<bool> {
     match command {
         Command::Exit => None,
+        Command::Clock { amount } => {
+            module.clock(amount);
+            *total_clocks += amount;
+            Some(false)
+        }
         Command::Read { sign, ty, address } => {
             match (sign, ty) {
                 (Sign::Unsigned, Type::Byte) => {
@@ -32,6 +44,12 @@ fn process_input(
                             println!(
                                 "[{address:#010X} ({sign} {ty})] {} (cache hit)",
                                 value as Byte
+                            )
+                        }
+                        Err(Status::Busy(clocks)) if manual => {
+                            println!(
+                                "Memory subsystem requires {clocks} {} to complete an operation",
+                                if clocks == 1 { "clock" } else { "clocks" }
                             )
                         }
                         Err(Status::Busy(clocks)) => {
@@ -56,6 +74,12 @@ fn process_input(
                                 value as SByte,
                             )
                         }
+                        Err(Status::Busy(clocks)) if manual => {
+                            println!(
+                                "Memory subsystem requires {clocks} {} to complete an operation",
+                                if clocks == 1 { "clock" } else { "clocks" }
+                            )
+                        }
                         Err(Status::Busy(clocks)) => {
                             module.clock(clocks);
                             *total_clocks += clocks;
@@ -76,6 +100,12 @@ fn process_input(
                             println!(
                                 "[{address:#010X} ({sign} {ty})] {} (cache hit)",
                                 value as Short,
+                            )
+                        }
+                        Err(Status::Busy(clocks)) if manual => {
+                            println!(
+                                "Memory subsystem requires {clocks} {} to complete an operation",
+                                if clocks == 1 { "clock" } else { "clocks" }
                             )
                         }
                         Err(Status::Busy(clocks)) => {
@@ -100,6 +130,12 @@ fn process_input(
                                 value as SShort,
                             )
                         }
+                        Err(Status::Busy(clocks)) if manual => {
+                            println!(
+                                "Memory subsystem requires {clocks} {} to complete an operation",
+                                if clocks == 1 { "clock" } else { "clocks" }
+                            )
+                        }
                         Err(Status::Busy(clocks)) => {
                             module.clock(clocks);
                             *total_clocks += clocks;
@@ -120,6 +156,12 @@ fn process_input(
                             println!(
                                 "[{address:#010X} ({sign} {ty})] {} (cache hit)",
                                 value as Word,
+                            )
+                        }
+                        Err(Status::Busy(clocks)) if manual => {
+                            println!(
+                                "Memory subsystem requires {clocks} {} to complete an operation",
+                                if clocks == 1 { "clock" } else { "clocks" }
                             )
                         }
                         Err(Status::Busy(clocks)) => {
@@ -144,6 +186,12 @@ fn process_input(
                                 value as SWord,
                             )
                         }
+                        Err(Status::Busy(clocks)) if manual => {
+                            println!(
+                                "Memory subsystem requires {clocks} {} to complete an operation",
+                                if clocks == 1 { "clock" } else { "clocks" }
+                            )
+                        }
                         Err(Status::Busy(clocks)) => {
                             module.clock(clocks);
                             *total_clocks += clocks;
@@ -164,6 +212,12 @@ fn process_input(
         Command::Write { ty, address, value } => {
             match ty {
                 Type::Byte => match module.write_byte(address, value as Byte) {
+                    Status::Busy(clocks) if manual => {
+                        println!(
+                            "Memory subsystem requires {clocks} {} to complete an operation",
+                            if clocks == 1 { "clock" } else { "clocks" }
+                        )
+                    }
                     Status::Busy(clocks) => {
                         module.clock(clocks);
                         *total_clocks += clocks;
@@ -178,6 +232,12 @@ fn process_input(
                     }
                 },
                 Type::Short => match module.write_short(address, value as Short) {
+                    Status::Busy(clocks) if manual => {
+                        println!(
+                            "Memory subsystem requires {clocks} {} to complete an operation",
+                            if clocks == 1 { "clock" } else { "clocks" }
+                        )
+                    }
                     Status::Busy(clocks) => {
                         module.clock(clocks);
                         *total_clocks += clocks;
@@ -192,6 +252,12 @@ fn process_input(
                     }
                 },
                 Type::Word => match module.write_word(address, value as Word) {
+                    Status::Busy(clocks) if manual => {
+                        println!(
+                            "Memory subsystem requires {clocks} {} to complete an operation",
+                            if clocks == 1 { "clock" } else { "clocks" }
+                        )
+                    }
                     Status::Busy(clocks) => {
                         module.clock(clocks);
                         *total_clocks += clocks;
@@ -400,6 +466,58 @@ fn process_input(
             );
             Some(false)
         }
+
+        Command::ShowMemory { page } => {
+            for i in page..page + PAGE_SIZE as Word {
+                if i % 256 == 0 && i != 0 {
+                    match (inquire::CustomType {
+                        message: "",
+                        starting_input: None,
+                        default: None,
+                        placeholder: None,
+                        help_message: Some("Press [ENTER] to continue or [ESC] to stop"),
+                        formatter: &|_: ()| String::new(),
+                        default_value_formatter: &|_| String::new(),
+                        parser: &|_| Ok(()),
+                        validators: vec![Box::new(|_: &()| {
+                            Ok(inquire::validator::Validation::Valid)
+                        })],
+                        error_message: "".into(),
+                        render_config: inquire::ui::RenderConfig {
+                            prompt_prefix: "".into(),
+                            answered_prompt_prefix: "".into(),
+                            prompt: StyleSheet::new()
+                                .with_attr(Attributes::ITALIC)
+                                .with_fg(Color::Grey),
+                            ..Default::default()
+                        },
+                    }
+                    .prompt())
+                    {
+                        Ok(_) => (),
+                        Err(_) => break,
+                    }
+                }
+
+                if i % 256 == 0 {
+                    print!("{i:#>010X}:\n\t")
+                }
+
+                print!("{:>02X} ", module.memory().read_byte(i));
+                if i % 4 == 3 {
+                    print!(" ");
+                }
+                if i % 32 == 31 {
+                    if i % 256 == 255 {
+                        println!();
+                    } else {
+                        print!("\n\t");
+                    }
+                }
+            }
+
+            Some(false)
+        }
     }
 }
 
@@ -409,6 +527,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let (dcache, icache) = match args.mode {
         cli::CacheMode::None => {
             args.writethrough = true;
+            args.manual_clock = false;
             (NullCache::new().boxed(), NullCache::new().boxed())
         }
         cli::CacheMode::Associative {
@@ -460,6 +579,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     Command::parse_from(line.split_whitespace()),
                     &mut module,
                     &mut total_clocks,
+                    false,
                 );
                 total_clocks += 1;
             }
@@ -474,7 +594,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .expect("Could not read input")
             {
                 match Command::try_parse_from(input.split_whitespace()) {
-                    Ok(command) => match process_input(command, &mut module, &mut total_clocks) {
+                    Ok(command) => match process_input(
+                        command,
+                        &mut module,
+                        &mut total_clocks,
+                        args.manual_clock,
+                    ) {
                         Some(true) => total_clocks += 1,
                         Some(false) => (),
                         None => break,

@@ -185,6 +185,10 @@ pub enum Command {
     ShowCache,
     /// Shows the statistics of the cache
     Statistics,
+    /// Clock the memory subsystem
+    Clock { amount: usize },
+    /// Reads data from memory
+    ShowMemory { page: Word },
     /// Stop the runtime
     Exit,
 }
@@ -299,6 +303,20 @@ impl Command {
                 }),
                 Arc::new("show-cache"),
                 Arc::new("statistics"),
+                Arc::new(StringCompleter {
+                    string: "show-memory",
+                    subtree: Arc::new([Arc::new(ArgumentField {
+                        string: "<page-id>",
+                        subtree: empty.clone(),
+                    })]),
+                }),
+                Arc::new(StringCompleter {
+                    string: "clock",
+                    subtree: Arc::new([Arc::new(ArgumentField {
+                        string: "<count>",
+                        subtree: empty,
+                    })]),
+                }),
             ]);
 
             unsafe {
