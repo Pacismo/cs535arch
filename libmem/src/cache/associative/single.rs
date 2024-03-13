@@ -255,29 +255,32 @@ impl Cache for Associative {
         let (tag, set, _) = self.split_address(address);
 
         // Flush a previously-existing line if it is dirty. Otherwise, purge its contents.
-        let replaced = if let Some(line) = take(&mut self.lines[set]) {
+        if let Some(mut line) = take(&mut self.lines[set]) {
             if line.dirty {
+                let construct_address = self.construct_address(line.tag, set as u32, 0);
+
                 line.data
-                    .into_iter()
-                    .zip(self.construct_address(line.tag, set as Word, 0)..)
-                    .for_each(|(&b, a)| memory.write_byte(a, b));
-                true
-            } else {
-                false
+                    .iter()
+                    .zip(construct_address..)
+                    .for_each(|(&byte, address)| memory.write_byte(address, byte));
             }
-        } else {
-            false
-        };
 
-        self.lines[set] = Some(Box::new(Line {
-            dirty: false,
-            tag,
-            data: memory.read_words(address, 2usize.pow(self.off_bits as u32)),
-        }));
+            line.tag = tag;
+            line.dirty = false;
+            memory.read_words_to(address, &mut line.data);
 
-        if replaced {
+            self.lines[set] = Some(line);
+
             LineReadStatus::Evicted
         } else {
+            let new_line = Box::new(Line {
+                tag,
+                dirty: false,
+                data: memory.read_words(address, self.line_len()),
+            });
+
+            self.lines[set] = Some(new_line);
+
             LineReadStatus::Swapped
         }
     }

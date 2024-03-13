@@ -1,8 +1,7 @@
-use libseis::types::{Byte, Short, Word};
-
-use crate::cache::{Cache, LineData, Status};
-
 use super::Line;
+use crate::cache::{Cache, LineData, LineReadStatus, ReadResult, Status};
+use libseis::types::{Byte, Short, Word};
+use std::mem::take;
 
 /// Represents an N-way set-associative cache.
 #[derive(Debug)]
@@ -14,7 +13,7 @@ pub struct MultiAssociative {
 }
 
 impl Cache for MultiAssociative {
-    fn get_byte(&mut self, address: Word) -> crate::cache::ReadResult<Byte> {
+    fn get_byte(&mut self, address: Word) -> ReadResult<Byte> {
         let (tag, set, off) = self.split_address(address);
         let set = self.set_mut(set);
 
@@ -42,32 +41,379 @@ impl Cache for MultiAssociative {
         }
     }
 
-    fn get_short(&mut self, address: Word) -> crate::cache::ReadResult<Short> {
-        todo!()
+    fn get_short(&mut self, address: Word) -> ReadResult<Short> {
+        let (tag, set, off) = self.split_address(address);
+
+        if off < self.line_len() - 1 {
+            let set = self.set_mut(set);
+            let mut nulls = 0;
+
+            if let Some((i, s)) = set.iter_mut().enumerate().find_map(|(i, s)| match s {
+                Some(s) if s.tag == tag => Some((i, s)),
+                Some(_) => None,
+                None => {
+                    nulls += 1;
+                    None
+                }
+            }) {
+                let v = [s[off], s[off + 1]];
+                set[0..=i].rotate_right(1);
+                Ok(Short::from_be_bytes(v))
+            } else if nulls == 0 {
+                Err(Status::Conflict)
+            } else {
+                Err(Status::Cold)
+            }
+        } else {
+            let (otag, oset) = if set + 1 < self.sets.len() / self.ways {
+                (tag, set + 1)
+            } else {
+                (tag + 1, 0)
+            };
+
+            let mut set = self.set_mut(set);
+            let mut nulls = 0;
+            let mut bytes = [0; 2];
+
+            if let Some((i, s)) = set.iter_mut().enumerate().find_map(|(i, s)| match s {
+                Some(s) if s.tag == tag => Some((i, s)),
+                Some(_) => None,
+                None => {
+                    nulls += 1;
+                    None
+                }
+            }) {
+                bytes[0] = s[s.len() - 1];
+                set[0..=i].rotate_right(1);
+            } else if nulls == 0 {
+                return Err(Status::Conflict);
+            } else {
+                return Err(Status::Cold);
+            }
+
+            set = self.set_mut(oset);
+            nulls = 0;
+
+            if let Some((i, s)) = set.iter_mut().enumerate().find_map(|(i, s)| match s {
+                Some(s) if s.tag == otag => Some((i, s)),
+                Some(_) => None,
+                None => {
+                    nulls += 1;
+                    None
+                }
+            }) {
+                bytes[1] = s[s.len() - 1];
+                set[0..=i].rotate_right(1);
+            } else if nulls == 0 {
+                return Err(Status::Conflict);
+            } else {
+                return Err(Status::Cold);
+            }
+
+            Ok(Short::from_be_bytes(bytes))
+        }
     }
 
-    fn get_word(&mut self, address: Word) -> crate::cache::ReadResult<Word> {
-        todo!()
+    fn get_word(&mut self, address: Word) -> ReadResult<Word> {
+        let (tag, set, off) = self.split_address(address);
+
+        if off < self.line_len() - 3 {
+            let set = self.set_mut(set);
+            let mut nulls = 0;
+
+            if let Some((i, s)) = set.iter_mut().enumerate().find_map(|(i, s)| match s {
+                Some(s) if s.tag == tag => Some((i, s)),
+                Some(_) => None,
+                None => {
+                    nulls += 1;
+                    None
+                }
+            }) {
+                let v = [s[off], s[off + 1], s[off + 2], s[off + 3]];
+                set[0..=i].rotate_right(1);
+                Ok(Word::from_be_bytes(v))
+            } else if nulls == 0 {
+                Err(Status::Conflict)
+            } else {
+                Err(Status::Cold)
+            }
+        } else {
+            let (otag, oset) = if set + 1 < self.sets.len() / self.ways {
+                (tag, set + 1)
+            } else {
+                (tag + 1, 0)
+            };
+
+            let mut set = self.set_mut(set);
+            let mut nulls = 0;
+            let mut bytes = [0; 4];
+            let mut index = 0;
+
+            if let Some((i, s)) = set.iter_mut().enumerate().find_map(|(i, s)| match s {
+                Some(s) if s.tag == tag => Some((i, s)),
+                Some(_) => None,
+                None => {
+                    nulls += 1;
+                    None
+                }
+            }) {
+                for &byte in &s[off..] {
+                    bytes[index] = byte;
+                    index += 1;
+                }
+
+                set[0..=i].rotate_right(1);
+            } else if nulls == 0 {
+                return Err(Status::Conflict);
+            } else {
+                return Err(Status::Cold);
+            }
+
+            set = self.set_mut(oset);
+            nulls = 0;
+
+            if let Some((i, s)) = set.iter_mut().enumerate().find_map(|(i, s)| match s {
+                Some(s) if s.tag == otag => Some((i, s)),
+                Some(_) => None,
+                None => {
+                    nulls += 1;
+                    None
+                }
+            }) {
+                for &byte in &s[0..4 - index] {
+                    bytes[index] = byte;
+                    index += 1;
+                }
+
+                set[0..=i].rotate_right(1);
+            } else if nulls == 0 {
+                return Err(Status::Conflict);
+            } else {
+                return Err(Status::Cold);
+            }
+
+            Ok(Word::from_be_bytes(bytes))
+        }
     }
 
-    fn write_byte(&mut self, address: Word, data: Byte) -> crate::cache::Status {
-        todo!()
+    fn write_byte(&mut self, address: Word, data: Byte) -> Status {
+        let (tag, set, off) = self.split_address(address);
+        let sets = self.set_mut(set);
+        let mut nulls = 0;
+
+        if let Some((i, s)) = sets.iter_mut().enumerate().find_map(|(i, s)| match s {
+            Some(s) if s.tag == tag => Some((i, s)),
+            Some(_) => None,
+            None => {
+                nulls += 1;
+                None
+            }
+        }) {
+            s.data[off] = data;
+            sets[..=i].rotate_right(1);
+            Status::Hit
+        } else if nulls == 0 {
+            Status::Conflict
+        } else {
+            Status::Cold
+        }
     }
 
-    fn write_short(&mut self, address: Word, data: Short) -> crate::cache::Status {
-        todo!()
+    fn write_short(&mut self, address: Word, data: Short) -> Status {
+        let bytes = data.to_be_bytes();
+        let (tag, set, off) = self.split_address(address);
+
+        if off < self.line_len() - 1 {
+            let set = self.set_mut(set);
+            let mut nulls = 0;
+
+            if let Some((i, s)) = set.iter_mut().enumerate().find_map(|(i, s)| match s {
+                Some(s) if s.tag == tag => Some((i, s)),
+                Some(_) => None,
+                None => {
+                    nulls += 1;
+                    None
+                }
+            }) {
+                s[off] = bytes[0];
+                s[off + 1] = bytes[1];
+                set[0..=i].rotate_right(1);
+                Status::Hit
+            } else if nulls == 0 {
+                Status::Conflict
+            } else {
+                Status::Cold
+            }
+        } else {
+            let (otag, oset) = if set + 1 < self.sets.len() / self.ways {
+                (tag, set + 1)
+            } else {
+                (tag + 1, 0)
+            };
+
+            let mut nulls = [0, 0];
+
+            let first = self
+                .set_mut(set)
+                .iter_mut()
+                .enumerate()
+                .find_map(|(i, s)| match s {
+                    Some(set) if set.tag == tag => Some((i, take(s).unwrap())),
+                    Some(_) => None,
+                    None => {
+                        nulls[0] += 1;
+                        None
+                    }
+                });
+            let second = self
+                .set_mut(oset)
+                .iter_mut()
+                .enumerate()
+                .find_map(|(i, s)| match s {
+                    Some(set) if set.tag == otag => Some((i, take(s).unwrap())),
+                    Some(_) => None,
+                    None => {
+                        nulls[1] += 1;
+                        None
+                    }
+                });
+
+            if first.is_some() && second.is_some() {
+                let (i, mut s) = first.unwrap();
+                let (j, mut t) = second.unwrap();
+
+                let last = s.len() - 1;
+                s[last] = bytes[0];
+                t[0] = bytes[1];
+
+                let mut sets = self.set_mut(set);
+                sets[..=i].rotate_right(1);
+                sets[0] = Some(s);
+
+                sets = self.set_mut(oset);
+                sets[..=j].rotate_right(1);
+                sets[0] = Some(t);
+
+                Status::Hit
+            } else {
+                if let Some((i, s)) = first {
+                    self.set_mut(set)[i] = Some(s);
+                }
+                if let Some((j, s)) = second {
+                    self.set_mut(oset)[j] = Some(s);
+                }
+
+                if nulls[0] == 0 || nulls[1] == 0 {
+                    Status::Conflict
+                } else {
+                    Status::Cold
+                }
+            }
+        }
     }
 
-    fn write_word(&mut self, address: Word, data: Word) -> crate::cache::Status {
-        todo!()
+    fn write_word(&mut self, address: Word, data: Word) -> Status {
+        let (tag, set, off) = self.split_address(address);
+        let bytes = data.to_be_bytes();
+
+        if off < self.line_len() - 3 {
+            let set = self.set_mut(set);
+            let mut nulls = 0;
+
+            if let Some((i, s)) = set.iter_mut().enumerate().find_map(|(i, s)| match s {
+                Some(s) if s.tag == tag => Some((i, s)),
+                Some(_) => None,
+                None => {
+                    nulls += 1;
+                    None
+                }
+            }) {
+                s[off..off + 4].copy_from_slice(&bytes);
+
+                set[0..=i].rotate_right(1);
+                Status::Hit
+            } else if nulls == 0 {
+                Status::Conflict
+            } else {
+                Status::Cold
+            }
+        } else {
+            let (otag, oset) = if set + 1 < self.sets.len() / self.ways {
+                (tag, set + 1)
+            } else {
+                (tag + 1, 0)
+            };
+
+            let mut nulls = [0, 0];
+
+            let first = self
+                .set_mut(set)
+                .iter_mut()
+                .enumerate()
+                .find_map(|(i, s)| match s {
+                    Some(set) if set.tag == tag => Some((i, take(s).unwrap())),
+                    Some(_) => None,
+                    None => {
+                        nulls[0] += 1;
+                        None
+                    }
+                });
+            let second = self
+                .set_mut(oset)
+                .iter_mut()
+                .enumerate()
+                .find_map(|(i, s)| match s {
+                    Some(set) if set.tag == otag => Some((i, take(s).unwrap())),
+                    Some(_) => None,
+                    None => {
+                        nulls[1] += 1;
+                        None
+                    }
+                });
+
+            if first.is_some() && second.is_some() {
+                let (i, mut s) = first.unwrap();
+                let (j, mut t) = second.unwrap();
+                let mut index = 0;
+
+                for byte in &mut s[off..] {
+                    *byte = bytes[index];
+                    index += 1;
+                }
+
+                t[..4 - index].copy_from_slice(&bytes[index..]);
+
+                self.set_mut(set)[..=i].rotate_right(1);
+                self.set_mut(oset)[..=j].rotate_right(1);
+
+                Status::Hit
+            } else {
+                if let Some((i, s)) = first {
+                    self.set_mut(set)[i] = Some(s);
+                }
+                if let Some((j, s)) = second {
+                    self.set_mut(oset)[j] = Some(s);
+                }
+
+                if nulls[0] == 0 || nulls[1] == 0 {
+                    Status::Conflict
+                } else {
+                    Status::Cold
+                }
+            }
+        }
     }
 
     fn has_address(&self, address: Word) -> bool {
-        todo!()
+        let (tag, set, _) = self.split_address(address);
+
+        self.set(set)
+            .iter()
+            .any(|s| matches!(s, Some(s) if s.tag == tag))
     }
 
     fn line_len(&self) -> usize {
-        todo!()
+        2usize.pow(self.off_bits as u32)
     }
 
     fn within_line(&self, address: Word, length: usize) -> bool {
@@ -93,12 +439,49 @@ impl Cache for MultiAssociative {
         }
     }
 
-    fn write_line(
-        &mut self,
-        address: Word,
-        memory: &mut crate::memory::Memory,
-    ) -> crate::cache::LineReadStatus {
-        todo!()
+    fn write_line(&mut self, address: Word, memory: &mut crate::memory::Memory) -> LineReadStatus {
+        let set_bits = self.set_bits;
+        let off_bits = self.off_bits;
+
+        let (tag, set, _) = self.split_address(address);
+        let line_len = self.line_len();
+
+        let sets = self.set_mut(set);
+        let last = &mut sets[sets.len() - 1];
+
+        if let Some(mut line) = take(last) {
+            if line.dirty {
+                let construct_address =
+                    construct_address(line.tag, set as u32, 0, set_bits, off_bits);
+
+                line.data
+                    .iter()
+                    .zip(construct_address..)
+                    .for_each(|(&byte, address)| memory.write_byte(address, byte));
+            }
+
+            line.tag = tag;
+            line.dirty = false;
+            memory.read_words_to(address, &mut line.data);
+
+            *last = Some(line);
+
+            sets.rotate_right(1);
+
+            LineReadStatus::Evicted
+        } else {
+            let new_line = Box::new(Line {
+                tag,
+                dirty: false,
+                data: memory.read_words(address, line_len),
+            });
+
+            *last = Some(new_line);
+
+            sets.rotate_right(1);
+
+            LineReadStatus::Swapped
+        }
     }
 
     fn get_lines(&self) -> Vec<Option<LineData>> {
@@ -127,11 +510,99 @@ impl Cache for MultiAssociative {
     }
 
     fn short_at(&self, address: Word) -> Option<Short> {
-        todo!()
+        let (tag, set, off) = self.split_address(address);
+
+        if off < self.line_len() - 1 {
+            if let Some(s) = self.set(set).iter().find_map(|s| match s {
+                Some(s) if s.tag == tag => Some(s),
+                _ => None,
+            }) {
+                let v = [s[off], s[off + 1]];
+
+                Some(Short::from_be_bytes(v))
+            } else {
+                None
+            }
+        } else {
+            let (otag, oset) = if set + 1 < self.sets.len() / self.ways {
+                (tag, set + 1)
+            } else {
+                (tag + 1, 0)
+            };
+
+            let mut bytes = [0; 2];
+
+            if let Some(s) = self.set(set).iter().find_map(|s| match s {
+                Some(s) if s.tag == tag => Some(s),
+                _ => None,
+            }) {
+                bytes[0] = s[s.len() - 1];
+            } else {
+                return None;
+            }
+
+            if let Some(s) = self.set(oset).iter().find_map(|s| match s {
+                Some(s) if s.tag == otag => Some(s),
+                _ => None,
+            }) {
+                bytes[1] = s[s.len() - 1];
+            } else {
+                return None;
+            }
+
+            Some(Short::from_be_bytes(bytes))
+        }
     }
 
     fn word_at(&self, address: Word) -> Option<Word> {
-        todo!()
+        let (tag, set, off) = self.split_address(address);
+
+        if off < self.line_len() - 3 {
+            if let Some(s) = self.set(set).iter().find_map(|s| match s {
+                Some(s) if s.tag == tag => Some(s),
+                _ => None,
+            }) {
+                let v = [s[off], s[off + 1], s[off + 2], s[off + 3]];
+                Some(Word::from_be_bytes(v))
+            } else {
+                None
+            }
+        } else {
+            let (otag, oset) = if set + 1 < self.sets.len() / self.ways {
+                (tag, set + 1)
+            } else {
+                (tag + 1, 0)
+            };
+
+            let mut bytes = [0; 4];
+            let mut index = 0;
+
+            if let Some(s) = self.set(set).iter().find_map(|s| match s {
+                Some(s) if s.tag == tag => Some(s),
+                _ => None,
+            }) {
+                for &byte in &s[off..] {
+                    bytes[index] = byte;
+                    index += 1;
+                }
+            } else {
+                return None;
+            }
+
+            if let Some(s) = self.set(oset).iter().find_map(|s| match s {
+                Some(s) if s.tag == otag => Some(s),
+                _ => None,
+            }) {
+                for &byte in &s[0..4 - index] {
+                    bytes[index] = byte;
+                    index += 1;
+                }
+            } else {
+                return None;
+            }
+
+            Some(Word::from_be_bytes(bytes))
+        }
     }
 }
 
@@ -155,6 +626,7 @@ impl MultiAssociative {
             off_bits + set_bits <= 32,
             "off_bits + set_bits cannot exceed 32"
         );
+        assert!(ways > 0, "ways must be greater than 0");
 
         let mut lines = vec![];
 
@@ -188,40 +660,27 @@ impl MultiAssociative {
         self.off_bits
     }
 
-    /// Gets a slice representing the set.
+    /// Gets range representing the set.
     fn set(&self, set: usize) -> &[Option<Box<Line>>] {
-        &self.sets[set..set + self.ways]
+        let base = set * self.ways;
+        &self.sets[base..base + self.ways]
     }
 
     /// Gets a slice representing the set, mutably.
     fn set_mut(&mut self, set: usize) -> &mut [Option<Box<Line>>] {
-        &mut self.sets[set..set + self.ways]
+        let base = set * self.ways;
+        &mut self.sets[base..base + self.ways]
     }
 
     /// Splits an address into its constituent *tag*, *set*, and *offset* indices.
     fn split_address(&self, address: Word) -> (Word, usize, usize) {
-        let set_shift = self.off_bits;
-        let set_mask = (1 << self.set_bits) - 1;
-        let tag_shift = self.off_bits + self.set_bits;
-        let tag_mask = (1 << self.tag_bits()) - 1;
-        let off_mask = (1 << self.off_bits) - 1;
-
-        let tag = (address >> tag_shift) & tag_mask;
-        let set = (address >> set_shift) & set_mask;
-        let off = address & off_mask;
-
-        (tag, set as usize, off as usize)
+        split_address(address, self.set_bits, self.off_bits)
     }
 
     /// Constructs an address from its constituent *tag*, *set*, and *offset* indices.
+    #[inline]
     fn construct_address(&self, tag: Word, set: Word, off: Word) -> Word {
-        let set_shift = self.off_bits;
-        let set_mask = (1 << self.set_bits) - 1;
-        let tag_shift = self.off_bits + self.set_bits;
-        let tag_mask = (1 << self.tag_bits()) - 1;
-        let off_mask = (1 << self.off_bits) - 1;
-
-        ((tag & tag_mask) << tag_shift) | ((set & set_mask) << set_shift) | (off & off_mask)
+        construct_address(tag, set, off, self.set_bits, self.off_bits)
     }
 
     /// Boxes the self to produce a dyn [`Cache`]
@@ -230,4 +689,24 @@ impl MultiAssociative {
     pub fn boxed(self) -> Box<dyn Cache> {
         Box::new(self)
     }
+}
+
+fn construct_address(tag: Word, set: Word, off: Word, set_bits: usize, off_bits: usize) -> Word {
+    let set_mask = (1 << set_bits) - 1;
+    let tag_mask = (1 << 32 - (set_bits + off_bits)) - 1;
+    let off_mask = (1 << off_bits) - 1;
+
+    ((tag & tag_mask) << (off_bits + set_bits)) | ((set & set_mask) << off_bits) | (off & off_mask)
+}
+
+fn split_address(address: Word, set_bits: usize, off_bits: usize) -> (Word, usize, usize) {
+    let set_mask = (1 << set_bits) - 1;
+    let tag_mask = (1 << 32 - (set_bits + off_bits)) - 1;
+    let off_mask = (1 << off_bits) - 1;
+
+    let tag = address >> off_bits + set_bits & tag_mask;
+    let set = address >> off_bits & set_mask;
+    let off = address & off_mask;
+
+    (tag, set as usize, off as usize)
 }
