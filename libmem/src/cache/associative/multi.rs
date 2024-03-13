@@ -1,5 +1,8 @@
-use super::Line;
-use crate::cache::{Cache, LineData, LineReadStatus, ReadResult, Status};
+use super::{construct_address, split_address, Line};
+use crate::{
+    cache::{Cache, LineData, LineReadStatus, ReadResult, Status},
+    memory::Memory,
+};
 use libseis::types::{Byte, Short, Word};
 use std::mem::take;
 
@@ -411,12 +414,22 @@ impl Cache for MultiAssociative {
         }
     }
 
-    fn has_address(&self, address: Word) -> bool {
+    fn check_address(&self, address: Word) -> Status {
         let (tag, set, _) = self.split_address(address);
+        let mut lines = 0;
 
-        self.set(set)
-            .iter()
-            .any(|s| matches!(s, Some(s) if s.tag == tag))
+        for line in self.set(set).iter().filter_map(|s| s.as_ref()) {
+            lines += 1;
+            if line.tag == tag {
+                return Status::Hit;
+            }
+        }
+
+        if lines == self.ways {
+            Status::Conflict
+        } else {
+            Status::Cold
+        }
     }
 
     fn line_len(&self) -> usize {
@@ -446,8 +459,8 @@ impl Cache for MultiAssociative {
         }
     }
 
-    fn write_line(&mut self, address: Word, memory: &mut crate::memory::Memory) -> LineReadStatus {
-        if self.has_address(address) {
+    fn write_line(&mut self, address: Word, memory: &mut Memory) -> LineReadStatus {
+        if self.check_address(address).is_hit() {
             return LineReadStatus::Skipped;
         }
 
@@ -493,6 +506,37 @@ impl Cache for MultiAssociative {
 
             LineReadStatus::Inserted
         }
+    }
+
+    fn flush(&mut self, memory: &mut Memory) -> usize {
+        let set_bits = self.set_bits;
+        let off_bits = self.off_bits;
+
+        self.sets
+            .chunks_mut(self.ways)
+            .enumerate()
+            .flat_map(|(i, s)| {
+                s.iter_mut().filter_map(move |s| match s {
+                    Some(s) if s.dirty => Some((i, s)),
+                    _ => None,
+                })
+            })
+            .map(|(i, s)| {
+                let addr = construct_address(s.tag, i as u32, 0, set_bits, off_bits);
+
+                s.data
+                    .iter()
+                    .zip(addr..)
+                    .for_each(|(&byte, address)| memory.write_byte(address, byte));
+            })
+            .count()
+    }
+
+    fn dirty_lines(&self) -> usize {
+        self.sets
+            .iter()
+            .filter(|s| matches!(s, Some(s) if s.dirty))
+            .count()
     }
 
     fn get_lines(&self) -> Vec<Option<LineData>> {
@@ -700,24 +744,4 @@ impl MultiAssociative {
     pub fn boxed(self) -> Box<dyn Cache> {
         Box::new(self)
     }
-}
-
-fn construct_address(tag: Word, set: Word, off: Word, set_bits: usize, off_bits: usize) -> Word {
-    let set_mask = (1 << set_bits) - 1;
-    let tag_mask = (1 << 32 - (set_bits + off_bits)) - 1;
-    let off_mask = (1 << off_bits) - 1;
-
-    ((tag & tag_mask) << (off_bits + set_bits)) | ((set & set_mask) << off_bits) | (off & off_mask)
-}
-
-fn split_address(address: Word, set_bits: usize, off_bits: usize) -> (Word, usize, usize) {
-    let set_mask = (1 << set_bits) - 1;
-    let tag_mask = (1 << 32 - (set_bits + off_bits)) - 1;
-    let off_mask = (1 << off_bits) - 1;
-
-    let tag = address >> off_bits + set_bits & tag_mask;
-    let set = address >> off_bits & set_mask;
-    let off = address & off_mask;
-
-    (tag, set as usize, off as usize)
 }

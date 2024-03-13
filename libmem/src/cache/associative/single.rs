@@ -1,4 +1,4 @@
-use super::Line;
+use super::{construct_address, split_address, Line};
 use crate::{
     cache::{Cache, LineData, LineReadStatus, ReadResult, Status},
     memory::Memory,
@@ -13,14 +13,14 @@ use std::mem::take;
 pub struct Associative {
     set_bits: usize,
     off_bits: usize,
-    lines: Box<[Option<Box<Line>>]>,
+    sets: Box<[Option<Box<Line>>]>,
 }
 
 impl Cache for Associative {
     fn get_byte(&mut self, address: Word) -> ReadResult<Byte> {
         let (tag, set, off) = self.split_address(address);
 
-        match &self.lines[set] {
+        match &self.sets[set] {
             Some(set) if set.tag == tag => Ok(set[off]),
             Some(_) => Err(Status::Conflict),
             None => Err(Status::Cold),
@@ -31,18 +31,18 @@ impl Cache for Associative {
         let (tag, set, off) = self.split_address(address);
 
         if off < self.line_len() - 1 {
-            match &self.lines[set] {
+            match &self.sets[set] {
                 Some(set) if set.tag == tag => Ok(Short::from_be_bytes([set[off], set[off + 1]])),
                 Some(_) => Err(Status::Conflict),
                 None => Err(Status::Cold),
             }
         } else {
-            let (otag, oset) = if set + 1 < self.lines.len() {
+            let (otag, oset) = if set + 1 < self.sets.len() {
                 (tag, set + 1)
             } else {
                 (tag + 1, 0)
             };
-            match (&self.lines[set], &self.lines[oset]) {
+            match (&self.sets[set], &self.sets[oset]) {
                 (Some(set1), Some(set2)) if set1.tag == tag && set2.tag == otag => {
                     Ok(Short::from_be_bytes([set1[set1.len() - 1], set2[0]]))
                 }
@@ -56,7 +56,7 @@ impl Cache for Associative {
         let (tag, set, off) = self.split_address(address);
 
         if off < self.line_len() - 3 {
-            match &self.lines[set] {
+            match &self.sets[set] {
                 Some(set) if set.tag == tag => Ok(Word::from_be_bytes([
                     set[off],
                     set[off + 1],
@@ -67,14 +67,14 @@ impl Cache for Associative {
                 None => Err(Status::Cold),
             }
         } else {
-            let (otag, oset) = if set + 1 < self.lines.len() {
+            let (otag, oset) = if set + 1 < self.sets.len() {
                 (tag, set + 1)
             } else {
                 (tag + 1, 0)
             };
             let former = (self.off_bits << 16) - off;
 
-            match (&self.lines[set], &self.lines[oset]) {
+            match (&self.sets[set], &self.sets[oset]) {
                 (Some(set1), Some(set2)) if set1.tag == tag && set2.tag == otag => {
                     let mut bytes = [0; 4];
                     for i in 0..4 {
@@ -95,7 +95,7 @@ impl Cache for Associative {
     fn write_byte(&mut self, address: Word, data: Byte) -> Status {
         let (tag, set, off) = self.split_address(address);
 
-        if let Some(set) = &mut self.lines[set] {
+        if let Some(set) = &mut self.sets[set] {
             if set.tag == tag {
                 set.data[off] = data;
                 set.dirty = true;
@@ -112,7 +112,7 @@ impl Cache for Associative {
         let (tag, set, off) = self.split_address(address);
 
         if off < self.line_len() - 1 {
-            if let Some(set) = &mut self.lines[set] {
+            if let Some(set) = &mut self.sets[set] {
                 if set.tag == tag {
                     let bytes = data.to_be_bytes();
                     set.data[off] = bytes[0];
@@ -126,14 +126,14 @@ impl Cache for Associative {
                 Status::Cold
             }
         } else {
-            let (otag, oset) = if set + 1 < self.lines.len() {
+            let (otag, oset) = if set + 1 < self.sets.len() {
                 (tag, set + 1)
             } else {
                 (tag + 1, 0)
             };
 
-            let mut first = take(&mut self.lines[set]);
-            let mut second = take(&mut self.lines[oset]);
+            let mut first = take(&mut self.sets[set]);
+            let mut second = take(&mut self.sets[oset]);
 
             let status = if let Some((first, second)) = first.as_mut().zip(second.as_mut()) {
                 if first.tag == tag && second.tag == otag {
@@ -152,8 +152,8 @@ impl Cache for Associative {
                 Status::Cold
             };
 
-            self.lines[set] = first;
-            self.lines[oset] = second;
+            self.sets[set] = first;
+            self.sets[oset] = second;
             status
         }
     }
@@ -163,7 +163,7 @@ impl Cache for Associative {
         let off_mask = (1 << self.off_bits) - 1;
 
         if off < off_mask - 3 {
-            if let Some(set) = &mut self.lines[set] {
+            if let Some(set) = &mut self.sets[set] {
                 if set.tag == tag {
                     let bytes = data.to_be_bytes();
                     set.data[off] = bytes[0];
@@ -179,14 +179,14 @@ impl Cache for Associative {
                 Status::Cold
             }
         } else {
-            let (otag, oset) = if set + 1 < self.lines.len() {
+            let (otag, oset) = if set + 1 < self.sets.len() {
                 (tag, set + 1)
             } else {
                 (tag + 1, 0)
             };
 
-            let mut first = take(&mut self.lines[set]);
-            let mut second = take(&mut self.lines[oset]);
+            let mut first = take(&mut self.sets[set]);
+            let mut second = take(&mut self.sets[oset]);
 
             let status = if let Some((first, second)) = first.as_mut().zip(second.as_mut()) {
                 if first.tag == tag && second.tag == otag {
@@ -211,19 +211,23 @@ impl Cache for Associative {
                 Status::Cold
             };
 
-            self.lines[set] = first;
-            self.lines[oset] = second;
+            self.sets[set] = first;
+            self.sets[oset] = second;
             status
         }
     }
 
-    fn has_address(&self, address: Word) -> bool {
+    fn check_address(&self, address: Word) -> Status {
         let (tag, set, _) = self.split_address(address);
 
-        if let Some(set) = &self.lines[set] {
-            set.tag == tag
+        if let Some(set) = &self.sets[set] {
+            if set.tag == tag {
+                Status::Hit
+            } else {
+                Status::Conflict
+            }
         } else {
-            false
+            Status::Cold
         }
     }
 
@@ -241,9 +245,9 @@ impl Cache for Associative {
     fn invalidate_line(&mut self, address: Word) -> bool {
         let (tag, set, _) = self.split_address(address);
 
-        if matches!(&self.lines[set], Some(line) if line.tag == tag) {
+        if matches!(&self.sets[set], Some(line) if line.tag == tag) {
             // Delete the line in question
-            self.lines[set] = None;
+            self.sets[set] = None;
             true
         } else {
             false
@@ -251,20 +255,20 @@ impl Cache for Associative {
     }
 
     fn write_line(&mut self, address: Word, memory: &mut Memory) -> LineReadStatus {
-        if self.has_address(address) {
+        if self.check_address(address).is_hit() {
             return LineReadStatus::Skipped;
         }
 
         let (tag, set, _) = self.split_address(address);
 
         // Flush a previously-existing line if it is dirty. Otherwise, purge its contents.
-        if let Some(mut line) = take(&mut self.lines[set]) {
+        if let Some(mut line) = take(&mut self.sets[set]) {
             if line.dirty {
-                let construct_address = self.construct_address(line.tag, set as u32, 0);
+                let addr = self.construct_address(line.tag, set as u32, 0);
 
                 line.data
                     .iter()
-                    .zip(construct_address..)
+                    .zip(addr..)
                     .for_each(|(&byte, address)| memory.write_byte(address, byte));
             }
 
@@ -272,7 +276,7 @@ impl Cache for Associative {
             line.dirty = false;
             memory.read_words_to(address, &mut line.data);
 
-            self.lines[set] = Some(line);
+            self.sets[set] = Some(line);
 
             LineReadStatus::Evicted
         } else {
@@ -282,14 +286,46 @@ impl Cache for Associative {
                 data: memory.read_words(address, self.line_len()),
             });
 
-            self.lines[set] = Some(new_line);
+            self.sets[set] = Some(new_line);
 
             LineReadStatus::Inserted
         }
     }
 
+    fn flush(&mut self, memory: &mut Memory) -> usize {
+        let set_bits = self.set_bits;
+        let off_bits = self.off_bits;
+
+        self.sets
+            .iter_mut()
+            .enumerate()
+            .filter_map(|(i, s)| match s {
+                Some(s) if s.dirty => {
+                    let addr = construct_address(s.tag, i as u32, 0, set_bits, off_bits);
+
+                    s.data
+                        .iter()
+                        .zip(addr..)
+                        .for_each(|(&byte, address)| memory.write_byte(address, byte));
+
+                    s.dirty = false;
+
+                    Some(())
+                }
+                _ => None,
+            })
+            .count()
+    }
+
+    fn dirty_lines(&self) -> usize {
+        self.sets
+            .iter()
+            .filter(|s| matches!(s, Some(s) if s.dirty))
+            .count()
+    }
+
     fn get_lines(&self) -> Vec<Option<LineData>> {
-        self.lines
+        self.sets
             .iter()
             .zip(0..)
             .map(|(line, set)| {
@@ -305,7 +341,7 @@ impl Cache for Associative {
     fn byte_at(&self, address: Word) -> Option<Byte> {
         let (tag, set, off) = self.split_address(address);
 
-        match &self.lines[set] {
+        match &self.sets[set] {
             Some(line) if line.tag == tag => Some(line.data[off]),
             _ => None,
         }
@@ -315,17 +351,17 @@ impl Cache for Associative {
         let (tag, set, off) = self.split_address(address);
 
         if off < self.line_len() - 1 {
-            match &self.lines[set] {
+            match &self.sets[set] {
                 Some(set) if set.tag == tag => Some(Short::from_be_bytes([set[off], set[off + 1]])),
                 _ => None,
             }
         } else {
-            let (otag, oset) = if set + 1 < self.lines.len() {
+            let (otag, oset) = if set + 1 < self.sets.len() {
                 (tag, set + 1)
             } else {
                 (tag + 1, 0)
             };
-            match self.lines[set].as_ref().zip(self.lines[oset].as_ref()) {
+            match self.sets[set].as_ref().zip(self.sets[oset].as_ref()) {
                 Some((set1, set2)) if set1.tag == tag && set2.tag == otag => {
                     Some(Short::from_be_bytes([set1[off], set2[0]]))
                 }
@@ -338,7 +374,7 @@ impl Cache for Associative {
         let (tag, set, off) = self.split_address(address);
 
         if off < self.line_len() - 3 {
-            match &self.lines[set] {
+            match &self.sets[set] {
                 Some(set) if set.tag == tag => Some(Word::from_be_bytes([
                     set[off],
                     set[off + 1],
@@ -348,14 +384,14 @@ impl Cache for Associative {
                 _ => None,
             }
         } else {
-            let (otag, oset) = if set + 1 < self.lines.len() {
+            let (otag, oset) = if set + 1 < self.sets.len() {
                 (tag, set + 1)
             } else {
                 (tag + 1, 0)
             };
             let former = (self.off_bits << 16) - off;
 
-            match self.lines[set].as_ref().zip(self.lines[oset].as_ref()) {
+            match self.sets[set].as_ref().zip(self.sets[oset].as_ref()) {
                 Some((set1, set2)) if set1.tag == tag && set2.tag == otag => {
                     let mut bytes = [0; 4];
                     for i in 0..4 {
@@ -397,7 +433,7 @@ impl Associative {
         lines.resize_with(2usize.pow(set_bits as u32), || None);
 
         Self {
-            lines: lines.into_boxed_slice(),
+            sets: lines.into_boxed_slice(),
             set_bits,
             off_bits,
         }
@@ -420,28 +456,12 @@ impl Associative {
 
     /// Splits an address into its constituent *tag*, *set*, and *offset* indices.
     fn split_address(&self, address: Word) -> (Word, usize, usize) {
-        let set_shift = self.off_bits;
-        let set_mask = (1 << self.set_bits) - 1;
-        let tag_shift = self.off_bits + self.set_bits;
-        let tag_mask = (1 << self.tag_bits()) - 1;
-        let off_mask = (1 << self.off_bits) - 1;
-
-        let tag = (address >> tag_shift) & tag_mask;
-        let set = (address >> set_shift) & set_mask;
-        let off = address & off_mask;
-
-        (tag, set as usize, off as usize)
+        split_address(address, self.set_bits, self.off_bits)
     }
 
     /// Constructs an address from its constituent *tag*, *set*, and *offset* indices.
     fn construct_address(&self, tag: Word, set: Word, off: Word) -> Word {
-        let set_shift = self.off_bits;
-        let set_mask = (1 << self.set_bits) - 1;
-        let tag_shift = self.off_bits + self.set_bits;
-        let tag_mask = (1 << self.tag_bits()) - 1;
-        let off_mask = (1 << self.off_bits) - 1;
-
-        ((tag & tag_mask) << tag_shift) | ((set & set_mask) << set_shift) | (off & off_mask)
+        construct_address(tag, set, off, self.set_bits, self.off_bits)
     }
 
     /// Boxes the self to produce a dyn [`Cache`]
