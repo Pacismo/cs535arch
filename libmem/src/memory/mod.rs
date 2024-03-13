@@ -3,17 +3,33 @@
 //! The datastructure in this module contains a set of dynamically-allocated pages,
 //! which are allocated on write.
 
-use std::mem::{size_of, take, transmute};
+use std::{
+    iter::{Enumerate, FlatMap, Map},
+    mem::take,
+    ops::Deref,
+    slice::Iter,
+};
 
 use libseis::{
     pages::PAGE_SIZE,
     types::{Byte, Short, Word},
 };
+use serde::{ser::SerializeSeq, Serialize};
 
-type Page = [Word; PAGE_SIZE / size_of::<Word>()];
+type Page = [Byte; PAGE_SIZE];
+
+pub type PageIterator<'a> =
+    Map<Iter<'a, Option<Box<Page>>>, fn(&'a Option<Box<Page>>) -> Option<&'a [u8]>>;
+
+/// An iterator over the pages of the [`Memory`] datastructure
+pub type AllocatedPageIterator<'a> = FlatMap<
+    Enumerate<PageIterator<'a>>,
+    Option<(usize, &'a [u8])>,
+    fn((usize, Option<&'a [u8]>)) -> Option<(usize, &'a [u8])>,
+>;
 
 fn allocate_page() -> Box<Page> {
-    Box::new([0; PAGE_SIZE / size_of::<Word>()])
+    Box::new([0; PAGE_SIZE])
 }
 
 /// Memory representation that only allocates pages when they're written to.
@@ -52,12 +68,10 @@ impl Memory {
     pub fn read_byte(&self, address: Word) -> Byte {
         let address = address as usize % (self.pages.len() << 16);
         let page = (address & 0xFFFF_0000) >> 16;
+        let byte = address & 0xFFFF;
 
         if let Some(page) = &self.pages[page] {
-            let offset = address & 0x3;
-            let word = page[(address & 0xFFFC) >> 2].to_be_bytes();
-
-            word[offset]
+            page[byte]
         } else {
             0
         }
@@ -66,113 +80,71 @@ impl Memory {
     pub fn read_short(&self, address: Word) -> Short {
         let address = address as usize % (self.pages.len() << 16);
 
-        match (address & 0x3 != 0x3, address & 0xFFFF != 0xFFFF) {
-            // neither crosses a word boundary nor crosses a page boundary
-            (true, true) => {
+        match address & 0xFFFF != 0xFFFF {
+            // does not cross a page boundary
+            true => {
                 let page = (address & 0xFFFF_0000) >> 16;
+                let byte = address & 0xFFFF;
+
                 if let Some(page) = &self.pages[page] {
-                    let offset = address & 0x3;
-                    let word = page[(address & 0xFFFC) >> 2].to_be_bytes();
-
-                    Short::from_be_bytes([word[offset], word[offset + 1]])
+                    let mut bytes = [0; 2];
+                    bytes.copy_from_slice(&page[byte..]);
+                    Short::from_be_bytes(bytes)
                 } else {
                     0
                 }
             }
-            // crosses a word boundary, but not a page boundary
-            (false, true) => {
-                let page = (address & 0xFFFF_0000) >> 16;
-
-                if let Some(page) = &self.pages[page as usize] {
-                    let word = ((address & 0xFFFC) >> 2) as usize;
-
-                    Short::from_be_bytes([
-                        page[word].to_be_bytes()[3],
-                        page[word + 1].to_be_bytes()[0],
-                    ])
-                } else {
-                    0
-                }
-            }
-            // crosses a page boundary
-            (false, false) => {
+            false => {
                 let page = (address & 0xFFFF_0000) >> 16;
                 let mut bytes = [0; 2];
 
                 bytes[0] = if let Some(page) = &self.pages[page as usize] {
-                    page[0x3FFF].to_be_bytes()[3]
+                    page[0xFFFF]
                 } else {
                     0
                 };
                 bytes[1] = if let Some(page) = &self.pages[page as usize + 1] {
-                    page[0].to_be_bytes()[0]
+                    page[0]
                 } else {
                     0
                 };
 
                 Short::from_be_bytes(bytes)
             }
-
-            _ => unreachable!(),
         }
     }
 
     pub fn read_word(&self, address: Word) -> Word {
         let address = address as usize % (self.pages.len() << 16);
-        match (address & 0x3 == 0, address & 0xFFFF < 0xFFFD) {
+        match address & 0xFFFF < 0xFFFD {
             // is a word
-            (true, true) => {
+            true => {
                 let page = (address & 0xFFFF_0000) >> 16;
+                let byte = address & 0xFFFF;
 
                 if let Some(page) = &self.pages[page] {
-                    // No need to convert -- value is already in native-endian encoding
-                    page[(address & 0xFFFC) >> 2]
-                } else {
-                    0
-                }
-            }
-            // crosses a word boundary, but not a page boundary
-            (false, true) => {
-                let page = (address & 0xFFFF_0000) >> 16;
-
-                if let Some(page) = &self.pages[page] {
-                    let word = (address & 0xFFFC) >> 2;
-                    let bytes: [u8; 8] = unsafe {
-                        transmute([page[word].to_be_bytes(), page[word + 1].to_be_bytes()])
-                    };
-
-                    let off = address & 0x3;
-
-                    Word::from_be_bytes([
-                        bytes[off],
-                        bytes[off + 1],
-                        bytes[off + 2],
-                        bytes[off + 3],
-                    ])
+                    let mut bytes = [0; 4];
+                    bytes.copy_from_slice(&page[byte..]);
+                    Word::from_be_bytes(bytes)
                 } else {
                     0
                 }
             }
             // crosses a page boundary
-            (false, false) => {
+            false => {
                 let page = (address & 0xFFFF_0000) >> 16;
-                let off = address & 0x3;
-                let mut words = [[0; 4]; 2];
+                let byte = address & 0xFFFF;
+                let mut bytes = [0; 4];
 
                 if let Some(page) = &self.pages[page] {
-                    words[0] = page[0x3FFF].to_be_bytes();
+                    bytes[..byte & 0x3].copy_from_slice(&page[byte..]);
                 }
-
                 if let Some(page) = &self.pages[page + 1] {
-                    words[1] = page[0].to_be_bytes()
+                    bytes[byte & 0x3..].copy_from_slice(&page[..byte & 3]);
                 }
 
-                let words: [u8; 8] = unsafe { transmute(words) };
-
-                Word::from_be_bytes([words[off], words[off + 1], words[off + 2], words[off + 3]])
+                Word::from_be_bytes(bytes)
             }
-
-            _ => unreachable!(),
         }
     }
 
@@ -180,22 +152,14 @@ impl Memory {
         let address = address as usize % (self.pages.len() << 16);
 
         let page = (address & 0xFFFF_0000) >> 16;
-        let word = (address & 0xFFFC) >> 2;
-        let offset = address & 0x3;
+        let byte = address & 0xFFFF;
 
         if let Some(page) = &mut self.pages[page] {
-            let mut o = page[word].to_be_bytes();
-
-            o[offset] = value;
-
-            page[word] = Word::from_be_bytes(o);
+            page[byte] = value;
         } else {
             let mut alloc = allocate_page();
-            let mut bytes = [0; 4];
-            bytes[offset] = value;
 
-            alloc[word] = Word::from_be_bytes(bytes);
-
+            alloc[byte] = value;
             self.pages[page] = Some(alloc)
         }
     }
@@ -203,164 +167,64 @@ impl Memory {
     pub fn write_short(&mut self, address: Word, value: Short) {
         let address = address as usize % (self.pages.len() << 16);
         let page = (address & 0xFFFF_0000) >> 16;
-        let word = (address & 0x0000_FFFC) >> 2;
-        let offset = 8 * (address & 0x3);
+        let byte = address & 0xFFFF;
         let v = value.to_be_bytes();
 
-        match (address & 0x3 != 0x3, address & 0xFFFF != 0xFFFF) {
-            // neither crosses a word boundary nor crosses a page boundary
-            (true, true) => {
+        match address & 0xFFFF != 0xFFFF {
+            // does not cross a page boundary
+            true => {
                 if let Some(page) = &mut self.pages[page] {
-                    let mut o = page[word].to_be_bytes();
-
-                    o[offset] = v[0];
-                    o[offset + 1] = v[1];
-
-                    page[word] = Word::from_be_bytes(o);
+                    page[byte] = v[0];
+                    page[byte + 1] = v[1];
                 } else {
                     let mut alloc = allocate_page();
-                    let mut bytes = [0; 4];
-                    bytes[offset] = v[0];
-                    bytes[offset + 1] = v[1];
-
-                    alloc[word] = Word::from_be_bytes(bytes);
-
-                    self.pages[page] = Some(alloc);
-                }
-            }
-            // crosses a word boundary, but not a page boundary
-            (false, true) => {
-                if let Some(page) = &mut self.pages[page] {
-                    let o = page[word].to_be_bytes();
-                    let p = page[word + 1].to_be_bytes();
-
-                    page[word] = Word::from_be_bytes([o[0], o[1], o[2], v[0]]);
-                    page[word + 1] = Word::from_be_bytes([v[1], p[1], p[2], p[3]]);
-                } else {
-                    let mut alloc = allocate_page();
-
-                    alloc[word] = Word::from_be_bytes([0, 0, 0, v[0]]);
-                    alloc[word + 1] = Word::from_be_bytes([v[1], 0, 0, 0]);
-
+                    alloc[byte] = v[0];
+                    alloc[byte + 1] = v[1];
                     self.pages[page] = Some(alloc);
                 }
             }
             // crosses a page boundary
-            (false, false) => {
-                if let Some(page) = &mut self.pages[page] {
-                    let mut o = page[0x3FFF].to_be_bytes();
-                    o[3] = v[0];
+            false => {
+                let mut first = take(&mut self.pages[page]).unwrap_or_else(allocate_page);
+                let mut second = take(&mut self.pages[page + 1]).unwrap_or_else(allocate_page);
 
-                    page[0x3FFF] = Word::from_be_bytes(o);
-                } else {
-                    let mut alloc = allocate_page();
+                first[byte] = v[0];
+                second[0] = v[1];
 
-                    alloc[0x3FFF] = Word::from_be_bytes([0, 0, 0, v[0]]);
-
-                    self.pages[page] = Some(alloc);
-                }
-                if let Some(page) = &mut self.pages[page + 1] {
-                    let mut o = page[0].to_be_bytes();
-                    o[0] = v[1];
-
-                    page[0] = Word::from_be_bytes(o);
-                } else {
-                    let mut alloc = allocate_page();
-
-                    alloc[0] = Word::from_be_bytes([v[1], 0, 0, 0]);
-
-                    self.pages[page + 1] = Some(alloc);
-                }
+                self.pages[page] = Some(first);
+                self.pages[page + 1] = Some(second);
             }
-
-            _ => unreachable!(),
         }
     }
 
     pub fn write_word(&mut self, address: Word, value: Word) {
         let address = address as usize % (self.pages.len() << 16);
         let page = (address & 0xFFFF_0000) >> 16;
-        let word = (address & 0xFFFC) >> 2;
+        let byte = address & 0xFFFF;
         let v = value.to_be_bytes();
 
-        match (address & 0x3 == 0, address & 0xFFFF < 0xFFFD) {
+        match address & 0xFFFF < 0xFFFD {
             // is a word
-            (true, true) => {
+            true => {
                 if let Some(page) = &mut self.pages[page] {
-                    // No need to convert -- value is already in native-endian encoding
-                    page[word] = value;
+                    page[byte..byte + 4].copy_from_slice(&v);
                 } else {
                     let mut alloc = allocate_page();
-
-                    alloc[word] = value;
-
-                    self.pages[page] = Some(alloc);
-                }
-            }
-            // crosses a word boundary, but not a page boundary
-            (false, true) => {
-                if let Some(page) = &mut self.pages[page] {
-                    let mut bytes: [u8; 8] = unsafe {
-                        transmute([page[word].to_be_bytes(), page[word + 1].to_be_bytes()])
-                    };
-
-                    let off = address & 0x3;
-
-                    bytes[off] = v[0];
-                    bytes[off + 1] = v[1];
-                    bytes[off + 2] = v[2];
-                    bytes[off + 3] = v[3];
-
-                    let bytes: [[u8; 4]; 2] = unsafe { transmute(bytes) };
-
-                    page[word] = Word::from_be_bytes(bytes[0]);
-                    page[word + 1] = Word::from_be_bytes(bytes[1]);
-                } else {
-                    let mut alloc = allocate_page();
-
-                    let mut bytes: [u8; 8] = [0; 8];
-
-                    let off = address & 0x3;
-
-                    bytes[off] = v[0];
-                    bytes[off + 1] = v[1];
-                    bytes[off + 2] = v[2];
-                    bytes[off + 3] = v[3];
-
-                    let bytes: [[u8; 4]; 2] = unsafe { transmute(bytes) };
-
-                    alloc[word] = Word::from_be_bytes(bytes[0]);
-                    alloc[word + 1] = Word::from_be_bytes(bytes[1]);
-
+                    alloc[byte..byte + 4].copy_from_slice(&v);
                     self.pages[page] = Some(alloc);
                 }
             }
             // crosses a page boundary
-            (false, false) => {
-                let off = address & 0x3;
-
+            false => {
                 let mut first = take(&mut self.pages[page]).unwrap_or_else(allocate_page);
-
                 let mut second = take(&mut self.pages[page + 1]).unwrap_or_else(allocate_page);
 
-                let mut bytes: [u8; 8] =
-                    unsafe { transmute([first[0x3FFF].to_be_bytes(), second[0].to_be_bytes()]) };
-
-                bytes[off] = v[0];
-                bytes[off + 1] = v[1];
-                bytes[off + 2] = v[2];
-                bytes[off + 3] = v[3];
-
-                let bytes: [[u8; 4]; 2] = unsafe { transmute(bytes) };
-
-                first[0x3FFF] = Word::from_be_bytes(bytes[0]);
-                second[0] = Word::from_be_bytes(bytes[1]);
+                first[byte..].copy_from_slice(&v[..byte & 3]);
+                second[..byte & 3].copy_from_slice(&v[byte & 3..]);
 
                 self.pages[page] = Some(first);
                 self.pages[page + 1] = Some(second);
             }
-
-            _ => unreachable!(),
         }
     }
 
@@ -380,5 +244,32 @@ impl Memory {
         for page in self.pages.iter_mut() {
             *page = None;
         }
+    }
+
+    pub fn pages(&self) -> PageIterator {
+        self.pages
+            .iter()
+            .map(|p| p.as_ref().map(|p| p.deref().as_ref()))
+    }
+
+    pub fn allocated_pages(&self) -> AllocatedPageIterator {
+        self.pages()
+            .enumerate()
+            .flat_map(|(i, p)| p.map(|p| (i, p)))
+    }
+}
+
+impl Serialize for Memory {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut seq = serializer.serialize_seq(Some(self.pages.len()))?;
+
+        for page in self.pages() {
+            seq.serialize_element(&page)?;
+        }
+
+        seq.end()
     }
 }
