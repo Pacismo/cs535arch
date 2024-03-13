@@ -339,11 +339,9 @@ impl Memory {
             (false, false) => {
                 let off = address & 0x3;
 
-                let mut first =
-                    take(&mut self.pages[page]).unwrap_or_else(|| allocate_page());
+                let mut first = take(&mut self.pages[page]).unwrap_or_else(allocate_page);
 
-                let mut second =
-                    take(&mut self.pages[page + 1]).unwrap_or_else(|| allocate_page());
+                let mut second = take(&mut self.pages[page + 1]).unwrap_or_else(allocate_page);
 
                 let mut bytes: [u8; 8] =
                     unsafe { transmute([first[0x3FFF].to_be_bytes(), second[0].to_be_bytes()]) };
@@ -367,9 +365,15 @@ impl Memory {
     }
 
     pub fn read_words(&self, address: Word, amount: usize) -> Box<[u8]> {
-        (address..(address + amount as Word))
-            .map(|a| self.read_byte(a))
-            .collect()
+        let mut data = vec![0; amount].into_boxed_slice();
+        self.read_words_to(address, &mut data);
+        data
+    }
+
+    pub fn read_words_to(&self, address: Word, to: &mut [u8]) {
+        (address..(address + to.len() as Word))
+            .enumerate()
+            .for_each(|(i, a)| to[i] = self.read_byte(a))
     }
 
     pub fn erase(&mut self) {
