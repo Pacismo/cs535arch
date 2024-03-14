@@ -481,7 +481,14 @@ fn process_input(
             );
             Some(false)
         }
-
+        Command::Debug { pretty } => {
+            if pretty {
+                println!("{module:#?}")
+            } else {
+                println!("{module:?}")
+            }
+            Some(false)
+        }
         Command::ShowMemory { page } => {
             for i in page..page + PAGE_SIZE as Word {
                 if i % 256 == 0 && i != 0 {

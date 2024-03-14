@@ -188,9 +188,21 @@ pub enum Command {
     /// Shows the statistics of the cache
     Statistics,
     /// Clock the memory subsystem
-    Clock { amount: usize },
+    Clock {
+        /// The number of clocks to pulse
+        amount: usize,
+    },
     /// Reads data from memory
-    ShowMemory { page: Word },
+    ShowMemory {
+        /// The page to read from
+        page: Word,
+    },
+    /// Prints the state of the module
+    Debug {
+        /// Pretty-print the information
+        #[arg(short)]
+        pretty: bool,
+    },
     /// Stop the runtime
     Exit,
 }
@@ -312,6 +324,10 @@ impl Command {
                         string: "<page-id>",
                         subtree: empty.clone(),
                     })]),
+                }),
+                Arc::new(StringCompleter {
+                    string: "debug",
+                    subtree: Arc::new([Arc::new("-p")]),
                 }),
                 Arc::new(StringCompleter {
                     string: "clock",
