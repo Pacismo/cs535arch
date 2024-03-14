@@ -8,3 +8,16 @@ edition = "2021"
 [dependencies]
 libmem = { path = "../libmem/" }
 libseis = { path = "../libseis/" }
+
+[dependencies.serde]
+version = "1.0.197"
+optional = true
+
+[dependencies.serde_json]
+version = "1.0.114"
+optional = true
+
+[features]
+default = ["json"]
+ser = ["dep:serde"]
+json = ["dep:serde_json", "ser"]
