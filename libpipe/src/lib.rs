@@ -5,12 +5,12 @@
 //! fetch, decode, execute, memory, and writeback stages.
 
 mod registers;
+mod serialize;
 
 use libmem::module::MemoryModule;
 pub use registers::Registers;
-use serde_json::ser::CompactFormatter;
+pub use serialize::{CompactJson, PrettyJson, Serializable};
 use std::fmt::Debug;
-use std::io::Write;
 
 /// The result of clocking the pipeline.
 pub enum ClockResult {
@@ -28,15 +28,16 @@ pub enum ClockResult {
     Dry,
 }
 
-type JsonSerializer<'a> = &'a mut serde_json::Serializer<&'a mut dyn Write, CompactFormatter>;
-type JsonSerializerResult<'a> = Result<
-    <JsonSerializer<'a> as serde::Serializer>::Ok,
-    <JsonSerializer<'a> as serde::Serializer>::Error,
->;
-
 /// Represents a processor pipeline. Clocking the processor will yield
 /// a [`ClockResult`].
-pub trait Pipeline: Debug {
+///
+/// Implementation requires the [`Serializable`] trait to be implemented for
+/// both *pretty* and *compact* JSON. This may be trivially acheived by deriving
+/// the [`serde::Serialize`] trait and calling the [`serialize`](serde::Serialize::serialize)
+/// function
+pub trait Pipeline<'a>:
+    Debug + Serializable<CompactJson<'a>> + Serializable<PrettyJson<'a>>
+{
     /// Applies a clock on the pipeline
     fn clock(&mut self) -> ClockResult;
 
@@ -45,7 +46,4 @@ pub trait Pipeline: Debug {
 
     /// Gets the registers in the pipeline
     fn registers(&self) -> &Registers;
-
-    /// Serializes the stages of the pipeline into JSON data
-    fn serialize_stages_json(&self, jser: JsonSerializer) -> JsonSerializerResult;
 }
