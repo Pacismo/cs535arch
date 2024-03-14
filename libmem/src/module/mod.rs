@@ -10,6 +10,8 @@
 
 mod single_level;
 
+use std::fmt::Debug;
+
 use crate::{cache::LineData, memory::Memory};
 use libseis::types::{Byte, Short, Word};
 use serde::Serialize;
@@ -44,7 +46,7 @@ pub enum Status {
 pub type Result<T> = std::result::Result<T, Status>;
 
 /// Represents a memory module containing a chache and a DRAM memory.
-pub trait MemoryModule {
+pub trait MemoryModule: Debug {
     /// Clocks the module, decrementing any counters.
     fn clock(&mut self, amount: usize);
 
