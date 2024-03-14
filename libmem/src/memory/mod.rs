@@ -3,28 +3,42 @@
 //! The datastructure in this module contains a set of dynamically-allocated pages,
 //! which are allocated on write.
 
-use std::{
-    iter::{Enumerate, FlatMap, Map},
-    mem::take,
-    ops::Deref,
-    slice::Iter,
-};
 use libseis::{
     pages::PAGE_SIZE,
     types::{Byte, Short, Word},
 };
 use serde::{ser::SerializeSeq, Serialize};
+use std::{
+    fmt::Debug,
+    iter::{Enumerate, FlatMap, Map},
+    mem::take,
+    ops::Deref,
+    slice::Iter,
+};
 
 type Page = [Byte; PAGE_SIZE];
 /// An iterator over the pages of the [`Memory`] datastructure
 pub type PageIterator<'a> =
-Map<Iter<'a, Option<Box<Page>>>, fn(&'a Option<Box<Page>>) -> Option<&'a [u8]>>;
+    Map<Iter<'a, Option<Box<Page>>>, fn(&'a Option<Box<Page>>) -> Option<&'a [u8]>>;
 /// An iterator over the allocated pages of the [`Memory`] datastructure
 pub type AllocatedPageIterator<'a> = FlatMap<
     Enumerate<PageIterator<'a>>,
     Option<(usize, &'a [u8])>,
     fn((usize, Option<&'a [u8]>)) -> Option<(usize, &'a [u8])>,
 >;
+
+#[repr(transparent)]
+struct AllocDebugWrapper<'a>(&'a Option<Box<Page>>);
+
+impl<'a> Debug for AllocDebugWrapper<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.0.is_some() {
+            write!(f, "allocated")
+        } else {
+            write!(f, "not allocated")
+        }
+    }
+}
 
 fn allocate_page() -> Box<Page> {
     Box::new([0; PAGE_SIZE])
@@ -44,7 +58,7 @@ impl std::fmt::Debug for Memory {
         f.debug_struct("Memory")
             .field(
                 "pages",
-                &self.pages.iter().map(Option::is_some).collect::<Vec<_>>(),
+                &self.pages.iter().map(AllocDebugWrapper).collect::<Vec<_>>(),
             )
             .finish()
     }
