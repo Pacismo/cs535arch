@@ -13,7 +13,7 @@ enum ReadRegister {
 #[derive(Debug)]
 pub struct NullCache(ReadRegister);
 
-impl Cache for NullCache {
+impl<'a> Cache<'a> for NullCache {
     fn get_byte(&mut self, address: Word) -> ReadResult<Byte> {
         if let Populated(a, b) = self.0 {
             if a == address {
@@ -117,14 +117,30 @@ impl Cache for NullCache {
     }
 }
 
-impl NullCache {
+impl Serialize for NullCache {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+
+        let mut map = serializer.serialize_map(Some(2))?;
+        if let Populated(addr, bytes) = self.0 {
+            map.serialize_entry("address", &addr)?;
+            map.serialize_entry("bytes", &bytes)?;
+        }
+        map.end()
+    }
+}
+
+impl<'a> NullCache {
     #[inline(always)]
     pub fn new() -> Self {
         Self(ReadRegister::Empty)
     }
 
     #[inline(always)]
-    pub fn boxed(self) -> Box<dyn Cache> {
+    pub fn boxed(self) -> Box<dyn Cache<'a>> {
         Box::new(self)
     }
 }

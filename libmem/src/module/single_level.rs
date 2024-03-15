@@ -55,9 +55,9 @@ impl Transaction {
 
 /// Represents a memory module with a single level of cache.
 #[derive(Debug)]
-pub struct SingleLevel {
-    data_cache: Box<dyn Cache>,
-    instruction_cache: Box<dyn Cache>,
+pub struct SingleLevel<'a> {
+    data_cache: Box<dyn Cache<'a>>,
+    instruction_cache: Box<dyn Cache<'a>>,
     memory: Memory,
 
     read_miss_penalty: usize,
@@ -76,7 +76,7 @@ pub struct SingleLevel {
     evictions: usize,
 }
 
-impl MemoryModule for SingleLevel {
+impl<'a> MemoryModule for SingleLevel<'a> {
     fn clock(&mut self, amount: usize) {
         self.clocks = self.clocks.saturating_sub(amount);
 
@@ -702,7 +702,7 @@ impl MemoryModule for SingleLevel {
     }
 }
 
-impl SingleLevel {
+impl<'a> SingleLevel<'a> {
     /// Creates a new single-level cache memory system.
     ///
     /// # Arguments
@@ -716,7 +716,7 @@ impl SingleLevel {
     /// # Notes
     ///
     /// - A misaligned access has a clock penalty of 1 plus another miss penalty (multiple accesses)
-    pub fn new<T: Cache + 'static, U: Cache + 'static>(
+    pub fn new<T: Cache<'a> + 'static, U: Cache<'a> + 'static>(
         data_cache: U,
         instruction_cache: T,
         memory: Memory,
@@ -735,8 +735,8 @@ impl SingleLevel {
     }
 
     pub fn new_with_boxed(
-        data_cache: Box<dyn Cache>,
-        instruction_cache: Box<dyn Cache>,
+        data_cache: Box<dyn Cache<'a>>,
+        instruction_cache: Box<dyn Cache<'a>>,
         memory: Memory,
         miss_penalty: usize,
         volatile_penalty: usize,

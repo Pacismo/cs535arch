@@ -1,9 +1,10 @@
-use super::{construct_address, split_address, Line};
+use super::{construct_address, line::Line, split_address};
 use crate::{
     cache::{Cache, LineData, LineReadStatus, ReadResult, Status},
     memory::Memory,
 };
 use libseis::types::{Byte, Short, Word};
+use serde::Serialize;
 use std::mem::take;
 
 /// Represents a one-way set-associative cache.
@@ -16,7 +17,7 @@ pub struct Associative {
     sets: Box<[Option<Box<Line>>]>,
 }
 
-impl Cache for Associative {
+impl<'a> Cache<'a> for Associative {
     fn get_byte(&mut self, address: Word) -> ReadResult<Byte> {
         let (tag, set, off) = self.split_address(address);
 
@@ -409,6 +410,26 @@ impl Cache for Associative {
     }
 }
 
+impl Serialize for Associative {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+
+        let mut map = serializer.serialize_map(Some(2 + self.sets.len()))?;
+        for (i, set) in self.sets.iter().enumerate() {
+            let name = format!("Set {i}");
+            if let Some(set) = set {
+                let address = self.construct_address(set.tag, i as Word, 0);
+                map.serialize_entry("name", &name)?;
+                todo!()
+            }
+        }
+        map.end()
+    }
+}
+
 impl Associative {
     /// Creates a new [`Associative`] with an offset bitfield width and a set bitfield width set at runtime.
     ///
@@ -467,7 +488,7 @@ impl Associative {
     /// Boxes the self to produce a dyn [`Cache`]
     #[inline(always)]
     #[track_caller]
-    pub fn boxed(self) -> Box<dyn Cache> {
+    pub fn boxed<'a>(self) -> Box<dyn Cache<'a>> {
         Box::new(self)
     }
 }
