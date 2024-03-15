@@ -5,11 +5,10 @@
 //! fetch, decode, execute, memory, and writeback stages.
 
 mod registers;
-mod serialize;
 
 use libmem::module::MemoryModule;
+pub use libser::{CompactJson, PrettyJson, Serializable};
 pub use registers::Registers;
-pub use serialize::{CompactJson, PrettyJson, Serializable};
 use std::fmt::Debug;
 
 /// The result of clocking the pipeline.

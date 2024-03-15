@@ -1,19 +1,12 @@
 [package]
-name = "libpipe"
+name = "libser"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-libmem = { path = "../libmem/" }
-libseis = { path = "../libseis/" }
 
 [dependencies.serde]
 version = "1.0.197"
 
 [dependencies.serde_json]
 version = "1.0.114"
-
-[dependencies.libser]
-path = "../libser/"
