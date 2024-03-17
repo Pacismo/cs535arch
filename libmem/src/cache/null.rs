@@ -14,7 +14,7 @@ impl Serialize for ReadRegister {
     {
         use serde::ser::SerializeMap;
 
-        if let Populated(address, bytes) = self {
+        if let Populated(_, _) = self {
             let map = serializer.serialize_map(Some(2))?;
 
             map.end()
