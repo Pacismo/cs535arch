@@ -1,6 +1,6 @@
 use super::{construct_address, line::Line, split_address};
 use crate::{
-    cache::{Cache, LineData, LineReadStatus, ReadResult, Status},
+    cache::{associative::line::LineSer, Cache, LineData, LineReadStatus, ReadResult, Status},
     memory::Memory,
 };
 use libseis::types::{Byte, Short, Word};
@@ -331,7 +331,7 @@ impl<'a> Cache<'a> for Associative {
             .zip(0..)
             .map(|(line, set)| {
                 line.as_ref().map(|line| LineData {
-                    address_base: self.construct_address(line.tag, set, 0),
+                    base_address: self.construct_address(line.tag, set, 0),
                     dirty: line.dirty,
                     data: line.data.as_ref(),
                 })
@@ -415,18 +415,12 @@ impl Serialize for Associative {
     where
         S: serde::Serializer,
     {
-        use serde::ser::SerializeMap;
-
-        let mut map = serializer.serialize_map(Some(2 + self.sets.len()))?;
-        for (i, set) in self.sets.iter().enumerate() {
-            let name = format!("Set {i}");
-            if let Some(set) = set {
-                let address = self.construct_address(set.tag, i as Word, 0);
-                map.serialize_entry("name", &name)?;
-                todo!()
-            }
-        }
-        map.end()
+        serializer.collect_seq(self.sets.iter().enumerate().map(|(i, line)| LineSer {
+            line,
+            set: i as Word,
+            set_bits: self.set_bits,
+            off_bits: self.off_bits,
+        }))
     }
 }
 

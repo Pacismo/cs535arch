@@ -674,15 +674,15 @@ impl<'a> MemoryModule for SingleLevel<'a> {
         self.accesses
     }
 
+    fn memory(&self) -> &Memory {
+        &self.memory
+    }
+
     fn cache_state(&self) -> Vec<CacheData> {
         vec![
             ("data cache", self.data_cache.get_lines()).into(),
             ("instruction cache", self.instruction_cache.get_lines()).into(),
         ]
-    }
-
-    fn memory(&self) -> &Memory {
-        &self.memory
     }
 
     fn flush_cache(&mut self) -> Status {

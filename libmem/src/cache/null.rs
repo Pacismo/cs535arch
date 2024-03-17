@@ -1,10 +1,27 @@
 use super::*;
 use ReadRegister::*;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 enum ReadRegister {
     Populated(Word, [u8; 4]),
     Empty,
+}
+
+impl Serialize for ReadRegister {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+
+        if let Populated(address, bytes) = self {
+            let map = serializer.serialize_map(Some(2))?;
+
+            map.end()
+        } else {
+            serializer.serialize_none()
+        }
+    }
 }
 
 /// This is a special cache type that only contains a single "read register".
@@ -122,14 +139,11 @@ impl Serialize for NullCache {
     where
         S: serde::Serializer,
     {
-        use serde::ser::SerializeMap;
+        use serde::ser::SerializeSeq;
 
-        let mut map = serializer.serialize_map(Some(2))?;
-        if let Populated(addr, bytes) = self.0 {
-            map.serialize_entry("address", &addr)?;
-            map.serialize_entry("bytes", &bytes)?;
-        }
-        map.end()
+        let mut seq = serializer.serialize_seq(Some(1))?;
+        seq.serialize_element(&self.0)?;
+        seq.end()
     }
 }
 
