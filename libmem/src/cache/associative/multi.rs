@@ -1,4 +1,4 @@
-use super::{construct_address, line::Line, split_address};
+use super::{construct_address, line::{Line, LineSer}, split_address};
 use crate::{
     cache::{Cache, LineData, LineReadStatus, ReadResult, Status},
     memory::Memory,
@@ -547,7 +547,7 @@ impl<'a> Cache<'a> for MultiAssociative {
             .flat_map(|(line, set)| {
                 line.iter().map(move |line| {
                     line.as_ref().map(|line| LineData {
-                        address_base: self.construct_address(line.tag, set, 0),
+                        base_address: self.construct_address(line.tag, set, 0),
                         dirty: line.dirty,
                         data: line.data.as_ref(),
                     })
@@ -667,8 +667,12 @@ impl Serialize for MultiAssociative {
     where
         S: serde::Serializer,
     {
-        let mut map = serializer.serialize_map(Some(4))?;
-        todo!()
+        serializer.collect_seq(self.sets.iter().enumerate().map(|(i, line)| LineSer {
+            line,
+            set: (i / self.ways) as Word,
+            set_bits: self.set_bits,
+            off_bits: self.off_bits,
+        }))
     }
 }
 

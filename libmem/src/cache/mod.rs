@@ -22,15 +22,15 @@ use std::fmt::Debug;
 
 #[derive(Debug, Serialize)]
 pub struct LineData<'a> {
-    pub address_base: Word,
+    pub base_address: Word,
     pub dirty: bool,
     pub data: &'a [u8],
 }
 
 impl<'a> From<(Word, bool, &'a [u8])> for LineData<'a> {
-    fn from((address_base, dirty, data): (Word, bool, &'a [u8])) -> Self {
+    fn from((base_address, dirty, data): (Word, bool, &'a [u8])) -> Self {
         Self {
-            address_base,
+            base_address,
             dirty,
             data,
         }
