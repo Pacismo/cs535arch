@@ -203,6 +203,12 @@ pub enum Command {
         #[arg(short)]
         pretty: bool,
     },
+    /// Prints the JSON representation of the current state
+    JSON {
+        /// Pretty-print the JSON
+        #[arg(short)]
+        pretty: bool,
+    },
     /// Stop the runtime
     Exit,
 }
@@ -327,6 +333,10 @@ impl Command {
                 }),
                 Arc::new(StringCompleter {
                     string: "debug",
+                    subtree: Arc::new([Arc::new("-p")]),
+                }),
+                Arc::new(StringCompleter {
+                    string: "json",
                     subtree: Arc::new([Arc::new("-p")]),
                 }),
                 Arc::new(StringCompleter {

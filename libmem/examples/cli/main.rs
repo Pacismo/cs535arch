@@ -17,6 +17,7 @@ use libseis::{
     pages::PAGE_SIZE,
     types::{Byte, SByte, SShort, SWord, Short, Word},
 };
+use serde::Serialize;
 use std::{
     error::Error,
     fs::File,
@@ -446,7 +447,7 @@ fn process_input(
                         Some(data) => {
                             println!(
                                 "\t[{i:>4}] {:#010X}{}:",
-                                data.address_base,
+                                data.base_address,
                                 if data.dirty { " (dirty)" } else { "" }
                             );
                             for bytes in data.data.chunks(8) {
@@ -487,6 +488,20 @@ fn process_input(
             } else {
                 println!("{module:?}")
             }
+            Some(false)
+        }
+        Command::JSON { pretty } => {
+            if pretty {
+                let mut jser = serde_json::Serializer::pretty(std::io::stdout());
+                module.cache_state().serialize(&mut jser).unwrap();
+                module.memory().serialize(&mut jser).unwrap();
+            } else {
+                let mut jser = serde_json::Serializer::new(std::io::stdout());
+                module.cache_state().serialize(&mut jser).unwrap();
+                module.memory().serialize(&mut jser).unwrap();
+            }
+            println!();
+
             Some(false)
         }
         Command::ShowMemory { page } => {
@@ -635,6 +650,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     println!("Total clocks: {}", total_clocks);
+
+    module
+        .cache_state()
+        .serialize(&mut serde_json::Serializer::pretty(File::create(
+            "./cache.json",
+        )?))?;
+    module
+        .memory()
+        .serialize(&mut serde_json::Serializer::pretty(File::create(
+            "./memory.json",
+        )?))?;
 
     Ok(())
 }
