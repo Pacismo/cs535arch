@@ -12,15 +12,7 @@ impl Serialize for ReadRegister {
     where
         S: serde::Serializer,
     {
-        use serde::ser::SerializeMap;
-
-        if let Populated(_, _) = self {
-            let map = serializer.serialize_map(Some(2))?;
-
-            map.end()
-        } else {
-            serializer.serialize_none()
-        }
+        serializer.serialize_none()
     }
 }
 
