@@ -1,0 +1,54 @@
+﻿<Window x:Class="gui.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:gui"
+        mc:Ignorable="d"
+        Title="SEIS Simulation Frontend" Height="450" Width="800">
+    <Grid>
+        <Menu>
+            <MenuItem Name="File" Header="File">
+                <MenuItem Name="NewSimulation" Header="Create New Configuration" Click="NewSimulation_Click"/>
+                <MenuItem Name="OpenSimulation" Header="Open Configuration"/>
+                <MenuItem Name="SaveSimulation" Header="Save Configuration"/>
+                <Separator/>
+                <MenuItem Name="OpenBinary" Header="Open Binary File"/>
+                <Separator/>
+                <MenuItem Name="Exit" Header="Exit" Click="Exit_Click"/>
+            </MenuItem>
+            <MenuItem Name="Simulation" Header="Simulation">
+                <MenuItem Name="StartSim" Header="Start"/>
+                <MenuItem Name="StopSim" Header="Stop"/>
+                <MenuItem Name="ResetSim" Header="Reset"/>
+                <Separator/>
+                <MenuItem Name="Clock" Header="Clock" StaysOpenOnClick="True"/>
+                <MenuItem Name="Run" Header="Run"/>
+            </MenuItem>
+            <MenuItem Name="Help" Header="Help">
+                <MenuItem Name="About" Header="About"/>
+            </MenuItem>
+        </Menu>
+
+        <TabControl Margin="0,20,0,0">
+            <TabItem Header="Cache">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition/>
+                    </Grid.ColumnDefinitions>
+                    <DataGrid HorizontalAlignment="Left" Width="397"/>
+                </Grid>
+            </TabItem>
+            <TabItem Header="Memory">
+                <Grid>
+                    <DataGrid HorizontalAlignment="Left" Width="397"/>
+                </Grid>
+            </TabItem>
+            <TabItem Header="Pipeline">
+                <Grid>
+
+                </Grid>
+            </TabItem>
+        </TabControl>
+    </Grid>
+</Window>
