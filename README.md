@@ -31,7 +31,7 @@ The OPTY field consumes the most significant 3 bits of the instruction.
 
 ## Addressing
 
-Pages will span 65,536 bytes. The processor will support a stack and a "zero page".
+Pages will span 65,536 bytes. The processor will support a stack and a "zero page", known as the "short page".
 
-For this simulation, the stack will be in the second page and the "zero page" will be in the third page. The load and store instructions both have a zero-page variant supporting a 16-bit immediate field, but the zero page will not support more advanced addressing modes. The intention of the zero page is to act as a scratch-space for frequently-used values and a location to store table addresses.
-However, the zero page may be treated like any other location in memory using any other addressing mode.
+For this simulation, the stack will be in the second page and the short page will be in the third page. The load and store instructions both have a zero-page variant supporting a 16-bit immediate field, but the short page will not support more advanced addressing modes. The intention of the short page is to act as a scratch-space for frequently-used values and a location to store table addresses.
+However, the short page may be treated like any other location in memory using any other addressing mode once the address of a short-page address is stored in a register.
