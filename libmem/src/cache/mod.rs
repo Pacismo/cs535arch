@@ -170,3 +170,13 @@ impl Status {
 }
 
 type ReadResult<T> = Result<T, Status>;
+
+impl<'a> Serialize for dyn Cache<'a> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+        dyn Cache<'a>: Serializable<S>,
+    {
+        self.serialize_to(serializer)
+    }
+}
