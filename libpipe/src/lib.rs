@@ -5,10 +5,14 @@
 //! fetch, decode, execute, memory, and writeback stages.
 
 mod registers;
+mod stages;
+mod unpiped;
+mod reg_locks;
 
 use libmem::module::MemoryModule;
 pub use libser::{CompactJson, PrettyJson, Serializable};
 pub use registers::Registers;
+pub use stages::*;
 use std::fmt::Debug;
 
 /// The result of clocking the pipeline.
@@ -45,4 +49,14 @@ pub trait Pipeline<'a>:
 
     /// Gets the registers in the pipeline
     fn registers(&self) -> &Registers;
+}
+
+impl<'a> serde::Serialize for dyn Pipeline<'a> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+        Self: Serializable<S>,
+    {
+        self.serialize_to(serializer)
+    }
 }
