@@ -297,6 +297,10 @@ dependencies = [
 [[package]]
 name = "libseis"
 version = "0.1.0"
+dependencies = [
+ "libser",
+ "serde",
+]
 
 [[package]]
 name = "libser"
