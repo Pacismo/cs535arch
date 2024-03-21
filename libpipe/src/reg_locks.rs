@@ -9,19 +9,19 @@ use serde::Serialize;
 #[repr(C)]
 #[derive(Serialize, Debug, Clone, Copy)]
 pub struct Named {
-    pub v: [bool; 16],
-    pub sp: bool,
-    pub bp: bool,
-    pub lp: bool,
-    pub pc: bool,
-    pub zf: bool,
-    pub of: bool,
-    pub eps: bool,
-    pub nan: bool,
-    pub inf: bool,
+    pub v: [u8; 16],
+    pub sp: u8,
+    pub bp: u8,
+    pub lp: u8,
+    pub pc: u8,
+    pub zf: u8,
+    pub of: u8,
+    pub eps: u8,
+    pub nan: u8,
+    pub inf: u8,
 }
 
-type Indexed = [bool; COUNT];
+type Indexed = [u8; COUNT];
 
 #[repr(C)]
 pub union Locks {
@@ -58,7 +58,7 @@ impl DerefMut for Locks {
 }
 
 impl Index<Register> for Locks {
-    type Output = bool;
+    type Output = u8;
 
     fn index(&self, index: Register) -> &Self::Output {
         unsafe { &self.by_id[index as usize] }
@@ -68,5 +68,11 @@ impl Index<Register> for Locks {
 impl IndexMut<Register> for Locks {
     fn index_mut(&mut self, index: Register) -> &mut Self::Output {
         unsafe { &mut self.by_id[index as usize] }
+    }
+}
+
+impl Locks {
+    pub fn is_locked(&self, reg: Register) -> bool {
+        self[reg] != 0
     }
 }

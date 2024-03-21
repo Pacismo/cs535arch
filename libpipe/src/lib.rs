@@ -4,13 +4,14 @@
 //! The expectation is that the processor will implement the
 //! fetch, decode, execute, memory, and writeback stages.
 
+mod reg_locks;
 mod registers;
 mod stages;
 mod unpiped;
-mod reg_locks;
 
 use libmem::module::MemoryModule;
-pub use libser::{CompactJson, PrettyJson, Serializable};
+use libser::{CompactJson, PrettyJson, Serializable};
+pub use reg_locks::Locks;
 pub use registers::Registers;
 pub use stages::*;
 use std::fmt::Debug;
