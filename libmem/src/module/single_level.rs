@@ -678,6 +678,10 @@ impl<'a> MemoryModule for SingleLevel<'a> {
         &self.memory
     }
 
+    fn memory_mut(&mut self) -> &mut Memory {
+        &mut self.memory
+    }
+
     fn cache_state(&self) -> Vec<CacheData> {
         vec![
             ("data cache", self.data_cache.get_lines()).into(),

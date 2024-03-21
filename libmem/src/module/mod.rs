@@ -97,6 +97,9 @@ pub trait MemoryModule: Debug {
     /// Get the memory structure
     fn memory(&self) -> &Memory;
 
+    /// Get a mutable reference to the memory structure
+    fn memory_mut(&mut self) -> &mut Memory;
+
     /// Get the state of the cache structures
     ///
     /// Provides the names of the caches as well

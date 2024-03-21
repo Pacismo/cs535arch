@@ -269,6 +269,20 @@ impl Memory {
             .enumerate()
             .flat_map(|(i, p)| p.map(|p| (i, p)))
     }
+
+    pub fn set_page<const LEN: usize>(&mut self, address: Word, data: [u8; LEN]) {
+        assert!(LEN <= PAGE_SIZE);
+
+        let page_id = ((address as usize) & 0xFFFF_0000) >> 16;
+
+        if LEN == 0 {
+            self.pages[page_id] = None;
+        } else {
+            let mut page = allocate_page();
+            page.copy_from_slice(&data);
+            self.pages[page_id] = Some(page);
+        }
+    }
 }
 
 impl Serialize for Memory {
