@@ -4,14 +4,13 @@ pub mod floating_point;
 pub mod integer;
 pub mod register;
 
-use std::fmt::Display;
-
-use crate::types::Word;
+use crate::types::{Register, Word};
 pub use control::ControlOp;
 use error::{DecodeError, DecodeResult};
 pub use floating_point::FloatingPointOp;
 pub use integer::IntegerOp;
 pub use register::RegisterOp;
+use std::fmt::Display;
 
 /// Represents a decodable type.
 pub trait Decode: Sized {
@@ -23,6 +22,14 @@ pub trait Decode: Sized {
 pub trait Encode: Sized {
     /// Encodes to a word
     fn encode(self) -> Word;
+}
+
+pub trait Info: Sized {
+    /// Gets the register being written to
+    fn get_write_reg(self) -> Option<Register>;
+
+    /// Gets the registers being read from
+    fn get_read_regs(self) -> Vec<Register>;
 }
 
 /// Alias for [`Decode::decode`]
@@ -43,6 +50,12 @@ pub enum Instruction {
     Integer(IntegerOp),
     FloatingPoint(FloatingPointOp),
     Register(RegisterOp),
+}
+
+impl Default for Instruction {
+    fn default() -> Self {
+        Self::Control(ControlOp::Nop)
+    }
 }
 
 impl Instruction {
@@ -89,6 +102,30 @@ impl Encode for Instruction {
     }
 }
 
+impl Info for Instruction {
+    fn get_write_reg(self) -> Option<Register> {
+        use Instruction::*;
+
+        match self {
+            Control(c) => c.get_write_reg(),
+            Integer(i) => i.get_write_reg(),
+            FloatingPoint(f) => f.get_write_reg(),
+            Register(r) => r.get_write_reg(),
+        }
+    }
+
+    fn get_read_regs(self) -> Vec<Register> {
+        use Instruction::*;
+
+        match self {
+            Control(c) => c.get_read_regs(),
+            Integer(i) => i.get_read_regs(),
+            FloatingPoint(f) => f.get_read_regs(),
+            Register(r) => r.get_read_regs(),
+        }
+    }
+}
+
 impl Display for Instruction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use Instruction::*;
@@ -113,5 +150,15 @@ impl TryFrom<Word> for Instruction {
 impl From<Instruction> for Word {
     fn from(value: Instruction) -> Self {
         encode(value)
+    }
+}
+
+impl serde::Serialize for Instruction {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let as_string = self.to_string();
+        serializer.serialize_str(&as_string)
     }
 }

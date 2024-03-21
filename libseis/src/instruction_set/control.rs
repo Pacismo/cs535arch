@@ -1,6 +1,6 @@
 use super::{
     error::{DecodeError, DecodeResult},
-    Decode, Encode,
+    Decode, Encode, Info,
 };
 use crate::{
     instruction_set::decode,
@@ -259,6 +259,30 @@ impl Encode for ControlOp {
             Jlt(jump) => (Self::JLT << Self::SHIFT) | jump.encode(),
             Jge(jump) => (Self::JGE << Self::SHIFT) | jump.encode(),
             Jle(jump) => (Self::JLE << Self::SHIFT) | jump.encode(),
+        }
+    }
+}
+
+impl Info for ControlOp {
+    fn get_write_reg(self) -> Option<Register> {
+        None
+    }
+
+    fn get_read_regs(self) -> Vec<Register> {
+        use ControlOp::*;
+        use Jump::Register;
+
+        match self {
+            Jmp(Register(r)) => vec![r],
+            Jsr(Register(r)) => vec![r],
+            Jeq(Register(r)) => vec![r],
+            Jne(Register(r)) => vec![r],
+            Jgt(Register(r)) => vec![r],
+            Jlt(Register(r)) => vec![r],
+            Jge(Register(r)) => vec![r],
+            Jle(Register(r)) => vec![r],
+
+            _ => vec![],
         }
     }
 }

@@ -1,4 +1,4 @@
-use super::{error::DecodeResult, Decode, Encode};
+use super::{error::DecodeResult, Decode, Encode, Info};
 use crate::{
     instruction_set::{decode, error::DecodeError},
     registers::{self, BP, LP, SP, V},
@@ -845,6 +845,48 @@ impl Encode for RegisterOp {
             Pop(p) => p.encode(),
             Ldr(i) => i.encode(),
         }
+    }
+}
+
+impl Info for RegisterOp {
+    fn get_write_reg(self) -> Option<Register> {
+        use RegisterOp::*;
+
+        match self {
+            Lbr(
+                ReadOp::IndexedIndirect { destination, .. }
+                | ReadOp::Indirect { destination, .. }
+                | ReadOp::OffsetIndirect { destination, .. }
+                | ReadOp::StackOffset { destination, .. }
+                | ReadOp::ZeroPage { destination, .. },
+            )
+            | Lsr(
+                ReadOp::IndexedIndirect { destination, .. }
+                | ReadOp::Indirect { destination, .. }
+                | ReadOp::OffsetIndirect { destination, .. }
+                | ReadOp::StackOffset { destination, .. }
+                | ReadOp::ZeroPage { destination, .. },
+            )
+            | Llr(
+                ReadOp::IndexedIndirect { destination, .. }
+                | ReadOp::Indirect { destination, .. }
+                | ReadOp::OffsetIndirect { destination, .. }
+                | ReadOp::StackOffset { destination, .. }
+                | ReadOp::ZeroPage { destination, .. },
+            )
+            | Tfr(RegOp { destination, .. })
+            | Ldr(
+                ImmOp::Immediate { destination, .. } | ImmOp::ZeroPageTranslate { destination, .. },
+            ) => Some(destination),
+
+            Pop(PopOp::Registers(_)) => todo!("Modify the output of the `get_write_reg` function to get a register bitset rather than a register index"),
+
+            _ => None
+        }
+    }
+
+    fn get_read_regs(self) -> Vec<Register> {
+        todo!()
     }
 }
 

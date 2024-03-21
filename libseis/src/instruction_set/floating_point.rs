@@ -5,7 +5,7 @@ use crate::{
     types::{Register, Word},
 };
 
-use super::{Decode, Encode};
+use super::{Decode, Encode, Info};
 
 #[derive(Debug, Clone, Copy)]
 pub struct BinaryOp(pub Register, pub Register, pub Register);
@@ -226,6 +226,42 @@ impl Encode for FloatingPointOp {
             Itof(u) => (Self::ITOF << Self::SHIFT) | u.encode(),
             Ftoi(u) => (Self::FTOI << Self::SHIFT) | u.encode(),
             Fchk(b) => (Self::FCHK << Self::SHIFT) | b.encode(),
+        }
+    }
+}
+
+impl Info for FloatingPointOp {
+    fn get_write_reg(self) -> Option<Register> {
+        use FloatingPointOp::*;
+
+        match self {
+            Fadd(BinaryOp(_, _, r))
+            | Fsub(BinaryOp(_, _, r))
+            | Fmul(BinaryOp(_, _, r))
+            | Fdiv(BinaryOp(_, _, r))
+            | Fmod(BinaryOp(_, _, r))
+            | Fneg(UnaryOp(_, r))
+            | Frec(UnaryOp(_, r))
+            | Itof(UnaryOp(_, r))
+            | Ftoi(UnaryOp(_, r)) => Some(r),
+
+            _ => None,
+        }
+    }
+
+    fn get_read_regs(self) -> Vec<Register> {
+        use FloatingPointOp::*;
+
+        match self {
+            Fadd(BinaryOp(r0, r1, _))
+            | Fsub(BinaryOp(r0, r1, _))
+            | Fmul(BinaryOp(r0, r1, _))
+            | Fdiv(BinaryOp(r0, r1, _))
+            | Fmod(BinaryOp(r0, r1, _))
+            | Fcmp(CompOp(r0, r1)) => vec![r0, r1],
+
+            Fneg(UnaryOp(r, _)) | Frec(UnaryOp(r, _)) | Itof(UnaryOp(r, _))
+            | Ftoi(UnaryOp(r, _)) | Fchk(CheckOp(r)) => vec![r],
         }
     }
 }

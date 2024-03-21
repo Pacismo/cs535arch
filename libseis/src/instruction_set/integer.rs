@@ -1,4 +1,4 @@
-use super::{error::DecodeResult, Decode, Encode};
+use super::{error::DecodeResult, Decode, Encode, Info};
 use crate::{
     instruction_set::{decode, error::DecodeError},
     types::{Register, Word},
@@ -87,15 +87,15 @@ impl Display for BinaryOp {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct SignExtentOp(pub Word, pub Register);
+pub struct SignExtendOp(pub Word, pub Register);
 
-impl SignExtentOp {
+impl SignExtendOp {
     const TGT_REG_MASK: Word = 0b0000_0000_0000_0000_0000_0000_0000_1111;
     const SXT_BIT_MASK: Word = 0b0000_0000_0000_0000_0000_0000_0011_0000;
     const SXT_BIT_SHIFT: Word = 4;
 }
 
-impl Decode for SignExtentOp {
+impl Decode for SignExtendOp {
     fn decode(word: Word) -> DecodeResult<Self> {
         Ok(Self(
             (word & Self::SXT_BIT_MASK) >> Self::SXT_BIT_SHIFT,
@@ -104,13 +104,13 @@ impl Decode for SignExtentOp {
     }
 }
 
-impl Encode for SignExtentOp {
+impl Encode for SignExtendOp {
     fn encode(self) -> Word {
         (self.0 << Self::SXT_BIT_SHIFT) | (self.1 as Word)
     }
 }
 
-impl Display for SignExtentOp {
+impl Display for SignExtendOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let width = if self.0 == 0 {
             "byte"
@@ -264,7 +264,7 @@ pub enum IntegerOp {
     /// Bitwise not
     Not(UnaryOp),
     /// Sign-extend
-    Sxt(SignExtentOp),
+    Sxt(SignExtendOp),
     /// Logical-shift left
     Bsl(BinaryOp),
     /// Logical-shift right
@@ -414,6 +414,75 @@ impl Encode for IntegerOp {
             Asr(b) => (Self::ASR << Self::SHIFT) | b.encode(),
             Rol(b) => (Self::ROL << Self::SHIFT) | b.encode(),
             Ror(b) => (Self::ROR << Self::SHIFT) | b.encode(),
+        }
+    }
+}
+
+impl Info for IntegerOp {
+    fn get_write_reg(self) -> Option<Register> {
+        use IntegerOp::*;
+
+        match self {
+            Not(UnaryOp(_, r))
+            | Sxt(SignExtendOp(_, r))
+            | Add(BinaryOp::Registers(.., r) | BinaryOp::Immediate(.., r))
+            | Sub(BinaryOp::Registers(.., r) | BinaryOp::Immediate(.., r))
+            | Mul(BinaryOp::Registers(.., r) | BinaryOp::Immediate(.., r))
+            | Dvu(BinaryOp::Registers(.., r) | BinaryOp::Immediate(.., r))
+            | Dvs(BinaryOp::Registers(.., r) | BinaryOp::Immediate(.., r))
+            | Mod(BinaryOp::Registers(.., r) | BinaryOp::Immediate(.., r))
+            | Bsl(BinaryOp::Registers(.., r) | BinaryOp::Immediate(.., r))
+            | Bsr(BinaryOp::Registers(.., r) | BinaryOp::Immediate(.., r))
+            | Asr(BinaryOp::Registers(.., r) | BinaryOp::Immediate(.., r))
+            | Rol(BinaryOp::Registers(.., r) | BinaryOp::Immediate(.., r))
+            | Ror(BinaryOp::Registers(.., r) | BinaryOp::Immediate(.., r))
+            | And(BinaryOp::Registers(.., r) | BinaryOp::Immediate(.., r))
+            | Ior(BinaryOp::Registers(.., r) | BinaryOp::Immediate(.., r))
+            | Xor(BinaryOp::Registers(.., r) | BinaryOp::Immediate(.., r)) => Some(r),
+
+            Cmp(_) | Tst(_) => None,
+        }
+    }
+
+    fn get_read_regs(self) -> Vec<Register> {
+        use IntegerOp::*;
+
+        match self {
+            Add(BinaryOp::Registers(r0, r1, _))
+            | Sub(BinaryOp::Registers(r0, r1, _))
+            | Mul(BinaryOp::Registers(r0, r1, _))
+            | Dvu(BinaryOp::Registers(r0, r1, _))
+            | Dvs(BinaryOp::Registers(r0, r1, _))
+            | Mod(BinaryOp::Registers(r0, r1, _))
+            | And(BinaryOp::Registers(r0, r1, _))
+            | Ior(BinaryOp::Registers(r0, r1, _))
+            | Xor(BinaryOp::Registers(r0, r1, _))
+            | Bsl(BinaryOp::Registers(r0, r1, _))
+            | Bsr(BinaryOp::Registers(r0, r1, _))
+            | Asr(BinaryOp::Registers(r0, r1, _))
+            | Rol(BinaryOp::Registers(r0, r1, _))
+            | Ror(BinaryOp::Registers(r0, r1, _))
+            | Cmp(CompOp::Registers(r0, r1))
+            | Tst(CompOp::Registers(r0, r1)) => vec![r0, r1],
+
+            Add(BinaryOp::Immediate(r, _, _))
+            | Sub(BinaryOp::Immediate(r, _, _))
+            | Mul(BinaryOp::Immediate(r, _, _))
+            | Dvu(BinaryOp::Immediate(r, _, _))
+            | Dvs(BinaryOp::Immediate(r, _, _))
+            | Mod(BinaryOp::Immediate(r, _, _))
+            | And(BinaryOp::Immediate(r, _, _))
+            | Ior(BinaryOp::Immediate(r, _, _))
+            | Xor(BinaryOp::Immediate(r, _, _))
+            | Bsl(BinaryOp::Immediate(r, _, _))
+            | Bsr(BinaryOp::Immediate(r, _, _))
+            | Asr(BinaryOp::Immediate(r, _, _))
+            | Rol(BinaryOp::Immediate(r, _, _))
+            | Ror(BinaryOp::Immediate(r, _, _))
+            | Cmp(CompOp::Immediate(r, _))
+            | Tst(CompOp::Immediate(r, _))
+            | Not(UnaryOp(r, _))
+            | Sxt(SignExtendOp(_, r)) => vec![r],
         }
     }
 }
