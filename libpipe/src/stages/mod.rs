@@ -79,7 +79,7 @@ impl Clock {
         matches!(self, Self::Squash(_))
     }
 
-    pub fn is_flow(self) -> bool {
+    pub fn is_ready(self) -> bool {
         matches!(self, Self::Ready(_))
     }
 
@@ -91,8 +91,19 @@ impl Clock {
         Self::Squash(self.clocks())
     }
 
-    pub fn to_flow(self) -> Self {
+    pub fn to_ready(self) -> Self {
         Self::Ready(self.clocks())
+    }
+
+    pub fn begin<T: PipelineStage>(
+        self,
+        clocks: usize,
+        first: &mut T,
+        registers: &mut Registers,
+        reg_locks: &mut Locks,
+        memory: &mut dyn MemoryModule,
+    ) -> Self {
+        first.clock(Self::Ready(clocks), registers, reg_locks, memory)
     }
 
     pub fn then<T: PipelineStage>(
@@ -106,14 +117,20 @@ impl Clock {
     }
 }
 
-/// The stage of the previous stage in the pipeline.
-#[derive(Debug)]
-pub enum Status<T: Debug> {
-    /// The pipeline has a stall
+/// The stage of the previous stage in the pipeline
+///
+/// If there is a stall, [`Stall`](Status::Stall) *must* contain the shortest stall time
+#[derive(Debug, Default)]
+pub enum Status<T: Debug = ()> {
+    /// Some previous stage has a stall
+    ///
+    /// The contained value is the minimum number of clocks required
+    /// to clear the shortest stall
     Stall(usize),
     /// The pipeline has completed a job and is forwarding a new job
     Flow(T),
     /// The stage is ready, but waiting
+    #[default]
     Ready,
     /// The pipeline squashed an instruction
     Squashed,
@@ -123,11 +140,11 @@ pub enum Status<T: Debug> {
 
 impl<T: Debug> Status<T> {
     pub fn is_stall(&self) -> bool {
-        matches!(self, Self::Stall(_))
+        matches!(self, Self::Stall(..))
     }
 
     pub fn is_flow(&self) -> bool {
-        matches!(self, Self::Flow(_))
+        matches!(self, Self::Flow(..))
     }
 
     pub fn is_ready(&self) -> bool {
@@ -142,7 +159,22 @@ impl<T: Debug> Status<T> {
         matches!(self, Self::Dry)
     }
 
+    /// Starts the process of forwarding results from the previous clock
+    pub fn begin<P: PipelineStage<Prev = ()>>(stage: &mut P) -> Status<P::Next> {
+        stage.forward(Status::default())
+    }
+
+    /// Forwards any information about the state, if available
     pub fn then<P: PipelineStage<Prev = T>>(self, stage: &mut P) -> Status<P::Next> {
         stage.forward(self)
+    }
+
+    /// Ends the stage-forwarding, possibly returning the number of clocks needed to clear any blockages
+    pub fn end<P: PipelineStage<Next = (), Prev = T>>(self, stage: &mut P) -> Option<usize> {
+        match stage.forward(self) {
+            Status::Stall(n) => Some(n),
+            Status::Dry => None,
+            _ => Some(1),
+        }
     }
 }
