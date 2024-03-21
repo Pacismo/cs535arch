@@ -834,7 +834,7 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
                 .into_iter()
                 .zip(address..)
                 .for_each(write),
-            I::Sxt(s) => Integer(Sxt(integer::SignExtentOp(s.width, s.register)))
+            I::Sxt(s) => Integer(Sxt(integer::SignExtendOp(s.width, s.register)))
                 .encode()
                 .to_be_bytes()
                 .into_iter()
