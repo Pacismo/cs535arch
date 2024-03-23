@@ -1,6 +1,7 @@
 use super::{error::DecodeResult, Decode, Encode, Info};
 use crate::{
     instruction_set::{decode, error::DecodeError},
+    registers::RegisterFlags,
     types::{Register, Word},
 };
 use std::fmt::Display;
@@ -419,7 +420,7 @@ impl Encode for IntegerOp {
 }
 
 impl Info for IntegerOp {
-    fn get_write_reg(self) -> Option<Register> {
+    fn get_write_regs(self) -> RegisterFlags {
         use IntegerOp::*;
 
         match self {
@@ -438,9 +439,11 @@ impl Info for IntegerOp {
             | Ror(BinaryOp::Registers(.., r) | BinaryOp::Immediate(.., r))
             | And(BinaryOp::Registers(.., r) | BinaryOp::Immediate(.., r))
             | Ior(BinaryOp::Registers(.., r) | BinaryOp::Immediate(.., r))
-            | Xor(BinaryOp::Registers(.., r) | BinaryOp::Immediate(.., r)) => Some(r),
+            | Xor(BinaryOp::Registers(.., r) | BinaryOp::Immediate(.., r)) => {
+                RegisterFlags::from(r)
+            }
 
-            Cmp(_) | Tst(_) => None,
+            Cmp(_) | Tst(_) => RegisterFlags::default(),
         }
     }
 

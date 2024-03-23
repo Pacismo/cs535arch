@@ -2,6 +2,7 @@ use std::fmt::Display;
 
 use crate::{
     instruction_set::{decode, error::DecodeError},
+    registers::RegisterFlags,
     types::{Register, Word},
 };
 
@@ -231,7 +232,7 @@ impl Encode for FloatingPointOp {
 }
 
 impl Info for FloatingPointOp {
-    fn get_write_reg(self) -> Option<Register> {
+    fn get_write_regs(self) -> RegisterFlags {
         use FloatingPointOp::*;
 
         match self {
@@ -243,9 +244,9 @@ impl Info for FloatingPointOp {
             | Fneg(UnaryOp(_, r))
             | Frec(UnaryOp(_, r))
             | Itof(UnaryOp(_, r))
-            | Ftoi(UnaryOp(_, r)) => Some(r),
+            | Ftoi(UnaryOp(_, r)) => RegisterFlags::from(r),
 
-            _ => None,
+            _ => RegisterFlags::default(),
         }
     }
 

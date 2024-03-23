@@ -1,103 +1,23 @@
 use super::{error::DecodeResult, Decode, Encode, Info};
+use crate::registers::RegisterFlags;
 use crate::{
     instruction_set::{decode, error::DecodeError},
-    registers::{self, BP, LP, SP, V},
+    registers,
     types::{Byte, Register, Short, Word},
 };
-use std::fmt::{Display, Write};
-
-#[derive(Debug, Clone, Copy)]
-pub struct RegisterFlags(Word);
-
-impl RegisterFlags {
-    const REG_MASK: Word = 0b0000_0000_0000_1111_1111_1111_1111_1111;
-
-    pub fn has_register(self, reg_id: Register) -> bool {
-        self.0 & (1 << reg_id as Word) != 0
-    }
-
-    pub fn registers(self) -> Vec<Register> {
-        let mut registers: Vec<Register> =
-            V.into_iter().filter(|&v| self.has_register(v)).collect();
-
-        if self.has_register(SP) {
-            registers.push(SP)
-        }
-
-        if self.has_register(BP) {
-            registers.push(BP)
-        }
-
-        if self.has_register(LP) {
-            registers.push(LP)
-        }
-
-        registers
-    }
-}
-
-impl FromIterator<Register> for RegisterFlags {
-    fn from_iter<T: IntoIterator<Item = Register>>(iter: T) -> Self {
-        let mut flags = 0;
-        for reg in iter {
-            assert!(reg <= LP);
-            flags |= 1 << reg as Word;
-        }
-        Self(flags)
-    }
-}
+use std::fmt::Display;
 
 impl Decode for RegisterFlags {
     fn decode(word: Word) -> DecodeResult<Self> {
-        let register_flags = word & Self::REG_MASK;
+        const REG_MASK: Word = 0b0000_0000_0000_1111_1111_1111_1111_1111;
 
-        Ok(Self(register_flags))
+        Ok(Self(word & REG_MASK))
     }
 }
 
 impl Encode for RegisterFlags {
     fn encode(self) -> Word {
         self.0
-    }
-}
-
-impl Display for RegisterFlags {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut string = "".to_owned();
-
-        for v in V.into_iter().filter(|&b| self.has_register(b)) {
-            if string.is_empty() {
-                write!(string, "V{v:X}")?;
-            } else {
-                write!(string, ", V{v:X}")?;
-            }
-        }
-
-        if self.has_register(SP) {
-            if string.is_empty() {
-                write!(string, "SP")?;
-            } else {
-                write!(string, ", SP")?;
-            }
-        }
-
-        if self.has_register(BP) {
-            if string.is_empty() {
-                write!(string, "BP")?;
-            } else {
-                write!(string, ", BP")?;
-            }
-        }
-
-        if self.has_register(LP) {
-            if string.is_empty() {
-                write!(string, "LP")?;
-            } else {
-                write!(string, ", LP")?;
-            }
-        }
-
-        write!(f, "{{{string}}}")
     }
 }
 
@@ -676,7 +596,7 @@ impl PushOp {
         use PushOp::*;
 
         match self {
-            Registers(reg) => reg.registers(),
+            Registers(reg) => reg.registers().collect(),
             _ => vec![],
         }
     }
@@ -739,7 +659,7 @@ impl PopOp {
         use PopOp::*;
 
         match self {
-            Registers(reg) => reg.registers(),
+            Registers(reg) => reg.registers().collect(),
             _ => vec![],
         }
     }
@@ -849,7 +769,7 @@ impl Encode for RegisterOp {
 }
 
 impl Info for RegisterOp {
-    fn get_write_reg(self) -> Option<Register> {
+    fn get_write_regs(self) -> RegisterFlags {
         use RegisterOp::*;
 
         match self {
@@ -877,16 +797,46 @@ impl Info for RegisterOp {
             | Tfr(RegOp { destination, .. })
             | Ldr(
                 ImmOp::Immediate { destination, .. } | ImmOp::ZeroPageTranslate { destination, .. },
-            ) => Some(destination),
+            ) => RegisterFlags::from(destination),
 
-            Pop(PopOp::Registers(_)) => todo!("Modify the output of the `get_write_reg` function to get a register bitset rather than a register index"),
+            Pop(PopOp::Registers(regs)) => regs,
 
-            _ => None
+            _ => RegisterFlags::default(),
         }
     }
 
     fn get_read_regs(self) -> Vec<Register> {
-        todo!()
+        use RegisterOp::*;
+
+        match self {
+            Lbr(r) | Lsr(r) | Llr(r) => match r {
+                ReadOp::Indirect { address, .. } => vec![address],
+                ReadOp::OffsetIndirect { address, .. } => vec![address],
+                ReadOp::IndexedIndirect { address, index, .. } => vec![address, index],
+
+                _ => vec![],
+            },
+            Sbr(w) | Ssr(w) | Slr(w) => match w {
+                WriteOp::ZeroPage { source, .. } => vec![source],
+                WriteOp::Indirect {
+                    address, source, ..
+                } => vec![address, source],
+                WriteOp::OffsetIndirect {
+                    address, source, ..
+                } => vec![address, source],
+                WriteOp::IndexedIndirect {
+                    address,
+                    index,
+                    source,
+                    ..
+                } => vec![address, index, source],
+                WriteOp::StackOffset { source, .. } => vec![source],
+            },
+            Tfr(RegOp { source, .. }) => vec![source],
+            Push(PushOp::Registers(regs)) => regs.registers().collect(),
+
+            _ => vec![],
+        }
     }
 }
 

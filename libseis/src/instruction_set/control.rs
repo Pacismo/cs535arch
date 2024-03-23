@@ -3,8 +3,7 @@ use super::{
     Decode, Encode, Info,
 };
 use crate::{
-    instruction_set::decode,
-    types::{self, Register, SWord, Word},
+    instruction_set::decode, registers::RegisterFlags, types::{self, Register, SWord, Word}
 };
 use std::fmt::Display;
 
@@ -264,8 +263,8 @@ impl Encode for ControlOp {
 }
 
 impl Info for ControlOp {
-    fn get_write_reg(self) -> Option<Register> {
-        None
+    fn get_write_regs(self) -> RegisterFlags {
+        RegisterFlags::default()
     }
 
     fn get_read_regs(self) -> Vec<Register> {
