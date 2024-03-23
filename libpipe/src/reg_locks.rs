@@ -73,6 +73,10 @@ impl IndexMut<Register> for Locks {
 
 impl Locks {
     pub fn is_locked(&self, reg: Register) -> bool {
-        self[reg] != 0
+        !self.is_unlocked(reg)
+    }
+
+    pub fn is_unlocked(&self, reg: Register) -> bool {
+        self[reg] == 0
     }
 }
