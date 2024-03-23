@@ -2,7 +2,8 @@ use crate::{reg_locks::Locks, Clock, PipelineStage, Registers, Status};
 use libmem::module::MemoryModule;
 use libseis::{
     instruction_set::{decode, Info, Instruction},
-    types::{Register, Word},
+    registers::RegisterFlags,
+    types::Word,
 };
 use serde::Serialize;
 
@@ -38,9 +39,8 @@ impl State {
 #[derive(Debug, Clone, Serialize)]
 pub struct DecodeResult {
     pub instruction: Instruction,
-    pub reg: Word,
-    pub opt: Word,
-    pub out: Register,
+    pub regvals: Vec<Word>,
+    pub reglocks: RegisterFlags,
 }
 
 #[derive(Debug, Serialize, Default)]
@@ -74,31 +74,18 @@ impl PipelineStage for Decode {
                     if clock.is_ready() {
                         let instruction: Instruction = decode(word).unwrap_or_default();
 
-                        let write = instruction.get_write_reg();
+                        let write = instruction.get_write_regs();
                         let reads = instruction.get_read_regs();
 
-                        if reads.iter().all(|&reg| !reg_locks.is_locked(reg)) {
-                            if let Some(reg) = write {
+                        if reads.iter().all(|&reg| reg_locks.is_unlocked(reg)) {
+                            for reg in write {
                                 reg_locks[reg] += 1;
                             }
 
-                            let (reg, opt) = {
-                                let reads = reads.iter().map(|&r| registers[r]).collect::<Vec<_>>();
-
-                                if reads.len() == 0 {
-                                    (0, 0)
-                                } else if reads.len() == 1 {
-                                    (reads[0], 0)
-                                } else {
-                                    (reads[0], reads[1])
-                                }
-                            };
-
                             self.forward = Some(DecodeResult {
                                 instruction,
-                                reg,
-                                opt,
-                                out: write.unwrap_or_default(),
+                                regvals: reads.into_iter().map(|r| registers[r]).collect(),
+                                reglocks: write,
                             });
 
                             self.state = Idle;
@@ -151,7 +138,7 @@ impl PipelineStage for Decode {
 mod test {
     use super::*;
     use libmem::{cache::Associative, memory::Memory, module::SingleLevel};
-    use libseis::pages::PAGE_SIZE;
+    use libseis::{instruction_set::ControlOp, pages::PAGE_SIZE};
     use std::array::from_fn;
 
     fn basic_setup<'a>() -> (SingleLevel<'a>, Registers, Locks) {
@@ -197,6 +184,20 @@ mod test {
         assert!(matches!(
             decode.forward(Status::Flow(0x0000_0000)),
             Status::Stall(1)
+        ));
+
+        assert!(matches!(
+            decode.clock(Clock::Ready(1), &mut reg, &mut lock, &mut mem),
+            Clock::Ready(1)
+        ));
+
+        assert!(matches!(
+            decode.forward(Status::Flow(0x0000_0000)),
+            Status::Flow(DecodeResult {
+                instruction: Instruction::Control(ControlOp::Nop),
+                regvals,
+                reglocks: RegisterFlags(0)
+            }) if regvals.len() == 0
         ))
     }
 
