@@ -1,8 +1,8 @@
-use crate::{reg_locks::Locks, Clock, PipelineStage, Registers, Status};
+use crate::{reg_locks::Locks, regmap::RegMap, Clock, PipelineStage, Registers, Status};
 use libmem::module::MemoryModule;
 use libseis::{
     instruction_set::{decode, Info, Instruction},
-    registers::RegisterFlags,
+    registers::{RegisterFlags, PC},
     types::Word,
 };
 use serde::Serialize;
@@ -37,10 +37,13 @@ impl State {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct DecodeResult {
-    pub instruction: Instruction,
-    pub regvals: Vec<Word>,
-    pub reglocks: RegisterFlags,
+pub enum DecodeResult {
+    Forward {
+        instruction: Instruction,
+        regvals: RegMap,
+        reglocks: RegisterFlags,
+    },
+    Squashed,
 }
 
 #[derive(Debug, Serialize, Default)]
@@ -82,9 +85,19 @@ impl PipelineStage for Decode {
                                 reg_locks[reg] += 1;
                             }
 
-                            self.forward = Some(DecodeResult {
+                            self.forward = Some(DecodeResult::Forward {
                                 instruction,
-                                regvals: reads.into_iter().map(|r| registers[r]).collect(),
+                                regvals: reads
+                                    .into_iter()
+                                    .map(|r| {
+                                        // PC must equal location of where instruction was fetched -- always one word behind
+                                        if r == PC {
+                                            (PC, registers[r] - 4)
+                                        } else {
+                                            (r, registers[r])
+                                        }
+                                    })
+                                    .collect(),
                                 reglocks: write,
                             });
 
@@ -103,6 +116,15 @@ impl PipelineStage for Decode {
                     }
                 }
                 Idle => clock.to_ready(),
+                Squashed => {
+                    if clock.is_ready() {
+                        self.forward = Some(DecodeResult::Squashed);
+                        self.state = Idle;
+                        clock.to_ready()
+                    } else {
+                        clock
+                    }
+                }
                 _ => unreachable!(),
             }
         }
@@ -123,17 +145,12 @@ impl PipelineStage for Decode {
         match take(&mut self.forward) {
             Some(v) => Status::Flow(v),
             None if self.state.is_ready() => Status::Ready,
-            None if self.state.is_squashed() => {
-                self.state = Idle;
-                Status::Squashed
-            }
             None if input.is_dry() => Status::Dry,
             None => Status::Stall(clocks),
         }
     }
 }
 
-// TODO: write tests
 #[cfg(test)]
 mod test {
     use super::*;
@@ -164,14 +181,18 @@ mod test {
     }
 
     #[test]
-    fn clock_ready() {
+    fn clock_basic() {
         let (mut mem, mut reg, mut lock) = basic_setup();
         let mut decode = Decode::default();
+
+        // Clock it once
 
         assert!(matches!(
             decode.clock(Clock::Ready(1), &mut reg, &mut lock, &mut mem),
             Clock::Ready(1)
         ));
+
+        // No state change
 
         assert!(matches!(
             decode,
@@ -181,24 +202,50 @@ mod test {
             }
         ));
 
+        // Forward a NOP word
+
         assert!(matches!(
             decode.forward(Status::Flow(0x0000_0000)),
             Status::Stall(1)
         ));
+
+        // Check that it changed state
+
+        assert!(matches!(
+            decode,
+            Decode {
+                forward: None,
+                state: State::Decoding { word: 0x0000_0000 }
+            }
+        ));
+
+        // Clock it once
 
         assert!(matches!(
             decode.clock(Clock::Ready(1), &mut reg, &mut lock, &mut mem),
             Clock::Ready(1)
         ));
 
+        // Check that its state changed to idle and that it finished decoding
+
+        assert!(matches!(
+            decode,
+            Decode {
+                forward: Some(_),
+                state: State::Idle,
+            }
+        ));
+
+        // Forward the value and make sure it is what we expect
+
         assert!(matches!(
             decode.forward(Status::Flow(0x0000_0000)),
-            Status::Flow(DecodeResult {
-                instruction: Instruction::Control(ControlOp::Nop),
-                regvals,
-                reglocks: RegisterFlags(0)
+            Status::Flow(DecodeResult::Forward {
+                instruction: Instruction::Control(ControlOp::Nop), // Nop
+                regvals, // No register values
+                reglocks: RegisterFlags(0) // No register locks
             }) if regvals.len() == 0
-        ))
+        ));
     }
 
     #[test]
@@ -211,7 +258,7 @@ mod test {
         assert!(matches!(
             decode.clock(Clock::Block(1), &mut reg, &mut lock, &mut mem),
             Clock::Ready(1)
-        ))
+        ));
     }
 
     #[test]
@@ -224,6 +271,6 @@ mod test {
         assert!(matches!(
             decode.clock(Clock::Squash(1), &mut reg, &mut lock, &mut mem),
             Clock::Squash(1)
-        ))
+        ));
     }
 }
