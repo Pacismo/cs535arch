@@ -1,6 +1,6 @@
 WHITESPACE = _{ " " | "\t" }
 
-comment = _{ "//" ~ (!NEWLINE ~ ANY)* }
+comment = _{ ("//" | ";") ~ (!NEWLINE ~ ANY)* }
 
 program = _{ SOI ~ (line? ~ comment?) ~ (NEWLINE ~ line? ~ comment?)* ~ EOI }
 
