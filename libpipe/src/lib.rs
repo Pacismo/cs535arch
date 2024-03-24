@@ -8,6 +8,7 @@ mod reg_locks;
 mod registers;
 mod stages;
 mod unpiped;
+mod regmap;
 
 use libmem::module::MemoryModule;
 use libser::{CompactJson, PrettyJson, Serializable};
