@@ -3,7 +3,9 @@ use super::{
     Decode, Encode, Info,
 };
 use crate::{
-    instruction_set::decode, registers::RegisterFlags, types::{self, Register, SWord, Word}
+    instruction_set::decode,
+    registers::RegisterFlags,
+    types::{self, Register, SWord, Word},
 };
 use std::fmt::Display;
 
@@ -89,10 +91,14 @@ pub enum ControlOp {
     /// HALT ; Stop the processor
     /// ```
     Halt,
-    /// Sets the PC to the link register
+    /// Returns from a subroutine
+    ///
+    /// Will restore old BP value from the stack
+    /// and use LP to jump back to the caller's
+    /// next instruction
     ///
     /// ```seis
-    /// RET ; Return from subroutine (jump to LR)
+    /// RET ; Return from subroutine (jump to LP)
     /// ```
     Ret,
     /// Unconditional jump
@@ -105,6 +111,11 @@ pub enum ControlOp {
     Jmp(Jump),
     /// Jump to subroutine
     ///
+    /// Will store the old BP address and set BP to
+    /// the new base, SP will point ahead of new BP
+    ///
+    /// Will store the return address to the LP
+    ///
     /// ```seis
     /// JSR Vx     ; Jump to subroutine (absolute)
     /// JSR N      ; Jump to subroutine (relative)
@@ -114,7 +125,6 @@ pub enum ControlOp {
     /// Jump if equal (ZF = 1)
     ///
     /// ```seis
-    /// < MUST FOLLOW A CMP >
     /// JEQ Vx
     /// JEQ N
     /// JEQ .label ; Expands to N
@@ -123,7 +133,6 @@ pub enum ControlOp {
     /// Jump if not equal (ZF = 0)
     ///
     /// ```seis
-    /// < MUST FOLLOW A CMP >
     /// JNE Vx
     /// JNE N
     /// JNE .label ; Expands to N
@@ -132,7 +141,6 @@ pub enum ControlOp {
     /// Jump if greater than (ZF = 0 & OF = 1)
     ///
     /// ```seis
-    /// < MUST FOLLOW A CMP >
     /// JGT Vx
     /// JGT N
     /// JGT .label ; Expands to N
@@ -141,7 +149,6 @@ pub enum ControlOp {
     /// Jump if less than (ZF = 0 & OF = 0)
     ///
     /// ```seis
-    /// < MUST FOLLOW A CMP >
     /// JLT Vx
     /// JLT N
     /// JLT .label ; Expands to N
@@ -150,7 +157,6 @@ pub enum ControlOp {
     /// Jump if greater than or equal to (OF = 1 | ZF = 1)
     ///
     /// ```seis
-    /// < MUST FOLLOW A CMP >
     /// JGE Vx
     /// JGE N
     /// JGE .label ; Expands to N
@@ -159,7 +165,6 @@ pub enum ControlOp {
     /// Jump if less than or equal to (OF = 0 | ZF = 1)
     ///
     /// ```seis
-    /// < MUST FOLLOW A CMP >
     /// JLE Vx
     /// JLE N
     /// JLE .label ; Expands to N
@@ -264,22 +269,32 @@ impl Encode for ControlOp {
 
 impl Info for ControlOp {
     fn get_write_regs(self) -> RegisterFlags {
-        RegisterFlags::default()
+        use crate::registers::{BP, LP, PC, SP};
+        use ControlOp::*;
+
+        match self {
+            Ret => RegisterFlags::from(PC) | LP | SP | BP,
+            Jmp(_) | Jeq(_) | Jne(_) | Jgt(_) | Jlt(_) | Jge(_) | Jle(_) => RegisterFlags::from(PC),
+            Jsr(_) => RegisterFlags::from(PC) | LP | SP | BP,
+
+            _ => RegisterFlags::default(),
+        }
     }
 
     fn get_read_regs(self) -> Vec<Register> {
+        use crate::registers::{BP, LP, PC, SP};
         use ControlOp::*;
-        use Jump::Register;
+        use Jump::*;
 
         match self {
-            Jmp(Register(r)) => vec![r],
-            Jsr(Register(r)) => vec![r],
-            Jeq(Register(r)) => vec![r],
-            Jne(Register(r)) => vec![r],
-            Jgt(Register(r)) => vec![r],
-            Jlt(Register(r)) => vec![r],
-            Jge(Register(r)) => vec![r],
-            Jle(Register(r)) => vec![r],
+            Jmp(Register(r)) | Jeq(Register(r)) | Jne(Register(r)) | Jgt(Register(r))
+            | Jlt(Register(r)) | Jge(Register(r)) | Jle(Register(r)) => {
+                vec![r, PC]
+            }
+
+            Jsr(Register(r)) => vec![r, PC, LP, SP, BP],
+            Jsr(Relative(_)) => vec![PC, LP, SP, BP],
+            Ret => vec![LP, SP, BP],
 
             _ => vec![],
         }

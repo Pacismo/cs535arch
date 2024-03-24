@@ -1,5 +1,5 @@
 use super::{error::DecodeResult, Decode, Encode, Info};
-use crate::registers::RegisterFlags;
+use crate::registers::{RegisterFlags, SP};
 use crate::{
     instruction_set::{decode, error::DecodeError},
     registers,
@@ -399,7 +399,7 @@ pub enum ReadOp {
         index: Register,
         destination: Register,
     },
-    /// Data from the stack, offset (multiplied by the width of the read) from the stack pointer
+    /// Data from the stack, offset (multiplied by the width of the read) from the stack base
     StackOffset {
         offset: Short,
         destination: Register,
@@ -799,13 +799,15 @@ impl Info for RegisterOp {
                 ImmOp::Immediate { destination, .. } | ImmOp::ZeroPageTranslate { destination, .. },
             ) => RegisterFlags::from(destination),
 
-            Pop(PopOp::Registers(regs)) => regs,
+            Push(PushOp::Registers(regs)) | Pop(PopOp::Registers(regs)) => regs | SP,
+            Push(_) | Pop(_) => SP.into(),
 
             _ => RegisterFlags::default(),
         }
     }
 
     fn get_read_regs(self) -> Vec<Register> {
+        use crate::registers::BP;
         use RegisterOp::*;
 
         match self {
@@ -813,7 +815,7 @@ impl Info for RegisterOp {
                 ReadOp::Indirect { address, .. } => vec![address],
                 ReadOp::OffsetIndirect { address, .. } => vec![address],
                 ReadOp::IndexedIndirect { address, index, .. } => vec![address, index],
-
+                ReadOp::StackOffset { .. } => vec![BP],
                 _ => vec![],
             },
             Sbr(w) | Ssr(w) | Slr(w) => match w {
@@ -830,10 +832,11 @@ impl Info for RegisterOp {
                     source,
                     ..
                 } => vec![address, index, source],
-                WriteOp::StackOffset { source, .. } => vec![source],
+                WriteOp::StackOffset { source, .. } => vec![source, BP],
             },
             Tfr(RegOp { source, .. }) => vec![source],
-            Push(PushOp::Registers(regs)) => regs.registers().collect(),
+            Push(PushOp::Registers(regs)) | Pop(PopOp::Registers(regs)) => (regs | SP).to_vec(),
+            Push(_) | Pop(_) => vec![SP],
 
             _ => vec![],
         }
