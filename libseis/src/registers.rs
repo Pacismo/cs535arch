@@ -1,7 +1,10 @@
 use serde::Serialize;
 
 use crate::types::{Register, Word};
-use std::fmt::{Display, Write};
+use std::{
+    fmt::{Display, Write},
+    ops::{BitOr, BitOrAssign},
+};
 
 pub const V: [Register; 16] = [
     0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
@@ -43,6 +46,12 @@ pub fn get_id(name: &str) -> Option<Register> {
 
 #[derive(Debug, Clone)]
 pub struct RegFlagIterator(Word, Register);
+
+impl RegFlagIterator {
+    pub fn to_vec(self) -> Vec<Register> {
+        self.collect()
+    }
+}
 
 impl Iterator for RegFlagIterator {
     type Item = Register;
@@ -96,6 +105,10 @@ impl RegisterFlags {
 
     pub fn registers(self) -> RegFlagIterator {
         self.into_iter()
+    }
+
+    pub fn to_vec(self) -> Vec<Register> {
+        self.into_iter().collect()
     }
 }
 
@@ -156,5 +169,35 @@ impl Serialize for RegisterFlags {
         S: serde::Serializer,
     {
         serializer.collect_seq(self.registers())
+    }
+}
+
+impl BitOr<Register> for RegisterFlags {
+    type Output = RegisterFlags;
+
+    fn bitor(self, rhs: Register) -> Self::Output {
+        assert!(rhs < COUNT as u8);
+        Self(self.0 | (1 << rhs))
+    }
+}
+
+impl BitOr for RegisterFlags {
+    type Output = RegisterFlags;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        Self(self.0 | rhs.0)
+    }
+}
+
+impl BitOrAssign<Register> for RegisterFlags {
+    fn bitor_assign(&mut self, rhs: Register) {
+        assert!(rhs < COUNT as u8);
+        self.0 |= 1 << rhs;
+    }
+}
+
+impl BitOrAssign for RegisterFlags {
+    fn bitor_assign(&mut self, rhs: Self) {
+        self.0 |= rhs.0
     }
 }
