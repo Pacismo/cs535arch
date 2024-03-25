@@ -10,9 +10,12 @@
 
 mod single_level;
 
-use std::fmt::Debug;
+use std::{collections::HashMap, fmt::Debug};
 
-use crate::{cache::LineData, memory::Memory};
+use crate::{
+    cache::{Cache, LineData},
+    memory::Memory,
+};
 use libseis::types::{Byte, Short, Word};
 use serde::Serialize;
 pub use single_level::SingleLevel;
@@ -45,7 +48,7 @@ pub enum Status {
 
 pub type Result<T> = std::result::Result<T, Status>;
 
-/// Represents a memory module containing a chache and a DRAM memory.
+/// Represents a memory module containing a cache and a DRAM memory.
 pub trait MemoryModule: Debug {
     /// Clocks the module, decrementing any counters.
     fn clock(&mut self, amount: usize);
@@ -100,10 +103,19 @@ pub trait MemoryModule: Debug {
     /// Get a mutable reference to the memory structure
     fn memory_mut(&mut self) -> &mut Memory;
 
+    /// Gets a hashmap containing the caches in the memory module
+    fn caches<'a>(&'a self) -> HashMap<&'static str, &'a dyn Cache>;
+
+    /// Gets a hashmap containing mutable references to the caches in the memory module
+    fn caches_mut<'a>(&'a mut self) -> HashMap<&'static str, &'a mut dyn Cache>;
+
     /// Get the state of the cache structures
     ///
     /// Provides the names of the caches as well
-    fn cache_state(&self) -> Vec<CacheData>;
+    fn cache_state<'a>(&'a self) -> Vec<CacheData>;
+
+    /// Gets a reference to the data cache (L1)
+    fn data_cache<'a>(&'a self) -> &'a dyn Cache;
 
     /// Flush the contents of cache into memory
     fn flush_cache(&mut self) -> Status;

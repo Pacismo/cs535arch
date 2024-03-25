@@ -7,22 +7,13 @@ enum ReadRegister {
     Empty,
 }
 
-impl Serialize for ReadRegister {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_none()
-    }
-}
-
 /// This is a special cache type that only contains a single "read register".
 ///
 /// It only contains a single register with an address and a value.
 #[derive(Debug)]
 pub struct NullCache(ReadRegister);
 
-impl<'a> Cache<'a> for NullCache {
+impl Cache for NullCache {
     fn get_byte(&mut self, address: Word) -> ReadResult<Byte> {
         if let Populated(a, b) = self.0 {
             if a == address {
@@ -105,12 +96,7 @@ impl<'a> Cache<'a> for NullCache {
     }
 
     fn get_lines(&self) -> Vec<Option<LineData>> {
-        match &self.0 {
-            Populated(addr, val) => {
-                vec![Some((*addr, false, val.as_ref()).into())]
-            }
-            Empty => vec![None],
-        }
+        vec![]
     }
 
     fn byte_at(&self, _: Word) -> Option<Byte> {
@@ -126,19 +112,6 @@ impl<'a> Cache<'a> for NullCache {
     }
 }
 
-impl Serialize for NullCache {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        use serde::ser::SerializeSeq;
-
-        let mut seq = serializer.serialize_seq(Some(1))?;
-        seq.serialize_element(&self.0)?;
-        seq.end()
-    }
-}
-
 impl<'a> NullCache {
     #[inline(always)]
     pub fn new() -> Self {
@@ -146,7 +119,7 @@ impl<'a> NullCache {
     }
 
     #[inline(always)]
-    pub fn boxed(self) -> Box<dyn Cache<'a>> {
+    pub fn boxed(self) -> Box<dyn Cache> {
         Box::new(self)
     }
 }

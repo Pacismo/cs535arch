@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use super::{CacheData, MemoryModule, Result, Status};
 use crate::{
     cache::{self, Cache},
@@ -55,9 +57,12 @@ impl Transaction {
 
 /// Represents a memory module with a single level of cache.
 #[derive(Debug)]
-pub struct SingleLevel<'a> {
-    data_cache: Box<dyn Cache<'a>>,
-    instruction_cache: Box<dyn Cache<'a>>,
+pub struct SingleLevel<C>
+where
+    C: Cache,
+{
+    data_cache: Box<C>,
+    instruction_cache: Box<C>,
     memory: Memory,
 
     read_miss_penalty: usize,
@@ -76,7 +81,10 @@ pub struct SingleLevel<'a> {
     evictions: usize,
 }
 
-impl<'a> MemoryModule for SingleLevel<'a> {
+impl<C> MemoryModule for SingleLevel<C>
+where
+    C: Cache,
+{
     fn clock(&mut self, amount: usize) {
         self.clocks = self.clocks.saturating_sub(amount);
 
@@ -682,11 +690,37 @@ impl<'a> MemoryModule for SingleLevel<'a> {
         &mut self.memory
     }
 
-    fn cache_state(&self) -> Vec<CacheData> {
-        vec![
-            ("data cache", self.data_cache.get_lines()).into(),
-            ("instruction cache", self.instruction_cache.get_lines()).into(),
+    fn caches<'a>(&'a self) -> HashMap<&'static str, &'a dyn Cache> {
+        [
+            ("data", self.data_cache.as_ref() as &dyn Cache),
+            ("instruction", self.instruction_cache.as_ref() as &dyn Cache),
         ]
+        .into()
+    }
+
+    fn caches_mut<'a>(&'a mut self) -> HashMap<&'static str, &'a mut dyn Cache> {
+        [
+            ("data", self.data_cache.as_mut() as &mut dyn Cache),
+            (
+                "instruction",
+                self.instruction_cache.as_mut() as &mut dyn Cache,
+            ),
+        ]
+        .into()
+    }
+
+    fn cache_state<'a>(&'a self) -> Vec<CacheData> {
+        self.caches()
+            .into_iter()
+            .map(|(name, cache)| CacheData {
+                name: name.into(),
+                lines: cache.get_lines(),
+            })
+            .collect()
+    }
+
+    fn data_cache<'a>(&'a self) -> &'a dyn Cache {
+        self.data_cache.as_ref()
     }
 
     fn flush_cache(&mut self) -> Status {
@@ -706,7 +740,10 @@ impl<'a> MemoryModule for SingleLevel<'a> {
     }
 }
 
-impl<'a> SingleLevel<'a> {
+impl<C> SingleLevel<C>
+where
+    C: Cache,
+{
     /// Creates a new single-level cache memory system.
     ///
     /// # Arguments
@@ -720,35 +757,20 @@ impl<'a> SingleLevel<'a> {
     /// # Notes
     ///
     /// - A misaligned access has a clock penalty of 1 plus another miss penalty (multiple accesses)
-    pub fn new<T: Cache<'a> + 'static, U: Cache<'a> + 'static>(
-        data_cache: U,
-        instruction_cache: T,
+    pub fn new(
+        data_cache: C,
+        instruction_cache: C,
         memory: Memory,
         miss_penalty: usize,
         volatile_penalty: usize,
         writethrough: bool,
-    ) -> Self {
-        Self::new_with_boxed(
-            Box::new(data_cache),
-            Box::new(instruction_cache),
-            memory,
-            miss_penalty,
-            volatile_penalty,
-            writethrough,
-        )
-    }
-
-    pub fn new_with_boxed(
-        data_cache: Box<dyn Cache<'a>>,
-        instruction_cache: Box<dyn Cache<'a>>,
-        memory: Memory,
-        miss_penalty: usize,
-        volatile_penalty: usize,
-        writethrough: bool,
-    ) -> Self {
+    ) -> Self
+    where
+        C: Sized,
+    {
         Self {
-            data_cache,
-            instruction_cache,
+            data_cache: Box::new(data_cache),
+            instruction_cache: Box::new(instruction_cache),
             memory,
 
             read_miss_penalty: miss_penalty,

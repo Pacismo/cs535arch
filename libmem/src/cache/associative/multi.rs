@@ -1,10 +1,9 @@
-use super::{construct_address, line::{Line, LineSer}, split_address};
+use super::{construct_address, line::Line, split_address};
 use crate::{
     cache::{Cache, LineData, LineReadStatus, ReadResult, Status},
     memory::Memory,
 };
 use libseis::types::{Byte, Short, Word};
-use serde::Serialize;
 use std::mem::take;
 
 /// Represents an N-way set-associative cache.
@@ -16,7 +15,7 @@ pub struct MultiAssociative {
     sets: Box<[Option<Box<Line>>]>,
 }
 
-impl<'a> Cache<'a> for MultiAssociative {
+impl Cache for MultiAssociative {
     fn get_byte(&mut self, address: Word) -> ReadResult<Byte> {
         let (tag, set, off) = self.split_address(address);
         let set = self.set_mut(set);
@@ -662,20 +661,6 @@ impl<'a> Cache<'a> for MultiAssociative {
     }
 }
 
-impl Serialize for MultiAssociative {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.collect_seq(self.sets.iter().enumerate().map(|(i, line)| LineSer {
-            line,
-            set: (i / self.ways) as Word,
-            set_bits: self.set_bits,
-            off_bits: self.off_bits,
-        }))
-    }
-}
-
 impl MultiAssociative {
     /// Creates a new [`MultiAssociative`] with an offset bitfield width and a set bitfield width set at runtime.
     ///
@@ -756,7 +741,7 @@ impl MultiAssociative {
     /// Boxes the self to produce a dyn [`Cache`]
     #[inline(always)]
     #[track_caller]
-    pub fn boxed<'a>(self) -> Box<dyn Cache<'a>> {
+    pub fn boxed<'a>(self) -> Box<dyn Cache> {
         Box::new(self)
     }
 }

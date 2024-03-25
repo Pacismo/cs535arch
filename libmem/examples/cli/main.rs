@@ -564,11 +564,19 @@ fn process_input(
 fn main() -> Result<(), Box<dyn Error>> {
     let mut args = Args::parse();
 
-    let (dcache, icache) = match args.mode {
+    let mut module: Box<dyn MemoryModule> = match args.mode {
         cli::CacheMode::None => {
             args.writethrough = true;
             args.manual_clock = false;
-            (NullCache::new().boxed(), NullCache::new().boxed())
+
+            Box::new(SingleLevel::new(
+                NullCache::new(),
+                NullCache::new(),
+                Memory::new(args.pages),
+                args.miss_penalty,
+                args.volatile_penalty,
+                args.writethrough,
+            ))
         }
         cli::CacheMode::Associative {
             set_bits,
@@ -578,29 +586,27 @@ fn main() -> Result<(), Box<dyn Error>> {
             if set_bits + off_bits > 32 {
                 return Err("set_bits + off_bits must sum up to 32".into());
             } else if ways == 1 {
-                (
-                    Associative::new(off_bits, set_bits).boxed(),
-                    Associative::new(off_bits, set_bits).boxed(),
-                )
+                Box::new(SingleLevel::new(
+                    Associative::new(off_bits, set_bits),
+                    Associative::new(off_bits, set_bits),
+                    Memory::new(args.pages),
+                    args.miss_penalty,
+                    args.volatile_penalty,
+                    args.writethrough,
+                ))
             } else {
-                (
-                    MultiAssociative::new(off_bits, set_bits, ways).boxed(),
-                    MultiAssociative::new(off_bits, set_bits, ways).boxed(),
-                )
+                Box::new(SingleLevel::new(
+                    MultiAssociative::new(off_bits, set_bits, ways),
+                    MultiAssociative::new(off_bits, set_bits, ways),
+                    Memory::new(args.pages),
+                    args.miss_penalty,
+                    args.volatile_penalty,
+                    args.writethrough,
+                ))
             }
         }
     };
 
-    let memory = Memory::new(args.pages);
-
-    let mut module = SingleLevel::new_with_boxed(
-        dcache,
-        icache,
-        memory,
-        args.miss_penalty,
-        args.volatile_penalty,
-        args.writethrough,
-    );
     let mut total_clocks = 0;
 
     if let Some(file) = args.cmd_file {
@@ -617,7 +623,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             } else {
                 process_input(
                     Command::parse_from(line.split_whitespace()),
-                    &mut module,
+                    module.as_mut(),
                     &mut total_clocks,
                     false,
                 );
@@ -635,7 +641,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 match Command::try_parse_from(input.split_whitespace()) {
                     Ok(command) => match process_input(
                         command,
-                        &mut module,
+                        module.as_mut(),
                         &mut total_clocks,
                         args.manual_clock,
                     ) {

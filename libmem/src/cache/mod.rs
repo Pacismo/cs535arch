@@ -15,7 +15,6 @@ mod null;
 use crate::memory::Memory;
 pub use associative::*;
 use libseis::types::{Byte, Short, Word};
-use libser::{CompactJson, PrettyJson, Serializable};
 pub use null::NullCache;
 use serde::Serialize;
 use std::fmt::Debug;
@@ -43,7 +42,7 @@ impl<'a> From<(Word, bool, &'a [u8])> for LineData<'a> {
 ///
 /// This interface also requires the struct implement [`Debug`]
 /// to allow debug information to be printed to the screen.
-pub trait Cache<'a>: Debug + Serializable<CompactJson<'a>> + Serializable<PrettyJson<'a>> {
+pub trait Cache: Debug {
     /// Gets the byte at the specified address. This may potentially modify the contents of the cache.
     ///
     /// Returns a value only on cache hit.
@@ -171,12 +170,11 @@ impl Status {
 
 type ReadResult<T> = Result<T, Status>;
 
-impl<'a> Serialize for dyn Cache<'a> {
+impl Serialize for dyn Cache {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
-        dyn Cache<'a>: Serializable<S>,
     {
-        self.serialize_to(serializer)
+        serializer.collect_seq(self.get_lines())
     }
 }
