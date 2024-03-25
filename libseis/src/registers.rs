@@ -110,6 +110,10 @@ impl RegisterFlags {
     pub fn to_vec(self) -> Vec<Register> {
         self.into_iter().collect()
     }
+
+    pub fn count(&self) -> usize {
+        self.into_iter().count()
+    }
 }
 
 impl FromIterator<Register> for RegisterFlags {
