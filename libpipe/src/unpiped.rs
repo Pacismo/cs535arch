@@ -8,13 +8,13 @@ use serde::Serialize;
 
 /// Represents an unpipelined processor
 #[derive(Debug, Serialize)]
-pub struct Unpipelined<'a> {
+pub struct Unpipelined {
     memory: Memory,
     registers: Registers,
-    cache: Box<dyn Cache<'a>>,
+    cache: Box<dyn Cache>,
 }
 
-impl<'a> Pipeline<'a> for Unpipelined<'a> {
+impl<'a> Pipeline<'a> for Unpipelined {
     fn clock(&mut self) -> crate::ClockResult {
         todo!()
     }
