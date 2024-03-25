@@ -17,6 +17,10 @@ use serde::Serialize;
 /// to complete an instruction
 #[derive(Debug, Clone, Copy, Serialize)]
 pub enum ExecuteResult {
+    /// Nothing
+    Nop,
+    /// Stops execution
+    Halt,
     /// Jump to a subroutine
     ///
     /// Store old BP and LP values
@@ -30,6 +34,11 @@ pub enum ExecuteResult {
         /// The current value of the BP
         bp: Word,
     },
+    /// Jumps to a location
+    JumpTo {
+        /// Where to jump
+        location: Word,
+    },
     /// Return from a subroutine
     ///
     /// Restore old BP value
@@ -42,7 +51,26 @@ pub enum ExecuteResult {
         bp: Word,
     },
     /// Write a value back to the register
-    WriteReg { destination: Register, value: Word },
+    ///
+    /// Sets the flag registers
+    WriteReg {
+        destination: Register,
+        value: Word,
+
+        zf: bool,
+        of: bool,
+        eps: bool,
+        nan: bool,
+        inf: bool,
+    },
+    /// Write back a sequence of bits to the status registers
+    WriteStatus {
+        zf: bool,
+        of: bool,
+        eps: bool,
+        nan: bool,
+        inf: bool,
+    },
     /// Write a value from a register to a location in memory
     ///
     /// Only considers the least significant byte
@@ -95,11 +123,6 @@ pub enum ExecuteResult {
 enum State {
     #[default]
     Idle,
-    Preparing {
-        instruction: Instruction,
-        wregs: RegisterFlags,
-        rvals: RegMap,
-    },
     Waiting {
         instruction: Instruction,
         wregs: RegisterFlags,
@@ -163,39 +186,6 @@ impl PipelineStage for Execute {
     ) -> Clock {
         match self.state {
             Idle => clock.to_ready(),
-            Preparing {
-                instruction,
-                wregs,
-                rvals,
-            } => {
-                if clock.is_squash() {
-                    self.forward = None;
-                    self.state = Squashed { wregs };
-                    return clock;
-                }
-
-                let clocks = instruction.clock_requirement(mem, &rvals);
-
-                if clocks == 1 {
-                    let result = instruction.execute(rvals);
-
-                    if clock.is_ready() {
-                        self.forward = Some(result);
-                        self.state = Idle;
-                        clock
-                    } else {
-                        clock.to_block()
-                    }
-                } else {
-                    self.state = Waiting {
-                        instruction,
-                        wregs,
-                        rvals,
-                        clocks: clocks - 1,
-                    };
-                    clock.to_block()
-                }
-            }
             Waiting {
                 instruction,
                 wregs,
@@ -258,12 +248,14 @@ impl PipelineStage for Execute {
                 regvals,
                 reglocks,
             }) => {
-                self.state = State::Preparing {
+                let clocks = instruction.clock_requirement();
+                self.state = State::Waiting {
                     instruction,
                     wregs: reglocks,
                     rvals: regvals,
+                    clocks,
                 };
-                1
+                clocks
             }
             Status::Flow(DecodeResult::Squashed) => {
                 self.state = PrevSquash;
