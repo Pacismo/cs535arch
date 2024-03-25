@@ -185,8 +185,8 @@ float_cmpop = @{ vareg ~ WHITESPACE* ~ "," ~ WHITESPACE* ~ vareg }
 float_binop = @{ vareg ~ WHITESPACE* ~ "," ~ WHITESPACE* ~ vareg ~ WHITESPACE* ~ assign ~ WHITESPACE* ~ vareg }
 float_unop  = @{ vareg ~ WHITESPACE* ~ assign ~ WHITESPACE* ~ vareg }
 
-push = @{ ^"PUSH" ~ WHITESPACE+ ~ (regstack | uinteger) }
-pop  = @{ ^"POP" ~ WHITESPACE+ ~ (regstack | uinteger) }
+push = @{ ^"PUSH" ~ WHITESPACE+ ~ regstack }
+pop  = @{ ^"POP" ~ WHITESPACE+ ~ regstack }
 
 regstack = ${ "{" ~ WHITESPACE* ~ reg ~ WHITESPACE* ~ ("," ~ WHITESPACE* ~ reg)* ~ WHITESPACE* ~ "}" }
 

@@ -509,14 +509,12 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
             };
             (push $p:ident) => {
                 match $p {
-                    SO::Registers(v) => register::PushOp::Registers(v.into_iter().collect()),
-                    SO::ExtendOrShrink(a) => register::PushOp::Extend(a),
+                    SO::Registers(v) => v.into_iter().collect(),
                 }
             };
             (pop $p:ident) => {
                 match $p {
-                    SO::Registers(v) => register::PopOp::Registers(v.into_iter().collect()),
-                    SO::ExtendOrShrink(a) => register::PopOp::Shrink(a),
+                    SO::Registers(v) => v.into_iter().collect(),
                 }
             };
             (load $l:ident) => {

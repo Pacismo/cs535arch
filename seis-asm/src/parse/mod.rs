@@ -492,7 +492,6 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
 
                     Registers(regs)
                 }
-                Rule::oct | Rule::dec | Rule::hex => ExtendOrShrink(parse_integer!(mode)),
                 _ => unreachable!(),
             };
 

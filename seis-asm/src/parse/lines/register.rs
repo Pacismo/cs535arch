@@ -1,9 +1,9 @@
 use libseis::types::{Byte, Register, Short};
 
 #[derive(Debug)]
+#[repr(transparent)]
 pub enum StackOp {
     Registers(Vec<Register>),
-    ExtendOrShrink(Short),
 }
 
 #[derive(Debug)]
