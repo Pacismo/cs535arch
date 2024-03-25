@@ -707,8 +707,8 @@ pub enum RegisterOp {
     Ssr(WriteOp),
     Slr(WriteOp),
     Tfr(RegOp),
-    Push(PushOp),
-    Pop(PopOp),
+    Push(RegisterFlags),
+    Pop(RegisterFlags),
     Ldr(ImmOp),
 }
 
@@ -799,8 +799,7 @@ impl Info for RegisterOp {
                 ImmOp::Immediate { destination, .. } | ImmOp::ZeroPageTranslate { destination, .. },
             ) => [destination].into(),
 
-            Push(PushOp::Registers(regs)) | Pop(PopOp::Registers(regs)) => regs | SP,
-            Push(_) | Pop(_) => [SP].into(),
+            Push(regs) | Pop(regs) => regs | SP,
 
             _ => [].into(),
         }
@@ -835,8 +834,7 @@ impl Info for RegisterOp {
                 WriteOp::StackOffset { source, .. } => [source, BP].into(),
             },
             Tfr(RegOp { source, .. }) => [source].into(),
-            Push(PushOp::Registers(regs)) | Pop(PopOp::Registers(regs)) => regs | SP,
-            Push(_) | Pop(_) => [SP].into(),
+            Push(regs) | Pop(regs) => regs | SP,
 
             _ => [].into(),
         }
