@@ -92,7 +92,7 @@ impl PipelineStage for Decode {
                                     .map(|r| {
                                         // PC must equal location of where instruction was fetched -- always one word behind
                                         if r == PC {
-                                            (PC, registers[r] - 4)
+                                            (PC, registers[r].wrapping_sub(4))
                                         } else {
                                             (r, registers[r])
                                         }

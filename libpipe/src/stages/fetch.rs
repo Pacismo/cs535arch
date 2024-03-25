@@ -76,7 +76,7 @@ impl PipelineStage for Fetch {
             match memory.read_instruction(registers.pc) {
                 Ok(instruction) => {
                     self.state = Ready { instruction };
-                    registers.pc += 4;
+                    registers.pc = registers.pc.wrapping_add(4);
                 }
                 Err(Busy(clocks)) => {
                     self.state = Waiting { clocks };
