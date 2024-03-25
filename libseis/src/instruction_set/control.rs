@@ -282,13 +282,31 @@ impl Info for ControlOp {
     }
 
     fn get_read_regs(self) -> RegisterFlags {
-        use crate::registers::{BP, LP, PC, SP};
+        use crate::registers::{BP, LP, OF, PC, SP, ZF};
         use ControlOp::*;
         use Jump::*;
 
         match self {
-            Jmp(Register(r)) | Jeq(Register(r)) | Jne(Register(r)) | Jgt(Register(r))
-            | Jlt(Register(r)) | Jge(Register(r)) | Jle(Register(r)) => [r, PC].into(),
+            Jmp(Register(r)) => [r, PC].into(),
+            Jmp(Relative(_)) => [PC].into(),
+
+            Jeq(Register(r)) => [r, PC, ZF].into(),
+            Jeq(Relative(_)) => [PC, ZF].into(),
+
+            Jne(Register(r)) => [r, PC, ZF].into(),
+            Jne(Relative(_)) => [PC, ZF].into(),
+
+            Jgt(Register(r)) => [r, PC, ZF, OF].into(),
+            Jgt(Relative(_)) => [PC, ZF, OF].into(),
+
+            Jlt(Register(r)) => [r, PC, ZF, OF].into(),
+            Jlt(Relative(_)) => [PC, ZF, OF].into(),
+
+            Jge(Register(r)) => [r, PC, ZF, OF].into(),
+            Jge(Relative(_)) => [PC, ZF, OF].into(),
+
+            Jle(Register(r)) => [r, PC, ZF, OF].into(),
+            Jle(Relative(_)) => [PC, ZF, OF].into(),
 
             Jsr(Register(r)) => [r, PC, LP, SP, BP].into(),
             Jsr(Relative(_)) => [PC, LP, SP, BP].into(),
