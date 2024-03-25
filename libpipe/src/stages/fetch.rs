@@ -129,7 +129,7 @@ mod test {
     use libseis::{pages::PAGE_SIZE, types::Word};
     use std::array::from_fn;
 
-    fn basic_setup<'a>() -> (SingleLevel<'a>, Registers, Locks) {
+    fn basic_setup() -> (SingleLevel<Associative>, Registers, Locks) {
         // Create a memoryspace where every byte is the index modulo 256
         let mut memory = Memory::new(4);
         memory.set_page::<PAGE_SIZE>(0x0000_0000, from_fn(|i| (i & 0xFF) as u8));
