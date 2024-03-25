@@ -95,6 +95,11 @@ pub enum ExecuteResult {
 enum State {
     #[default]
     Idle,
+    Preparing {
+        instruction: Instruction,
+        wregs: RegisterFlags,
+        rvals: RegMap,
+    },
     Waiting {
         instruction: Instruction,
         wregs: RegisterFlags,
@@ -154,10 +159,43 @@ impl PipelineStage for Execute {
         clock: Clock,
         _: &mut Registers,
         _: &mut Locks,
-        _: &mut dyn MemoryModule,
+        mem: &mut dyn MemoryModule,
     ) -> Clock {
         match self.state {
             Idle => clock.to_ready(),
+            Preparing {
+                instruction,
+                wregs,
+                rvals,
+            } => {
+                if clock.is_squash() {
+                    self.forward = None;
+                    self.state = Squashed { wregs };
+                    return clock;
+                }
+
+                let clocks = instruction.clock_requirement(mem, &rvals);
+
+                if clocks == 1 {
+                    let result = instruction.execute(rvals);
+
+                    if clock.is_ready() {
+                        self.forward = Some(result);
+                        self.state = Idle;
+                        clock
+                    } else {
+                        clock.to_block()
+                    }
+                } else {
+                    self.state = Waiting {
+                        instruction,
+                        wregs,
+                        rvals,
+                        clocks: clocks - 1,
+                    };
+                    clock.to_block()
+                }
+            }
             Waiting {
                 instruction,
                 wregs,
@@ -220,16 +258,12 @@ impl PipelineStage for Execute {
                 regvals,
                 reglocks,
             }) => {
-                let clocks = instruction.clock_requirement();
-
-                self.state = State::Waiting {
+                self.state = State::Preparing {
                     instruction,
                     wregs: reglocks,
                     rvals: regvals,
-                    clocks,
                 };
-
-                clocks
+                1
             }
             Status::Flow(DecodeResult::Squashed) => {
                 self.state = PrevSquash;
