@@ -4,7 +4,6 @@ mod integer_ops;
 mod register_ops;
 
 use crate::regmap::RegMap;
-use libmem::module::MemoryModule;
 use libseis::instruction_set::Instruction;
 
 /// A trait which will resolve the instruction and then execute it
@@ -14,7 +13,7 @@ use libseis::instruction_set::Instruction;
 pub trait Resolver {
     fn execute(self, regvals: RegMap) -> super::ExecuteResult;
 
-    fn clock_requirement(self, mem: &dyn MemoryModule, regvals: &RegMap) -> usize;
+    fn clock_requirement(self) -> usize;
 }
 
 impl Resolver for Instruction {
@@ -29,12 +28,12 @@ impl Resolver for Instruction {
     }
 
     #[inline]
-    fn clock_requirement(self, mem: &dyn MemoryModule, regvals: &RegMap) -> usize {
+    fn clock_requirement(self) -> usize {
         match self {
-            Instruction::Control(c) => c.clock_requirement(mem, regvals),
-            Instruction::Integer(i) => i.clock_requirement(mem, regvals),
-            Instruction::FloatingPoint(f) => f.clock_requirement(mem, regvals),
-            Instruction::Register(r) => r.clock_requirement(mem, regvals),
+            Instruction::Control(c) => c.clock_requirement(),
+            Instruction::Integer(i) => i.clock_requirement(),
+            Instruction::FloatingPoint(f) => f.clock_requirement(),
+            Instruction::Register(r) => r.clock_requirement(),
         }
     }
 }
