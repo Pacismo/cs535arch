@@ -244,13 +244,13 @@ impl Info for FloatingPointOp {
             | Fneg(UnaryOp(_, r))
             | Frec(UnaryOp(_, r))
             | Itof(UnaryOp(_, r))
-            | Ftoi(UnaryOp(_, r)) => RegisterFlags::from(r),
+            | Ftoi(UnaryOp(_, r)) => [r].into(),
 
-            _ => RegisterFlags::default(),
+            _ => [].into(),
         }
     }
 
-    fn get_read_regs(self) -> Vec<Register> {
+    fn get_read_regs(self) -> RegisterFlags {
         use FloatingPointOp::*;
 
         match self {
@@ -259,10 +259,10 @@ impl Info for FloatingPointOp {
             | Fmul(BinaryOp(r0, r1, _))
             | Fdiv(BinaryOp(r0, r1, _))
             | Fmod(BinaryOp(r0, r1, _))
-            | Fcmp(CompOp(r0, r1)) => vec![r0, r1],
+            | Fcmp(CompOp(r0, r1)) => [r0, r1].into(),
 
             Fneg(UnaryOp(r, _)) | Frec(UnaryOp(r, _)) | Itof(UnaryOp(r, _))
-            | Ftoi(UnaryOp(r, _)) | Fchk(CheckOp(r)) => vec![r],
+            | Ftoi(UnaryOp(r, _)) | Fchk(CheckOp(r)) => [r].into(),
         }
     }
 }

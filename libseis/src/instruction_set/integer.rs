@@ -439,15 +439,13 @@ impl Info for IntegerOp {
             | Ror(BinaryOp::Registers(.., r) | BinaryOp::Immediate(.., r))
             | And(BinaryOp::Registers(.., r) | BinaryOp::Immediate(.., r))
             | Ior(BinaryOp::Registers(.., r) | BinaryOp::Immediate(.., r))
-            | Xor(BinaryOp::Registers(.., r) | BinaryOp::Immediate(.., r)) => {
-                RegisterFlags::from(r)
-            }
+            | Xor(BinaryOp::Registers(.., r) | BinaryOp::Immediate(.., r)) => [r].into(),
 
-            Cmp(_) | Tst(_) => RegisterFlags::default(),
+            Cmp(_) | Tst(_) => [].into(),
         }
     }
 
-    fn get_read_regs(self) -> Vec<Register> {
+    fn get_read_regs(self) -> RegisterFlags {
         use IntegerOp::*;
 
         match self {
@@ -466,7 +464,7 @@ impl Info for IntegerOp {
             | Rol(BinaryOp::Registers(r0, r1, _))
             | Ror(BinaryOp::Registers(r0, r1, _))
             | Cmp(CompOp::Registers(r0, r1))
-            | Tst(CompOp::Registers(r0, r1)) => vec![r0, r1],
+            | Tst(CompOp::Registers(r0, r1)) => [r0, r1].into(),
 
             Add(BinaryOp::Immediate(r, _, _))
             | Sub(BinaryOp::Immediate(r, _, _))
@@ -485,7 +483,7 @@ impl Info for IntegerOp {
             | Cmp(CompOp::Immediate(r, _))
             | Tst(CompOp::Immediate(r, _))
             | Not(UnaryOp(r, _))
-            | Sxt(SignExtendOp(_, r)) => vec![r],
+            | Sxt(SignExtendOp(_, r)) => [r].into(),
         }
     }
 }

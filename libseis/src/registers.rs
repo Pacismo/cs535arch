@@ -201,3 +201,9 @@ impl BitOrAssign for RegisterFlags {
         self.0 |= rhs.0
     }
 }
+
+impl<const COUNT: usize> From<[Register; COUNT]> for RegisterFlags {
+    fn from(regs: [Register; COUNT]) -> Self {
+        regs.into_iter().collect()
+    }
+}

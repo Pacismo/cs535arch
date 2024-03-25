@@ -797,48 +797,48 @@ impl Info for RegisterOp {
             | Tfr(RegOp { destination, .. })
             | Ldr(
                 ImmOp::Immediate { destination, .. } | ImmOp::ZeroPageTranslate { destination, .. },
-            ) => RegisterFlags::from(destination),
+            ) => [destination].into(),
 
             Push(PushOp::Registers(regs)) | Pop(PopOp::Registers(regs)) => regs | SP,
-            Push(_) | Pop(_) => SP.into(),
+            Push(_) | Pop(_) => [SP].into(),
 
-            _ => RegisterFlags::default(),
+            _ => [].into(),
         }
     }
 
-    fn get_read_regs(self) -> Vec<Register> {
+    fn get_read_regs(self) -> RegisterFlags {
         use crate::registers::BP;
         use RegisterOp::*;
 
         match self {
             Lbr(r) | Lsr(r) | Llr(r) => match r {
-                ReadOp::Indirect { address, .. } => vec![address],
-                ReadOp::OffsetIndirect { address, .. } => vec![address],
-                ReadOp::IndexedIndirect { address, index, .. } => vec![address, index],
-                ReadOp::StackOffset { .. } => vec![BP],
-                _ => vec![],
+                ReadOp::Indirect { address, .. } => [address].into(),
+                ReadOp::OffsetIndirect { address, .. } => [address].into(),
+                ReadOp::IndexedIndirect { address, index, .. } => [address, index].into(),
+                ReadOp::StackOffset { .. } => [BP].into(),
+                _ => [].into(),
             },
             Sbr(w) | Ssr(w) | Slr(w) => match w {
-                WriteOp::ZeroPage { source, .. } => vec![source],
+                WriteOp::ZeroPage { source, .. } => [source].into(),
                 WriteOp::Indirect {
                     address, source, ..
-                } => vec![address, source],
+                } => [address, source].into(),
                 WriteOp::OffsetIndirect {
                     address, source, ..
-                } => vec![address, source],
+                } => [address, source].into(),
                 WriteOp::IndexedIndirect {
                     address,
                     index,
                     source,
                     ..
-                } => vec![address, index, source],
-                WriteOp::StackOffset { source, .. } => vec![source, BP],
+                } => [address, index, source].into(),
+                WriteOp::StackOffset { source, .. } => [source, BP].into(),
             },
-            Tfr(RegOp { source, .. }) => vec![source],
-            Push(PushOp::Registers(regs)) | Pop(PopOp::Registers(regs)) => (regs | SP).to_vec(),
-            Push(_) | Pop(_) => vec![SP],
+            Tfr(RegOp { source, .. }) => [source].into(),
+            Push(PushOp::Registers(regs)) | Pop(PopOp::Registers(regs)) => regs | SP,
+            Push(_) | Pop(_) => [SP].into(),
 
-            _ => vec![],
+            _ => [].into(),
         }
     }
 }

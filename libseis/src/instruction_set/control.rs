@@ -273,30 +273,28 @@ impl Info for ControlOp {
         use ControlOp::*;
 
         match self {
-            Ret => RegisterFlags::from(PC) | SP | BP,
-            Jmp(_) | Jeq(_) | Jne(_) | Jgt(_) | Jlt(_) | Jge(_) | Jle(_) => RegisterFlags::from(PC),
-            Jsr(_) => RegisterFlags::from(PC) | LP | SP | BP,
+            Ret => [PC, SP, BP].into(),
+            Jmp(_) | Jeq(_) | Jne(_) | Jgt(_) | Jlt(_) | Jge(_) | Jle(_) => [PC].into(),
+            Jsr(_) => [PC, LP, SP, BP].into(),
 
-            _ => RegisterFlags::default(),
+            _ => [].into(),
         }
     }
 
-    fn get_read_regs(self) -> Vec<Register> {
+    fn get_read_regs(self) -> RegisterFlags {
         use crate::registers::{BP, LP, PC, SP};
         use ControlOp::*;
         use Jump::*;
 
         match self {
             Jmp(Register(r)) | Jeq(Register(r)) | Jne(Register(r)) | Jgt(Register(r))
-            | Jlt(Register(r)) | Jge(Register(r)) | Jle(Register(r)) => {
-                vec![r, PC]
-            }
+            | Jlt(Register(r)) | Jge(Register(r)) | Jle(Register(r)) => [r, PC].into(),
 
-            Jsr(Register(r)) => vec![r, PC, LP, SP, BP],
-            Jsr(Relative(_)) => vec![PC, LP, SP, BP],
-            Ret => vec![LP, SP, BP],
+            Jsr(Register(r)) => [r, PC, LP, SP, BP].into(),
+            Jsr(Relative(_)) => [PC, LP, SP, BP].into(),
+            Ret => [LP, SP, BP].into(),
 
-            _ => vec![],
+            _ => [].into(),
         }
     }
 }

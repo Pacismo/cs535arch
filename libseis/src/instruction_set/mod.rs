@@ -4,7 +4,7 @@ pub mod floating_point;
 pub mod integer;
 pub mod register;
 
-use crate::{registers::RegisterFlags, types::{Register, Word}};
+use crate::{registers::RegisterFlags, types::Word};
 pub use control::ControlOp;
 use error::{DecodeError, DecodeResult};
 pub use floating_point::FloatingPointOp;
@@ -29,7 +29,7 @@ pub trait Info: Sized {
     fn get_write_regs(self) -> RegisterFlags;
 
     /// Gets the registers being read from
-    fn get_read_regs(self) -> Vec<Register>;
+    fn get_read_regs(self) -> RegisterFlags;
 }
 
 /// Alias for [`Decode::decode`]
@@ -114,7 +114,7 @@ impl Info for Instruction {
         }
     }
 
-    fn get_read_regs(self) -> Vec<Register> {
+    fn get_read_regs(self) -> RegisterFlags {
         use Instruction::*;
 
         match self {

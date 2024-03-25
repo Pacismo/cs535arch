@@ -80,7 +80,7 @@ impl PipelineStage for Decode {
                         let write = instruction.get_write_regs();
                         let reads = instruction.get_read_regs();
 
-                        if reads.iter().all(|&reg| reg_locks.is_unlocked(reg)) {
+                        if reads.registers().all(|reg| reg_locks.is_unlocked(reg)) {
                             for reg in write {
                                 reg_locks[reg] += 1;
                             }
@@ -88,7 +88,7 @@ impl PipelineStage for Decode {
                             self.forward = Some(DecodeResult::Forward {
                                 instruction,
                                 regvals: reads
-                                    .into_iter()
+                                    .registers()
                                     .map(|r| {
                                         // PC must equal location of where instruction was fetched -- always one word behind
                                         if r == PC {
