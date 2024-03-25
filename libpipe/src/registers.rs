@@ -40,9 +40,14 @@ pub union Registers {
 
 impl Default for Registers {
     fn default() -> Self {
-        Self {
+        let mut values = Self {
             by_id: Indexed::default(),
-        }
+        };
+
+        values.sp = 0x00001;
+        values.bp = 0x00001;
+
+        values
     }
 }
 
