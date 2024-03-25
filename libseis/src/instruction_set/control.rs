@@ -273,7 +273,7 @@ impl Info for ControlOp {
         use ControlOp::*;
 
         match self {
-            Ret => RegisterFlags::from(PC) | LP | SP | BP,
+            Ret => RegisterFlags::from(PC) | SP | BP,
             Jmp(_) | Jeq(_) | Jne(_) | Jgt(_) | Jlt(_) | Jge(_) | Jle(_) => RegisterFlags::from(PC),
             Jsr(_) => RegisterFlags::from(PC) | LP | SP | BP,
 
