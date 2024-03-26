@@ -5,7 +5,7 @@ mod labels;
 use self::{constants::Constant, error::Error};
 use crate::{
     linker::labels::Label,
-    parse::{Instruction, Lines, Span},
+    parse::{Instruction, Lines, Span, StackOp},
 };
 use libseis::{
     instruction_set::Encode,
@@ -254,6 +254,29 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
                             }
                         }
                     }
+
+                    Instruction::Push(StackOp::Registers(regs)) => {
+                        for reg in regs {
+                            expanded.push_back((
+                                Instruction::Push(StackOp::Register(reg)),
+                                ip,
+                                span.clone(),
+                            ));
+                            ip += 4;
+                        }
+                    }
+
+                    Instruction::Pop(StackOp::Registers(regs)) => {
+                        for reg in regs {
+                            expanded.push_back((
+                                Instruction::Pop(StackOp::Register(reg)),
+                                ip,
+                                span.clone(),
+                            ));
+                            ip += 4;
+                        }
+                    }
+
                     x => {
                         expanded.push_back((x, ip, span));
                         ip += 4;
@@ -262,7 +285,6 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
             }
 
             T::Directive(value, span) => {
-                // TODO: put an assertion to ensure that the address does not go past the memory upper-bound.
                 use crate::parse::Directive::*;
                 match &value {
                     &Location(address) => {
@@ -509,12 +531,14 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
             };
             (push $p:ident) => {
                 match $p {
-                    SO::Registers(v) => v.into_iter().collect(),
+                    SO::Register(v) => v,
+                    _ => unreachable!(),
                 }
             };
             (pop $p:ident) => {
                 match $p {
-                    SO::Registers(v) => v.into_iter().collect(),
+                    SO::Register(v) => v,
+                    _ => unreachable!(),
                 }
             };
             (load $l:ident) => {

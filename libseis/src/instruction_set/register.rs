@@ -1,5 +1,5 @@
 use super::{error::DecodeResult, Decode, Encode, Info};
-use crate::registers::{RegisterFlags, SP};
+use crate::registers::{get_name, RegisterFlags, SP};
 use crate::{
     instruction_set::{decode, error::DecodeError},
     registers,
@@ -7,17 +7,17 @@ use crate::{
 };
 use std::fmt::Display;
 
-impl Decode for RegisterFlags {
+impl Decode for Register {
     fn decode(word: Word) -> DecodeResult<Self> {
-        const REG_MASK: Word = 0b0000_0000_0000_1111_1111_1111_1111_1111;
+        const REG_MASK: Word = 0b0000_0000_0000_0000_0000_0000_0001_1111;
 
-        Ok(Self(word & REG_MASK))
+        Ok((word & REG_MASK) as Register)
     }
 }
 
-impl Encode for RegisterFlags {
+impl Encode for Register {
     fn encode(self) -> Word {
-        self.0
+        self as Word
     }
 }
 
@@ -574,131 +574,6 @@ impl Display for ReadOp {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum PushOp {
-    Registers(RegisterFlags),
-    Extend(Short),
-}
-
-impl PushOp {
-    const EXTEND_MODE: Word = 0b0000_0001_0000_0000_0000_0000_0000_0000;
-    const EXTEND_MASK: Word = 0b0000_0000_0000_0000_1111_1111_1111_1111;
-
-    pub fn has_register(self, reg_id: Register) -> bool {
-        use PushOp::*;
-
-        match self {
-            Registers(reg) => reg.has_register(reg_id),
-            _ => false,
-        }
-    }
-
-    pub fn registers(self) -> Vec<Register> {
-        use PushOp::*;
-
-        match self {
-            Registers(reg) => reg.registers().collect(),
-            _ => vec![],
-        }
-    }
-}
-
-impl Decode for PushOp {
-    fn decode(word: Word) -> DecodeResult<Self> {
-        use PushOp::*;
-
-        if word & Self::EXTEND_MODE == 0 {
-            Ok(Registers(decode(word)?))
-        } else {
-            Ok(Extend((word & Self::EXTEND_MASK) as Short))
-        }
-    }
-}
-
-impl Encode for PushOp {
-    fn encode(self) -> Word {
-        use PushOp::*;
-
-        match self {
-            Registers(reg) => reg.encode(),
-            Extend(size) => Self::EXTEND_MASK | size as Word,
-        }
-    }
-}
-
-impl Display for PushOp {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use PushOp::*;
-
-        match self {
-            Registers(reg) => write!(f, "PUSH {reg}"),
-            Extend(ext) => write!(f, "PUSH {ext}"),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum PopOp {
-    Registers(RegisterFlags),
-    Shrink(Short),
-}
-
-impl PopOp {
-    const SHRINK_MODE: Word = 0b0000_0001_0000_0000_0000_0000_0000_0000;
-    const SHRINK_MASK: Word = 0b0000_0000_0000_0000_1111_1111_1111_1111;
-
-    pub fn has_register(self, reg_id: Register) -> bool {
-        use PopOp::*;
-
-        match self {
-            Registers(reg) => reg.has_register(reg_id),
-            _ => false,
-        }
-    }
-
-    pub fn registers(self) -> Vec<Register> {
-        use PopOp::*;
-
-        match self {
-            Registers(reg) => reg.registers().collect(),
-            _ => vec![],
-        }
-    }
-}
-
-impl Decode for PopOp {
-    fn decode(word: Word) -> DecodeResult<Self> {
-        use PopOp::*;
-        if word & Self::SHRINK_MODE == 0 {
-            Ok(Registers(decode(word)?))
-        } else {
-            Ok(Shrink((word & Self::SHRINK_MASK) as Short))
-        }
-    }
-}
-
-impl Encode for PopOp {
-    fn encode(self) -> Word {
-        use PopOp::*;
-
-        match self {
-            Registers(reg) => reg.encode(),
-            Shrink(size) => Self::SHRINK_MODE | size as Word,
-        }
-    }
-}
-
-impl Display for PopOp {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use PopOp::*;
-
-        match self {
-            Registers(reg) => write!(f, "POP {reg}"),
-            Shrink(size) => write!(f, "POP {size}"),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
 pub enum RegisterOp {
     Lbr(ReadOp),
     Lsr(ReadOp),
@@ -707,8 +582,8 @@ pub enum RegisterOp {
     Ssr(WriteOp),
     Slr(WriteOp),
     Tfr(RegOp),
-    Push(RegisterFlags),
-    Pop(RegisterFlags),
+    Push(Register),
+    Pop(Register),
     Ldr(ImmOp),
 }
 
@@ -799,7 +674,8 @@ impl Info for RegisterOp {
                 ImmOp::Immediate { destination, .. } | ImmOp::ZeroPageTranslate { destination, .. },
             ) => [destination].into(),
 
-            Push(regs) | Pop(regs) => regs | SP,
+            Pop(reg) => [reg, SP].into(),
+            Push(_) => [SP].into(),
 
             _ => [].into(),
         }
@@ -834,7 +710,8 @@ impl Info for RegisterOp {
                 WriteOp::StackOffset { source, .. } => [source, BP].into(),
             },
             Tfr(RegOp { source, .. }) => [source].into(),
-            Push(regs) | Pop(regs) => regs | SP,
+            Push(reg) => [reg, SP].into(),
+            Pop(_) => [SP].into(),
             Ldr(ImmOp::Immediate { destination, .. }) => [destination].into(),
 
             _ => [].into(),
@@ -854,8 +731,8 @@ impl Display for RegisterOp {
             Ssr(m) => write!(f, "SSR {m}"),
             Slr(m) => write!(f, "SLR {m}"),
             Tfr(r) => write!(f, "TFR {r}"),
-            Push(p) => write!(f, "PUSH {p}"),
-            Pop(p) => write!(f, "POP {p}"),
+            &Push(r) => write!(f, "PUSH {{{}}}", get_name(r).unwrap_or("unknown")),
+            &Pop(r) => write!(f, "POP {{{}}}", get_name(r).unwrap_or("unknown")),
             Ldr(i) => write!(f, "LDR {i}"),
         }
     }

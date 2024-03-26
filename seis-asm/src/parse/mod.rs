@@ -490,7 +490,11 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
                         regs.push(regid);
                     }
 
-                    Registers(regs)
+                    if regs.len() == 1 {
+                        Register(regs[0])
+                    } else {
+                        Registers(regs)
+                    }
                 }
                 _ => unreachable!(),
             };
