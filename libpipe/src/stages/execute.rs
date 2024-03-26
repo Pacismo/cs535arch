@@ -1,7 +1,5 @@
 mod resolver;
 
-use std::mem::take;
-
 use super::decode::DecodeResult;
 use crate::{reg_locks::Locks, regmap::RegMap, Clock, PipelineStage, Registers, Status};
 use libmem::module::MemoryModule;
@@ -12,10 +10,11 @@ use libseis::{
 };
 use resolver::Resolver;
 use serde::Serialize;
+use std::mem::take;
 
 /// Represents the steps that must be taken by the next stage of the pipeline
 /// to complete an instruction
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub enum ExecuteResult {
     /// Nothing
     Nop,
@@ -111,10 +110,10 @@ pub enum ExecuteResult {
         destination: Register,
         volatile: bool,
     },
-    /// Read a collection of registers from the stack
-    ReadRegStack { regs: RegisterFlags, sp: Word },
-    /// Write a collection of registers to the stack
-    WriteRegStack { regs: RegisterFlags, sp: Word },
+    /// Read a register from the stack
+    ReadRegStack { reg: Register, sp: Word },
+    /// Write a register to the stack
+    WriteRegStack { regval: Word, sp: Word },
     /// Squash all instructions in the pipeline
     Squash { regs: RegisterFlags },
 }
@@ -182,36 +181,42 @@ impl PipelineStage for Execute {
         clock: Clock,
         _: &mut Registers,
         _: &mut Locks,
-        mem: &mut dyn MemoryModule,
+        _: &mut dyn MemoryModule,
     ) -> Clock {
-        match self.state {
+        match take(&mut self.state) {
             Idle => clock.to_ready(),
             Waiting {
                 instruction,
                 wregs,
-                ref mut rvals,
-                ref mut clocks,
+                rvals,
+                mut clocks,
             } => {
                 if clock.is_squash() {
                     self.forward = None;
                     self.state = Squashed { wregs };
-                    return clock;
-                }
+                    clock
+                } else {
+                    clocks = clocks.saturating_sub(clock.clocks());
+                    if clocks == 0 {
+                        let result = instruction.execute(rvals);
 
-                *clocks = clocks.saturating_sub(clock.clocks());
-                if *clocks == 0 {
-                    let result = instruction.execute(take(rvals));
-
-                    if clock.is_ready() {
-                        self.forward = Some(result);
-                        self.state = Idle;
-                        clock.to_ready()
+                        if clock.is_ready() {
+                            self.forward = Some(result);
+                            self.state = Idle;
+                            clock.to_ready()
+                        } else {
+                            self.state = Ready { result, wregs };
+                            clock.to_block()
+                        }
                     } else {
-                        self.state = Ready { result, wregs };
+                        self.state = Waiting {
+                            instruction,
+                            wregs,
+                            rvals,
+                            clocks,
+                        };
                         clock.to_block()
                     }
-                } else {
-                    clock.to_block()
                 }
             }
             Ready { result, wregs } => {
@@ -224,6 +229,7 @@ impl PipelineStage for Execute {
                     self.state = Idle;
                     clock
                 } else {
+                    self.state = Ready { result, wregs };
                     clock.to_block()
                 }
             }
@@ -233,10 +239,21 @@ impl PipelineStage for Execute {
                     self.forward = Some(ExecuteResult::Squash { regs: wregs });
                     clock
                 } else {
+                    self.state = Squashed { wregs };
                     clock.to_block()
                 }
             }
-            PrevSquash => clock,
+            PrevSquash => {
+                if clock.is_ready() {
+                    self.state = Idle;
+                    self.forward = Some(ExecuteResult::Squash {
+                        regs: RegisterFlags::default(),
+                    });
+                } else {
+                    self.state = PrevSquash;
+                }
+                clock
+            }
         }
     }
 
@@ -262,18 +279,18 @@ impl PipelineStage for Execute {
                 1
             }
             Status::Ready => 1,
-            Status::Squashed => {
-                self.state = State::PrevSquash;
-                1
-            }
+            Status::Squashed => 1,
             Status::Dry => 0,
         };
 
-        match self.forward {
+        match take(&mut self.forward) {
             Some(xr) => Status::Flow(xr),
             None if self.state.is_ready() => Status::Ready,
+            None if self.state.is_squashed() => Status::Squashed,
             None if clk == 0 => Status::Dry,
             None => Status::Stall(clk.min(self.state.wait_time())),
         }
     }
 }
+
+// TODO: Write tests

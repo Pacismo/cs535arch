@@ -4,14 +4,8 @@ use std::ops::{Index, IndexMut};
 
 #[derive(Debug, Clone, Copy, Serialize)]
 pub struct RegMapPair {
-    register: Register,
-    value: Word,
-}
-
-impl RegMapPair {
-    pub fn new(register: Register, value: Word) -> Self {
-        Self { register, value }
-    }
+    pub register: Register,
+    pub value: Word,
 }
 
 /// Simple, low-budget map that uses a binary search to find a desired value.

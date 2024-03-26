@@ -19,8 +19,11 @@ enum State {
     #[default]
     Idle,
     Squashed,
+    PrevSquash,
 }
 use State::*;
+
+use super::fetch::FetchResult;
 
 impl State {
     fn is_ready(self) -> bool {
@@ -32,7 +35,7 @@ impl State {
     }
 
     fn is_squashed(self) -> bool {
-        matches!(self, Squashed)
+        matches!(self, Squashed | PrevSquash)
     }
 }
 
@@ -53,7 +56,7 @@ pub struct Decode {
 }
 
 impl PipelineStage for Decode {
-    type Prev = Word;
+    type Prev = FetchResult;
     type Next = DecodeResult;
 
     fn clock(
@@ -134,8 +137,12 @@ impl PipelineStage for Decode {
         use std::mem::take;
 
         let clocks = match input {
-            Status::Flow(word) => {
+            Status::Flow(FetchResult::Ready { word }) => {
                 self.state = Decoding { word };
+                1
+            }
+            Status::Flow(FetchResult::Squashed) => {
+                self.state = PrevSquash;
                 1
             }
             Status::Stall(clocks) => clocks,
@@ -145,6 +152,7 @@ impl PipelineStage for Decode {
         match take(&mut self.forward) {
             Some(v) => Status::Flow(v),
             None if self.state.is_ready() => Status::Ready,
+            None if self.state.is_squashed() => Status::Squashed,
             None if input.is_dry() => Status::Dry,
             None => Status::Stall(clocks),
         }
@@ -205,7 +213,7 @@ mod test {
         // Forward a NOP word
 
         assert!(matches!(
-            decode.forward(Status::Flow(0x0000_0000)),
+            decode.forward(Status::Flow(FetchResult::Ready { word: 0x0000_0000 })),
             Status::Stall(1)
         ));
 
@@ -239,7 +247,7 @@ mod test {
         // Forward the value and make sure it is what we expect
 
         assert!(matches!(
-            decode.forward(Status::Flow(0x0000_0000)),
+            decode.forward(Status::Flow(FetchResult::Ready { word: 0x0000_0000 })),
             Status::Flow(DecodeResult::Forward {
                 instruction: Instruction::Control(ControlOp::Nop), // Nop
                 regvals, // No register values

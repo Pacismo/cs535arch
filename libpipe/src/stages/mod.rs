@@ -59,42 +59,55 @@ where
 
 #[derive(Debug, Clone, Copy)]
 pub enum Clock {
+    /// The next stage is ready to receive
     Ready(usize),
+    /// The next stage is not ready to receive
     Block(usize),
+    /// The next stage ordered a squash 🍐
     Squash(usize),
 }
 
 impl Clock {
+    /// The number of clocks sent
     pub fn clocks(self) -> usize {
         match self {
             Self::Ready(x) | Self::Block(x) | Self::Squash(x) => x,
         }
     }
 
+    /// Whether the signal is a block
     pub fn is_block(self) -> bool {
         matches!(self, Self::Block(_))
     }
 
+    /// Whether the signal is a squash
     pub fn is_squash(self) -> bool {
         matches!(self, Self::Squash(_))
     }
 
+    /// Whether the next stage is ready
+    ///
+    /// True for [`Ready`](Clock::Ready) or [`Squash`](Clock::Squash) signals
     pub fn is_ready(self) -> bool {
-        matches!(self, Self::Ready(_))
+        matches!(self, Self::Ready(_) | Self::Squash(_))
     }
 
+    /// Transforms the clock to a block signal
     pub fn to_block(self) -> Self {
         Self::Block(self.clocks())
     }
 
+    /// Transforms the clock to a squash signal
     pub fn to_squash(self) -> Self {
         Self::Squash(self.clocks())
     }
 
+    /// Transforms the clock to a ready signal
     pub fn to_ready(self) -> Self {
         Self::Ready(self.clocks())
     }
 
+    /// Creates a clock signal
     pub fn begin<T: PipelineStage>(
         self,
         clocks: usize,
@@ -106,6 +119,7 @@ impl Clock {
         first.clock(Self::Ready(clocks), registers, reg_locks, memory)
     }
 
+    /// Forwards the previous stage's clock to the next stage
     pub fn then<T: PipelineStage>(
         self,
         next: &mut T,
