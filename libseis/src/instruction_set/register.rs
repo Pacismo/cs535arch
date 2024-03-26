@@ -835,6 +835,7 @@ impl Info for RegisterOp {
             },
             Tfr(RegOp { source, .. }) => [source].into(),
             Push(regs) | Pop(regs) => regs | SP,
+            Ldr(ImmOp::Immediate { destination, .. }) => [destination].into(),
 
             _ => [].into(),
         }
