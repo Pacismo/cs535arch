@@ -28,11 +28,11 @@ impl State {
         }
     }
 
-    fn waiting(&self) -> bool {
+    fn is_waiting(&self) -> bool {
         matches!(self, Waiting { .. })
     }
 
-    fn squashed(&self) -> bool {
+    fn is_squashed(&self) -> bool {
         matches!(self, Squashed { .. })
     }
 }
@@ -127,8 +127,8 @@ impl PipelineStage for Fetch {
                 self.forward = None;
                 Status::Flow(instruction)
             }
-            None if self.state.waiting() => Status::Stall(self.state.clocks()),
-            None if self.state.squashed() => Status::Squashed,
+            None if self.state.is_waiting() => Status::Stall(self.state.clocks()),
+            None if self.state.is_squashed() => Status::Squashed,
             None => Status::Ready,
         }
     }

@@ -118,6 +118,13 @@ pub enum ExecuteResult {
     Squash { regs: RegisterFlags },
 }
 
+impl ExecuteResult {
+    #[inline]
+    pub fn is_squash(&self) -> bool {
+        matches!(self, ExecuteResult::Squash { .. })
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Default)]
 enum State {
     #[default]
@@ -135,26 +142,17 @@ enum State {
     Squashed {
         wregs: RegisterFlags,
     },
-    PrevSquash,
 }
 
 use State::*;
 
 impl State {
-    fn is_idle(&self) -> bool {
-        matches!(self, Idle)
-    }
-
     fn is_waiting(&self) -> bool {
         matches!(self, Waiting { .. })
     }
 
-    fn is_ready(&self) -> bool {
-        matches!(self, Ready { .. })
-    }
-
     fn is_squashed(&self) -> bool {
-        matches!(self, Squashed { .. } | PrevSquash)
+        matches!(self, Squashed { .. })
     }
 
     fn wait_time(&self) -> usize {
@@ -199,14 +197,25 @@ impl PipelineStage for Execute {
                     clocks = clocks.saturating_sub(clock.clocks());
                     if clocks == 0 {
                         let result = instruction.execute(rvals);
+                        let squash = result.is_squash();
 
                         if clock.is_ready() {
                             self.forward = Some(result);
                             self.state = Idle;
-                            clock.to_ready()
+
+                            if squash {
+                                clock.to_squash()
+                            } else {
+                                clock.to_ready()
+                            }
                         } else {
                             self.state = Ready { result, wregs };
-                            clock.to_block()
+
+                            if squash {
+                                clock.to_squash()
+                            } else {
+                                clock.to_block()
+                            }
                         }
                     } else {
                         self.state = Waiting {
@@ -243,17 +252,6 @@ impl PipelineStage for Execute {
                     clock.to_block()
                 }
             }
-            PrevSquash => {
-                if clock.is_ready() {
-                    self.state = Idle;
-                    self.forward = Some(ExecuteResult::Squash {
-                        regs: RegisterFlags::default(),
-                    });
-                } else {
-                    self.state = PrevSquash;
-                }
-                clock
-            }
         }
     }
 
@@ -275,7 +273,9 @@ impl PipelineStage for Execute {
                 clocks
             }
             Status::Flow(DecodeResult::Squashed) => {
-                self.state = PrevSquash;
+                self.state = Squashed {
+                    wregs: Default::default(),
+                };
                 1
             }
             Status::Ready => 1,
@@ -285,10 +285,10 @@ impl PipelineStage for Execute {
 
         match take(&mut self.forward) {
             Some(xr) => Status::Flow(xr),
-            None if self.state.is_ready() => Status::Ready,
+            None if self.state.is_waiting() => Status::Stall(clk.min(self.state.wait_time())),
             None if self.state.is_squashed() => Status::Squashed,
             None if clk == 0 => Status::Dry,
-            None => Status::Stall(clk.min(self.state.wait_time())),
+            None => Status::Ready,
         }
     }
 }
