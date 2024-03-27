@@ -25,12 +25,12 @@ mod writeback;
 /// Presents interfaces for each stage to perform the necessary processing.
 pub trait PipelineStage
 where
-    Self: Debug + Serialize,
+    Self: Debug + Serialize + Default,
 {
     /// What the stage takes in when forwarding a clock.
-    type Prev: Debug;
+    type Prev: Debug + Serialize;
     /// What the stage outputs as a result of taking a clock.
-    type Next: Debug;
+    type Next: Debug + Serialize;
 
     /// Called when the clock sends a new clock.
     ///
