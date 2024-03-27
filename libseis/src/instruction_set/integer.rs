@@ -1,7 +1,7 @@
 use super::{error::DecodeResult, Decode, Encode, Info};
 use crate::{
     instruction_set::{decode, error::DecodeError},
-    registers::RegisterFlags,
+    registers::{RegisterFlags, EPS, INF, NAN, OF, ZF},
     types::{Register, Word},
 };
 use std::fmt::Display;
@@ -439,9 +439,11 @@ impl Info for IntegerOp {
             | Ror(BinaryOp::Registers(.., r) | BinaryOp::Immediate(.., r))
             | And(BinaryOp::Registers(.., r) | BinaryOp::Immediate(.., r))
             | Ior(BinaryOp::Registers(.., r) | BinaryOp::Immediate(.., r))
-            | Xor(BinaryOp::Registers(.., r) | BinaryOp::Immediate(.., r)) => [r].into(),
+            | Xor(BinaryOp::Registers(.., r) | BinaryOp::Immediate(.., r)) => {
+                [r, ZF, OF, EPS, NAN, INF].into()
+            }
 
-            Cmp(_) | Tst(_) => [].into(),
+            Cmp(_) | Tst(_) => [ZF, OF, EPS, NAN, INF].into(),
         }
     }
 

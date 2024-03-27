@@ -1,12 +1,10 @@
-use std::fmt::Display;
-
+use super::{Decode, Encode, Info};
 use crate::{
     instruction_set::{decode, error::DecodeError},
-    registers::RegisterFlags,
+    registers::{RegisterFlags, EPS, INF, NAN, OF, ZF},
     types::{Register, Word},
 };
-
-use super::{Decode, Encode, Info};
+use std::fmt::Display;
 
 #[derive(Debug, Clone, Copy)]
 pub struct BinaryOp(pub Register, pub Register, pub Register);
@@ -244,7 +242,7 @@ impl Info for FloatingPointOp {
             | Fneg(UnaryOp(_, r))
             | Frec(UnaryOp(_, r))
             | Itof(UnaryOp(_, r))
-            | Ftoi(UnaryOp(_, r)) => [r].into(),
+            | Ftoi(UnaryOp(_, r)) => [r, ZF, OF, EPS, NAN, INF].into(),
 
             _ => [].into(),
         }
