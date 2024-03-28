@@ -1,11 +1,12 @@
-use crate::{Clock, Locks, Registers, Status};
-
 use super::{memory::MemoryResult, PipelineStage};
+use crate::{Clock, Locks, Registers, Status};
 use libmem::module::MemoryModule;
 use serde::Serialize;
 
-#[derive(Debug, Serialize, Default)]
-pub struct Writeback {}
+#[derive(Debug, Clone, Serialize, Default)]
+pub struct Writeback {
+    job: Option<MemoryResult>,
+}
 
 pub type WritebackResult = ();
 
@@ -16,15 +17,15 @@ impl PipelineStage for Writeback {
 
     fn clock(
         &mut self,
-        clock: Clock,
-        registers: &mut Registers,
-        reg_locks: &mut Locks,
-        memory: &mut dyn MemoryModule,
+        _: Clock,
+        _: &mut Registers,
+        _: &mut Locks,
+        _: &mut dyn MemoryModule,
     ) -> Clock {
         todo!()
     }
 
-    fn forward(&mut self, input: Status<Self::Prev>) -> Status<Self::Next> {
+    fn forward(&mut self, _: Status<Self::Prev>) -> Status<Self::Next> {
         todo!()
     }
 }
