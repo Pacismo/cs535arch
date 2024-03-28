@@ -310,7 +310,7 @@ impl Info for ControlOp {
 
             Jsr(Register(r)) => [r, PC, LP, SP, BP].into(),
             Jsr(Relative(_)) => [PC, LP, SP, BP].into(),
-            Ret => [LP, SP, BP].into(),
+            Ret => [LP, BP].into(),
 
             _ => [].into(),
         }
