@@ -1,5 +1,5 @@
 use super::{error::DecodeResult, Decode, Encode, Info};
-use crate::registers::{get_name, RegisterFlags, SP};
+use crate::registers::{get_name, RegisterFlags, EPS, INF, NAN, OF, SP, ZF};
 use crate::{
     instruction_set::{decode, error::DecodeError},
     registers,
@@ -672,9 +672,9 @@ impl Info for RegisterOp {
             | Tfr(RegOp { destination, .. })
             | Ldr(
                 ImmOp::Immediate { destination, .. } | ImmOp::ZeroPageTranslate { destination, .. },
-            ) => [destination].into(),
+            ) => [destination, ZF, OF, EPS, NAN, INF].into(),
 
-            Pop(reg) => [reg, SP].into(),
+            Pop(reg) => [reg, SP, ZF, OF, EPS, NAN, INF].into(),
             Push(_) => [SP].into(),
 
             _ => [].into(),
