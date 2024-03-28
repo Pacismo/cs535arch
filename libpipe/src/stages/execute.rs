@@ -44,8 +44,6 @@ pub enum ExecuteResult {
     Return {
         /// Where to jump back to
         link: Word,
-        /// The current value of the SP
-        sp: Word,
         /// The current value of the BP (from which the old BP is restored)
         bp: Word,
     },
@@ -116,6 +114,8 @@ pub enum ExecuteResult {
     WriteRegStack { regval: Word, sp: Word },
     /// Squash all instructions in the pipeline
     Squash { regs: RegisterFlags },
+    /// Ignore a jump instruction
+    Ignore { regs: RegisterFlags },
 }
 
 impl ExecuteResult {
@@ -161,6 +161,10 @@ impl State {
         } else {
             1
         }
+    }
+
+    fn is_idle(&self) -> bool {
+        matches!(self, Idle)
     }
 }
 
@@ -256,7 +260,7 @@ impl PipelineStage for Execute {
     }
 
     fn forward(&mut self, input: Status<Self::Prev>) -> Status<Self::Next> {
-        let clk = match input {
+        let clocks = match input {
             Status::Stall(clocks) => clocks,
             Status::Flow(DecodeResult::Forward {
                 instruction,
@@ -285,9 +289,10 @@ impl PipelineStage for Execute {
 
         match take(&mut self.forward) {
             Some(xr) => Status::Flow(xr),
-            None if self.state.is_waiting() => Status::Stall(clk.min(self.state.wait_time())),
+            None if self.state.is_waiting() => Status::Stall(clocks.min(self.state.wait_time())),
             None if self.state.is_squashed() => Status::Squashed,
-            None if clk == 0 => Status::Dry,
+            None if self.state.is_idle() => Status::Stall(clocks),
+            None if clocks == 0 => Status::Dry,
             None => Status::Ready,
         }
     }

@@ -1,6 +1,5 @@
-use crate::{Clock, Locks, PipelineStage, Registers, Status};
-
 use super::execute::ExecuteResult;
+use crate::{Clock, Locks, PipelineStage, Registers, Status};
 use libmem::module::MemoryModule;
 use libseis::{
     registers::RegisterFlags,
@@ -74,6 +73,19 @@ enum State {
         sp: Word,
         clocks: usize,
     },
+    JsrPrep {
+        sp: Word,
+        bp: Word,
+        pc: Word,
+        lr: Word,
+        clocks: usize,
+    },
+    RetPrep {
+        bp: Word,
+        pc: Word,
+        lr: Word,
+        clocks: Word,
+    },
     Ready {
         result: MemoryResult,
     },
@@ -87,9 +99,7 @@ pub enum MemoryResult {
     /// Nothing
     Nop,
     /// Squashed instruction
-    Squashed {
-        wregs: RegisterFlags,
-    },
+    Squashed { wregs: RegisterFlags },
     /// Write data back to a register
     WriteReg1 {
         register: Register,
@@ -113,6 +123,22 @@ pub enum MemoryResult {
         nan: bool,
         inf: bool,
     },
+    /// Jump to a subroutine
+    ///
+    /// Write the current BP value to where the SP is, copy SP to BP,
+    /// and increment the SP by 4
+    JumpSubroutine {
+        address: Word,
+        link: Word,
+        sp: Word,
+        bp: Word,
+    },
+    /// Jump to a location in memory
+    Jump { address: Word },
+    /// Return from a subroutine
+    ///
+    /// Write the current BP value to the SP, read the BP back in
+    Return { address: Word, bp: Word, sp: Word },
 }
 
 #[derive(Debug, Serialize, Default)]

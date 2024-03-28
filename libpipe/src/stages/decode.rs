@@ -154,7 +154,8 @@ impl PipelineStage for Decode {
             None if self.state.is_ready() => Status::Ready,
             None if self.state.is_squashed() => Status::Squashed,
             None if input.is_dry() => Status::Dry,
-            None => Status::Stall(clocks),
+            None if self.state.is_idle() => Status::Stall(clocks),
+            None => Status::Stall(1),
         }
     }
 }
