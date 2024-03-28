@@ -16,7 +16,9 @@ enum State {
         operation: ExecuteResult,
         clocks: usize,
     },
-    Ready {},
+    Ready {
+        result: MemoryResult,
+    },
     Squashed {
         wregs: RegisterFlags,
     },
@@ -31,11 +33,23 @@ pub enum MemoryResult {
     WriteReg1 {
         register: Register,
         value: Word,
+
+        zf: bool,
+        of: bool,
+        eps: bool,
+        nan: bool,
+        inf: bool,
     },
     WriteReg2 {
         register: Register,
         value: Word,
         sp: Word,
+
+        zf: bool,
+        of: bool,
+        eps: bool,
+        nan: bool,
+        inf: bool,
     },
 }
 
