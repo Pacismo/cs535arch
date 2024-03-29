@@ -65,6 +65,8 @@ pub enum Clock {
     Block(usize),
     /// The next stage ordered a squash 🍐
     Squash(usize),
+    /// Stops execution
+    Halt,
 }
 
 impl Clock {
@@ -72,6 +74,7 @@ impl Clock {
     pub fn clocks(self) -> usize {
         match self {
             Self::Ready(x) | Self::Block(x) | Self::Squash(x) => x,
+            Self::Halt => 0,
         }
     }
 
@@ -128,6 +131,10 @@ impl Clock {
         memory: &mut dyn MemoryModule,
     ) -> Self {
         next.clock(self, registers, reg_locks, memory)
+    }
+
+    fn is_halt(&self) -> bool {
+        matches!(self, Clock::Halt)
     }
 }
 

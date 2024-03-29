@@ -6,15 +6,17 @@ use serde::Serialize;
 /// The state of the [`Fetch`] object
 #[derive(Debug, Clone, Copy, Serialize, Default)]
 enum State {
-    /// The next instruction word is available
-    Ready { instruction: Word },
-    /// The next instruction word is being fetched
-    Waiting { clocks: usize },
-    /// The stage has been squashed
-    Squashed { clocks: usize },
     /// The stage is waiting for the next job
     #[default]
     Idle,
+    /// The next instruction word is being fetched
+    Waiting { clocks: usize },
+    /// The next instruction word is available
+    Ready { instruction: Word },
+    /// The stage has been squashed
+    Squashed { clocks: usize },
+    /// The stage has been halted
+    Halted,
 }
 use State::*;
 
@@ -34,6 +36,14 @@ impl State {
 
     fn is_squashed(&self) -> bool {
         matches!(self, Squashed { .. })
+    }
+
+    fn is_halted(&self) -> bool {
+        matches!(self, Halted)
+    }
+
+    fn is_idle(&self) -> bool {
+        matches!(self, Idle)
     }
 }
 
@@ -70,7 +80,11 @@ impl PipelineStage for Fetch {
         _: &mut Locks,
         memory: &mut dyn libmem::module::MemoryModule,
     ) -> Clock {
-        if clock.is_squash() {
+        if clock.is_halt() {
+            self.state = Halted;
+            self.forward = None;
+            return Clock::Halt;
+        } else if clock.is_squash() {
             self.state = Squashed { clocks: 2 };
             self.forward = None;
             return clock;
@@ -92,7 +106,7 @@ impl PipelineStage for Fetch {
             return clock;
         }
 
-        if matches!(self.state, Idle) {
+        if self.state.is_idle() {
             match memory.read_instruction(registers.pc) {
                 Ok(instruction) => {
                     self.state = Ready { instruction };
@@ -113,6 +127,8 @@ impl PipelineStage for Fetch {
             }
             Ready { .. } => clock.to_block(),
             Waiting { .. } => clock.to_block(),
+            Halted => Clock::Halt,
+
             Squashed { .. } => {
                 unreachable!("The squashed state can never be the result of a clock")
             }
@@ -129,6 +145,7 @@ impl PipelineStage for Fetch {
             }
             None if self.state.is_waiting() => Status::Stall(self.state.clocks()),
             None if self.state.is_squashed() => Status::Squashed,
+            None if self.state.is_halted() => Status::Dry,
             None => Status::Ready,
         }
     }

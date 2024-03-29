@@ -20,6 +20,7 @@ enum State {
     Idle,
     Squashed,
     PrevSquash,
+    Halted,
 }
 use State::*;
 
@@ -36,6 +37,10 @@ impl State {
 
     fn is_squashed(self) -> bool {
         matches!(self, Squashed | PrevSquash)
+    }
+
+    fn is_halted(&self) -> bool {
+        matches!(self, Halted)
     }
 }
 
@@ -66,7 +71,11 @@ impl PipelineStage for Decode {
         reg_locks: &mut Locks,
         _: &mut dyn MemoryModule,
     ) -> crate::Clock {
-        if clock.is_squash() {
+        if clock.is_halt() {
+            self.state = Halted;
+            self.forward = None;
+            clock
+        } else if clock.is_squash() {
             self.forward = None;
             self.state = Squashed;
             clock
@@ -136,26 +145,29 @@ impl PipelineStage for Decode {
     fn forward(&mut self, input: Status<Self::Prev>) -> Status<Self::Next> {
         use std::mem::take;
 
-        let clocks = match input {
-            Status::Flow(FetchResult::Ready { word }) => {
-                self.state = Decoding { word };
-                1
-            }
-            Status::Flow(FetchResult::Squashed) => {
-                self.state = PrevSquash;
-                1
-            }
-            Status::Stall(clocks) => clocks,
-            _ => 1,
-        };
+        if self.state.is_halted() {
+            Status::Dry
+        } else {
+            let clocks = match input {
+                Status::Flow(FetchResult::Ready { word }) => {
+                    self.state = Decoding { word };
+                    1
+                }
+                Status::Flow(FetchResult::Squashed) => {
+                    self.state = PrevSquash;
+                    1
+                }
+                Status::Stall(clocks) => clocks,
+                _ => 1,
+            };
 
-        match take(&mut self.forward) {
-            Some(v) => Status::Flow(v),
-            None if self.state.is_ready() => Status::Ready,
-            None if self.state.is_squashed() => Status::Squashed,
-            None if input.is_dry() => Status::Dry,
-            None if self.state.is_idle() => Status::Stall(clocks),
-            None => Status::Stall(1),
+            match take(&mut self.forward) {
+                Some(v) => Status::Flow(v),
+                None if self.state.is_ready() => Status::Ready,
+                None if self.state.is_squashed() => Status::Squashed,
+                None if self.state.is_idle() => Status::Stall(clocks),
+                None => Status::Stall(1),
+            }
         }
     }
 }

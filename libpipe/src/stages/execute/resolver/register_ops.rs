@@ -204,12 +204,12 @@ impl Resolver for RegisterOp {
             },
 
             RegisterOp::Push(reg) => ExecuteResult::WriteRegStack {
-                regval: regvals[reg],
+                value: regvals[reg],
                 sp: regvals[SP],
             },
 
             RegisterOp::Pop(reg) => ExecuteResult::ReadRegStack {
-                reg,
+                register: reg,
                 sp: regvals[SP],
             },
         }

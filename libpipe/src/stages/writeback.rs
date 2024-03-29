@@ -26,14 +26,27 @@ impl PipelineStage for Writeback {
     ) -> Clock {
         if let Some(job) = take(&mut self.job) {
             match job {
-                MemoryResult::Nop => {}
-                MemoryResult::Squashed { wregs } => {
+                MemoryResult::Nop | MemoryResult::Halt => {}
+                MemoryResult::Squashed { wregs } | MemoryResult::Ignore { wregs } => {
                     for reg in wregs {
                         locks[reg] -= 1;
                     }
                 }
+                MemoryResult::WriteStatus {
+                    zf,
+                    of,
+                    eps,
+                    nan,
+                    inf,
+                } => {
+                    registers[ZF] = zf.then_some(1).unwrap_or(0);
+                    registers[OF] = of.then_some(1).unwrap_or(0);
+                    registers[EPS] = eps.then_some(1).unwrap_or(0);
+                    registers[NAN] = nan.then_some(1).unwrap_or(0);
+                    registers[INF] = inf.then_some(1).unwrap_or(0);
+                }
                 MemoryResult::WriteReg1 {
-                    register,
+                    destination: register,
                     value,
 
                     zf,

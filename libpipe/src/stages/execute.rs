@@ -25,7 +25,7 @@ pub enum ExecuteResult {
     /// Store old BP and LP values
     Subroutine {
         /// Where to jump
-        location: Word,
+        address: Word,
         /// Where to return to
         link: Word,
         /// The current value of the SP
@@ -36,7 +36,7 @@ pub enum ExecuteResult {
     /// Jumps to a location
     JumpTo {
         /// Where to jump
-        location: Word,
+        address: Word,
     },
     /// Return from a subroutine
     ///
@@ -109,9 +109,9 @@ pub enum ExecuteResult {
         volatile: bool,
     },
     /// Read a register from the stack
-    ReadRegStack { reg: Register, sp: Word },
+    ReadRegStack { register: Register, sp: Word },
     /// Write a register to the stack
-    WriteRegStack { regval: Word, sp: Word },
+    WriteRegStack { value: Word, sp: Word },
     /// Squash all instructions in the pipeline
     Squash { regs: RegisterFlags },
     /// Ignore a jump instruction
@@ -122,6 +122,11 @@ impl ExecuteResult {
     #[inline]
     pub fn is_squash(&self) -> bool {
         matches!(self, ExecuteResult::Squash { .. })
+    }
+
+    #[inline]
+    pub fn is_halt(&self) -> bool {
+        matches!(self, ExecuteResult::Halt)
     }
 }
 
@@ -142,6 +147,7 @@ enum State {
     Squashed {
         wregs: RegisterFlags,
     },
+    Halted,
 }
 
 use State::*;
@@ -165,6 +171,10 @@ impl State {
 
     fn is_idle(&self) -> bool {
         matches!(self, Idle)
+    }
+
+    fn is_halted(&self) -> bool {
+        matches!(self, Halted)
     }
 }
 
@@ -203,7 +213,11 @@ impl PipelineStage for Execute {
                         let result = instruction.execute(rvals);
                         let squash = result.is_squash();
 
-                        if clock.is_ready() {
+                        if result.is_halt() {
+                            self.forward = None;
+                            self.state = Halted;
+                            Clock::Halt
+                        } else if clock.is_ready() {
                             self.forward = Some(result);
                             self.state = Idle;
 
@@ -233,7 +247,11 @@ impl PipelineStage for Execute {
                 }
             }
             Ready { result, wregs } => {
-                if clock.is_squash() {
+                if result.is_halt() {
+                    self.forward = None;
+                    self.state = Halted;
+                    Clock::Halt
+                } else if clock.is_squash() {
                     self.forward = None;
                     self.state = Squashed { wregs };
                     clock
@@ -256,44 +274,50 @@ impl PipelineStage for Execute {
                     clock.to_block()
                 }
             }
+            Halted => Clock::Halt,
         }
     }
 
     fn forward(&mut self, input: Status<Self::Prev>) -> Status<Self::Next> {
-        let clocks = match input {
-            Status::Stall(clocks) => clocks,
-            Status::Flow(DecodeResult::Forward {
-                instruction,
-                regvals,
-                reglocks,
-            }) => {
-                let clocks = instruction.clock_requirement();
-                self.state = State::Waiting {
+        if self.state.is_halted() {
+            Status::Dry
+        } else {
+            let clocks = match input {
+                Status::Stall(clocks) => clocks,
+                Status::Flow(DecodeResult::Forward {
                     instruction,
-                    wregs: reglocks,
-                    rvals: regvals,
-                    clocks,
-                };
-                clocks
-            }
-            Status::Flow(DecodeResult::Squashed) => {
-                self.state = Squashed {
-                    wregs: Default::default(),
-                };
-                1
-            }
-            Status::Ready => 1,
-            Status::Squashed => 1,
-            Status::Dry => 0,
-        };
+                    regvals,
+                    reglocks,
+                }) => {
+                    let clocks = instruction.clock_requirement();
+                    self.state = State::Waiting {
+                        instruction,
+                        wregs: reglocks,
+                        rvals: regvals,
+                        clocks,
+                    };
+                    clocks
+                }
+                Status::Flow(DecodeResult::Squashed) => {
+                    self.state = Squashed {
+                        wregs: Default::default(),
+                    };
+                    1
+                }
+                Status::Ready => 1,
+                Status::Squashed => 1,
+                Status::Dry => unreachable!(),
+            };
 
-        match take(&mut self.forward) {
-            Some(xr) => Status::Flow(xr),
-            None if self.state.is_waiting() => Status::Stall(clocks.min(self.state.wait_time())),
-            None if self.state.is_squashed() => Status::Squashed,
-            None if self.state.is_idle() => Status::Stall(clocks),
-            None if clocks == 0 => Status::Dry,
-            None => Status::Ready,
+            match take(&mut self.forward) {
+                Some(xr) => Status::Flow(xr),
+                None if self.state.is_waiting() => {
+                    Status::Stall(clocks.min(self.state.wait_time()))
+                }
+                None if self.state.is_squashed() => Status::Squashed,
+                None if self.state.is_idle() => Status::Stall(clocks),
+                None => Status::Ready,
+            }
         }
     }
 }
