@@ -7,6 +7,16 @@ edition = "2021"
 
 [dependencies.clap]
 version = "4.5.2"
+features = ["derive"]
+
+[dependencies.serde]
+version = "1.0.197"
+
+[dependencies.serde_yaml]
+version = "0.9.34"
+
+[dependencies.serde_json]
+version = "1.0.115"
 
 [dependencies.libseis]
 path = "../libseis/"
