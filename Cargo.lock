@@ -298,7 +298,6 @@ dependencies = [
  "clap",
  "inquire",
  "libseis",
- "libser",
  "rand",
  "rand_chacha",
  "serde",
@@ -311,7 +310,6 @@ version = "0.1.0"
 dependencies = [
  "libmem",
  "libseis",
- "libser",
  "serde",
  "serde_json",
 ]
@@ -320,16 +318,7 @@ dependencies = [
 name = "libseis"
 version = "0.1.0"
 dependencies = [
- "libser",
  "serde",
-]
-
-[[package]]
-name = "libser"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
 ]
 
 [[package]]
