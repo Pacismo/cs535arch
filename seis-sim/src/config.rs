@@ -4,7 +4,7 @@ use libmem::{
     memory::Memory,
     module::{MemoryModule, SingleLevel},
 };
-use std::{collections::HashMap, error::Error};
+use std::{collections::HashMap, error::Error, path::PathBuf};
 
 #[derive(Debug, Clone, Copy)]
 pub enum CacheConfiguration {
@@ -183,5 +183,11 @@ impl SimulationConfiguration {
         table.insert("cache".to_string(), caches.into());
 
         table
+    }
+
+    pub fn from_toml_file(file: PathBuf) -> Result<Self, Box<dyn Error>> {
+        let fdata = std::fs::read_to_string(file)?;
+        let table = toml::from_str(&fdata)?;
+        Self::from_toml(table)
     }
 }

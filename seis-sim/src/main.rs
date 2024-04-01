@@ -2,12 +2,17 @@ mod cli;
 mod config;
 
 use clap::Parser;
-use cli::Cli;
+use cli::{Cli, SimulatorConfig};
 use config::{CacheConfiguration, SimulationConfiguration};
+use std::{error::Error, path::PathBuf};
 use toml::toml;
 
 /// However many pages of memory are supported by the simulator
 const PAGES: usize = 16;
+
+fn run_config(conf: PathBuf, bin: PathBuf) -> Result<(), Box<dyn Error>> {
+    Ok(())
+}
 
 fn main() {
     let cli = Cli::parse();
@@ -32,9 +37,11 @@ fn main() {
                 }
             );
         }
-    } else if let Some(config) = cli.config {
-        todo!()
-    } else {
-        unreachable!()
+    } else if let Some(SimulatorConfig {
+        configuration,
+        image_file,
+    }) = cli.config
+    {
+        run_config(configuration, image_file).expect("Simulator ran into an error");
     }
 }
