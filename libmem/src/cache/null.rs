@@ -117,9 +117,4 @@ impl<'a> NullCache {
     pub fn new() -> Self {
         Self(ReadRegister::Empty)
     }
-
-    #[inline(always)]
-    pub fn boxed(self) -> Box<dyn Cache> {
-        Box::new(self)
-    }
 }

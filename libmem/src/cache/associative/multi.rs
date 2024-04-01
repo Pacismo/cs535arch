@@ -675,8 +675,6 @@ impl MultiAssociative {
     /// The remaining bits are used for the tag field.
     pub fn new(off_bits: usize, set_bits: usize, ways: usize) -> Self {
         assert!(off_bits >= 2, "off_bits must be at least 2");
-        assert!(off_bits <= 32, "off_bits must be at most 32");
-        assert!(set_bits <= 30, "set_bits can be at most 30");
         assert!(
             off_bits + set_bits <= 32,
             "off_bits + set_bits cannot exceed 32"

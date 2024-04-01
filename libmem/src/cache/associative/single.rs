@@ -421,8 +421,6 @@ impl Associative {
     /// The remaining bits are used for the tag field.
     pub fn new(off_bits: usize, set_bits: usize) -> Self {
         assert!(off_bits >= 2, "off_bits must be at least 2");
-        assert!(off_bits <= 32, "off_bits must be at most 32");
-        assert!(set_bits <= 30, "set_bits can be at most 30");
         assert!(
             off_bits + set_bits <= 32,
             "off_bits + set_bits cannot exceed 32"
@@ -462,12 +460,5 @@ impl Associative {
     /// Constructs an address from its constituent *tag*, *set*, and *offset* indices.
     fn construct_address(&self, tag: Word, set: Word, off: Word) -> Word {
         construct_address(tag, set, off, self.set_bits, self.off_bits)
-    }
-
-    /// Boxes the self to produce a dyn [`Cache`]
-    #[inline(always)]
-    #[track_caller]
-    pub fn boxed<'a>(self) -> Box<dyn Cache> {
-        Box::new(self)
     }
 }
