@@ -4,18 +4,28 @@
 //! The expectation is that the processor will implement the
 //! fetch, decode, execute, memory, and writeback stages.
 
+mod piped;
 mod reg_locks;
 mod registers;
+mod regmap;
 mod stages;
 mod unpiped;
-mod regmap;
 
 use libmem::module::MemoryModule;
-use libser::{CompactJson, PrettyJson, Serializable};
 pub use reg_locks::Locks;
 pub use registers::Registers;
 pub use stages::*;
 use std::fmt::Debug;
+pub use unpiped::Unpipelined;
+pub use piped::Pipelined;
+
+pub struct PipelineStages<'a> {
+    pub fetch: &'a Fetch,
+    pub decode: &'a Decode,
+    pub execute: &'a Execute,
+    pub memory: &'a Memory,
+    pub writeback: &'a Writeback,
+}
 
 /// The result of clocking the pipeline.
 pub enum ClockResult {
@@ -35,30 +45,16 @@ pub enum ClockResult {
 
 /// Represents a processor pipeline. Clocking the processor will yield
 /// a [`ClockResult`].
-///
-/// Implementation requires the [`Serializable`] trait to be implemented for
-/// both *pretty* and *compact* JSON. This may be trivially acheived by deriving
-/// the [`serde::Serialize`] trait and calling the [`serialize`](serde::Serialize::serialize)
-/// function
-pub trait Pipeline<'a>:
-    Debug + Serializable<CompactJson<'a>> + Serializable<PrettyJson<'a>>
-{
+pub trait Pipeline: Debug {
     /// Applies a clock on the pipeline
-    fn clock(&mut self) -> ClockResult;
+    fn clock(&mut self, amount: usize) -> ClockResult;
 
     /// Gets the memory module in the pipeline
     fn memory_module(&self) -> &dyn MemoryModule;
 
     /// Gets the registers in the pipeline
     fn registers(&self) -> &Registers;
-}
 
-impl<'a> serde::Serialize for dyn Pipeline<'a> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-        Self: Serializable<S>,
-    {
-        self.serialize_to(serializer)
-    }
+    /// Gets references to the pipeline stages
+    fn stages(&self) -> PipelineStages;
 }

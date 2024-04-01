@@ -6,11 +6,16 @@
 //! This ensures that the stages may be consistently serialized for
 //! display to the user in the frontend.
 
-use crate::{reg_locks::Locks, Registers};
-pub use fetch::Fetch;
+use crate::{reg_locks::Locks, ClockResult, Registers};
 use libmem::module::MemoryModule;
 use serde::Serialize;
 use std::fmt::Debug;
+
+pub use decode::*;
+pub use execute::*;
+pub use fetch::*;
+pub use memory::*;
+pub use writeback::*;
 
 mod decode;
 mod execute;
@@ -114,7 +119,6 @@ impl Clock {
 
     /// Creates a clock signal
     pub fn begin<T: PipelineStage>(
-        self,
         clocks: usize,
         first: &mut T,
         registers: &mut Registers,
@@ -133,6 +137,16 @@ impl Clock {
         memory: &mut dyn MemoryModule,
     ) -> Self {
         next.clock(self, registers, reg_locks, memory)
+    }
+
+    pub fn finally<T: PipelineStage>(
+        self,
+        next: &mut T,
+        registers: &mut Registers,
+        reg_locks: &mut Locks,
+        memory: &mut dyn MemoryModule,
+    ) {
+        next.clock(self, registers, reg_locks, memory);
     }
 
     fn is_halt(&self) -> bool {
@@ -161,6 +175,13 @@ pub enum Status<T: Debug = ()> {
     Dry,
 }
 
+impl Status<()> {
+    /// Starts the process of forwarding results from the previous clock
+    pub fn begin<P: PipelineStage<Prev = ()>>(stage: &mut P) -> Status<P::Next> {
+        stage.forward(Status::default())
+    }
+}
+
 impl<T: Debug> Status<T> {
     pub fn is_stall(&self) -> bool {
         matches!(self, Self::Stall(..))
@@ -182,22 +203,17 @@ impl<T: Debug> Status<T> {
         matches!(self, Self::Dry)
     }
 
-    /// Starts the process of forwarding results from the previous clock
-    pub fn begin<P: PipelineStage<Prev = ()>>(stage: &mut P) -> Status<P::Next> {
-        stage.forward(Status::default())
-    }
-
     /// Forwards any information about the state, if available
     pub fn then<P: PipelineStage<Prev = T>>(self, stage: &mut P) -> Status<P::Next> {
         stage.forward(self)
     }
 
     /// Ends the stage-forwarding, possibly returning the number of clocks needed to clear any blockages
-    pub fn end<P: PipelineStage<Next = (), Prev = T>>(self, stage: &mut P) -> Option<usize> {
+    pub fn finally<P: PipelineStage<Next = (), Prev = T>>(self, stage: &mut P) -> ClockResult {
         match stage.forward(self) {
-            Status::Stall(n) => Some(n),
-            Status::Dry => None,
-            _ => Some(1),
+            Status::Stall(n) => ClockResult::Stall(n),
+            Status::Dry => ClockResult::Dry,
+            _ => ClockResult::Flow,
         }
     }
 }

@@ -2,28 +2,163 @@
 //!
 //! The [`Pipeline`] trait simply enables consistent interfacing.
 
+use crate::{
+    stages::{self, Clock, PipelineStage, Status},
+    ClockResult, Locks, PipelineStages,
+};
 use crate::{Pipeline, Registers};
-use libmem::{cache::Cache, memory::Memory};
-use serde::Serialize;
+use libmem::module::MemoryModule;
+use std::mem::take;
+
+#[derive(Debug, Default, Clone)]
+enum Stage {
+    #[default]
+    Fetch,
+    Decode,
+    Execute,
+    Memory,
+    Writeback,
+}
+use Stage::*;
 
 /// Represents an unpipelined processor
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub struct Unpipelined {
-    memory: Memory,
+    memory_module: Box<dyn MemoryModule>,
     registers: Registers,
-    cache: Box<dyn Cache>,
+    locks: Locks,
+
+    stage: Stage,
+
+    fetch: stages::Fetch,
+    decode: stages::Decode,
+    execute: stages::Execute,
+    memory: stages::Memory,
+    writeback: stages::Writeback,
 }
 
-impl<'a> Pipeline<'a> for Unpipelined {
-    fn clock(&mut self) -> crate::ClockResult {
-        todo!()
+impl Pipeline for Unpipelined {
+    fn clock(&mut self, clocks: usize) -> ClockResult {
+        self.memory_module.clock(clocks);
+
+        match take(&mut self.stage) {
+            Stage::Fetch => {
+                self.fetch.clock(
+                    Clock::Ready(clocks),
+                    &mut self.registers,
+                    &mut self.locks,
+                    self.memory_module.as_mut(),
+                );
+
+                match self.fetch.forward(Status::Ready) {
+                    Status::Stall(k) => ClockResult::Stall(k),
+                    Status::Flow(r) => {
+                        self.stage = Decode;
+                        self.decode.forward(Status::Flow(r));
+                        ClockResult::Flow
+                    }
+                    Status::Ready => ClockResult::Stall(1),
+                    Status::Squashed => ClockResult::Stall(1),
+                    Status::Dry => ClockResult::Dry,
+                }
+            }
+            Stage::Decode => {
+                self.decode.clock(
+                    Clock::Ready(clocks),
+                    &mut self.registers,
+                    &mut self.locks,
+                    self.memory_module.as_mut(),
+                );
+
+                match self.decode.forward(Status::Ready) {
+                    Status::Stall(k) => ClockResult::Stall(k),
+                    Status::Flow(r) => {
+                        self.stage = Execute;
+                        self.execute.forward(Status::Flow(r));
+                        ClockResult::Flow
+                    }
+                    Status::Ready => ClockResult::Stall(1),
+                    Status::Squashed => ClockResult::Stall(1),
+                    Status::Dry => ClockResult::Dry,
+                }
+            }
+            Stage::Execute => {
+                self.execute.clock(
+                    Clock::Ready(clocks),
+                    &mut self.registers,
+                    &mut self.locks,
+                    self.memory_module.as_mut(),
+                );
+
+                match self.execute.forward(Status::Ready) {
+                    Status::Stall(k) => ClockResult::Stall(k),
+                    Status::Flow(r) => {
+                        self.stage = Memory;
+                        self.memory.forward(Status::Flow(r));
+                        ClockResult::Flow
+                    }
+                    Status::Ready => ClockResult::Stall(1),
+                    Status::Squashed => ClockResult::Stall(1),
+                    Status::Dry => ClockResult::Dry,
+                }
+            }
+            Stage::Memory => {
+                self.memory.clock(
+                    Clock::Ready(clocks),
+                    &mut self.registers,
+                    &mut self.locks,
+                    self.memory_module.as_mut(),
+                );
+
+                match self.memory.forward(Status::Ready) {
+                    Status::Stall(k) => ClockResult::Stall(k),
+                    Status::Flow(r) => {
+                        self.stage = Writeback;
+                        self.writeback.forward(Status::Flow(r));
+                        ClockResult::Flow
+                    }
+                    Status::Ready => ClockResult::Stall(1),
+                    Status::Squashed => ClockResult::Stall(1),
+                    Status::Dry => ClockResult::Dry,
+                }
+            }
+            Stage::Writeback => {
+                self.writeback.clock(
+                    Clock::Ready(clocks),
+                    &mut self.registers,
+                    &mut self.locks,
+                    self.memory_module.as_mut(),
+                );
+
+                match self.writeback.forward(Status::Ready) {
+                    Status::Stall(k) => ClockResult::Stall(k),
+                    Status::Flow(()) => {
+                        self.stage = Fetch;
+                        ClockResult::Flow
+                    }
+                    Status::Ready => ClockResult::Stall(1),
+                    Status::Squashed => ClockResult::Stall(1),
+                    Status::Dry => ClockResult::Dry,
+                }
+            }
+        }
     }
 
-    fn memory_module(&self) -> &dyn libmem::module::MemoryModule {
-        todo!()
+    fn memory_module(&self) -> &dyn MemoryModule {
+        self.memory_module.as_ref()
     }
 
     fn registers(&self) -> &crate::Registers {
-        todo!()
+        &self.registers
+    }
+
+    fn stages(&self) -> PipelineStages {
+        PipelineStages {
+            fetch: &self.fetch,
+            decode: &self.decode,
+            execute: &self.execute,
+            memory: &self.memory,
+            writeback: &self.writeback,
+        }
     }
 }
