@@ -120,8 +120,9 @@ impl FromIterator<Register> for RegisterFlags {
     fn from_iter<T: IntoIterator<Item = Register>>(iter: T) -> Self {
         let mut flags = 0;
         for reg in iter {
-            assert!(reg <= LP);
-            flags |= 1 << reg as Word;
+            if reg < COUNT as Register {
+                flags |= 1 << reg as Word;
+            }
         }
         Self(flags)
     }
