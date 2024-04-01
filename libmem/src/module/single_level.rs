@@ -1,4 +1,4 @@
-use super::{CacheData, MemoryModule, Result, Status};
+use super::{MemoryModule, Result, Status};
 use crate::{
     cache::{self, Cache},
     memory::Memory,
@@ -700,16 +700,6 @@ impl MemoryModule for SingleLevel {
             ),
         ]
         .into()
-    }
-
-    fn cache_state<'a>(&'a self) -> Vec<CacheData> {
-        self.caches()
-            .into_iter()
-            .map(|(name, cache)| CacheData {
-                name: name.into(),
-                lines: cache.get_lines(),
-            })
-            .collect()
     }
 
     fn data_cache<'a>(&'a self) -> &'a dyn Cache {

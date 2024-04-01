@@ -10,8 +10,6 @@
 
 mod single_level;
 
-use std::{collections::HashMap, fmt::Debug};
-
 use crate::{
     cache::{Cache, LineData},
     memory::Memory,
@@ -19,6 +17,7 @@ use crate::{
 use libseis::types::{Byte, Short, Word};
 use serde::Serialize;
 pub use single_level::SingleLevel;
+use std::{collections::HashMap, fmt::Debug};
 
 #[derive(Debug, Serialize)]
 pub struct CacheData<'a> {
@@ -112,7 +111,15 @@ pub trait MemoryModule: Debug {
     /// Get the state of the cache structures
     ///
     /// Provides the names of the caches as well
-    fn cache_state<'a>(&'a self) -> Vec<CacheData>;
+    fn cache_state<'a>(&'a self) -> Vec<CacheData> {
+        self.caches()
+            .into_iter()
+            .map(|(name, cache)| CacheData {
+                name: name.into(),
+                lines: cache.get_lines(),
+            })
+            .collect()
+    }
 
     /// Gets a reference to the data cache (L1)
     fn data_cache<'a>(&'a self) -> &'a dyn Cache;
