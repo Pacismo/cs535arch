@@ -4,6 +4,7 @@ mod config;
 use config::{CacheConfiguration, SimulationConfiguration};
 use toml::toml;
 
+/// 64 pages of memory are supported by the simulator
 const PAGES: usize = 64;
 
 fn main() {
