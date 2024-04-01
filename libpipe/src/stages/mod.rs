@@ -23,6 +23,8 @@ mod writeback;
 /// Must be implemented by each stage. Not object-safe.
 ///
 /// Presents interfaces for each stage to perform the necessary processing.
+///
+/// The memory module must be clocked separately from the pipeline.
 pub trait PipelineStage
 where
     Self: Debug + Serialize + Default,

@@ -1,4 +1,6 @@
 mod resolver;
+#[cfg(test)]
+mod tests;
 
 use super::decode::DecodeResult;
 use crate::{reg_locks::Locks, regmap::RegMap, Clock, PipelineStage, Registers, Status};
@@ -32,6 +34,8 @@ pub enum ExecuteResult {
         sp: Word,
         /// The current value of the BP
         bp: Word,
+        /// The current value of the LP
+        lp: Word,
     },
     /// Jumps to a location
     JumpTo {
@@ -116,6 +120,8 @@ pub enum ExecuteResult {
     Squash { regs: RegisterFlags },
     /// Ignore a jump instruction
     Ignore { regs: RegisterFlags },
+    /// Simply remove a word from the stack (since the destination was invalid)
+    PopStack { sp: Word },
 }
 
 impl ExecuteResult {

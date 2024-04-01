@@ -45,6 +45,9 @@ impl PipelineStage for Writeback {
                     registers[NAN] = nan.then_some(1).unwrap_or(0);
                     registers[INF] = inf.then_some(1).unwrap_or(0);
                 }
+                MemoryResult::WriteRegNoStatus { destination, value } => {
+                    registers[destination] = value;
+                }
                 MemoryResult::WriteReg1 {
                     destination: register,
                     value,
@@ -94,10 +97,16 @@ impl PipelineStage for Writeback {
                 MemoryResult::Jump { address } => {
                     registers[PC] = address;
                 }
-                MemoryResult::Return { address, bp, sp } => {
+                MemoryResult::Return {
+                    address,
+                    bp,
+                    sp,
+                    lp,
+                } => {
                     registers[PC] = address;
                     registers[BP] = bp;
                     registers[SP] = sp;
+                    registers[LP] = lp;
                 }
             }
         }

@@ -1,36 +1,66 @@
 use super::execute::ExecuteResult;
 use crate::{Clock, Locks, PipelineStage, Registers, Status};
-use libmem::module::MemoryModule;
+use libmem::module::{MemoryModule, Status as MemStatus};
 use libseis::{
-    registers::RegisterFlags,
+    registers::{RegisterFlags, BP, EPS, INF, LP, NAN, OF, PC, SP, ZF},
     types::{Byte, Register, Short, Word},
 };
 use serde::Serialize;
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Copy, Serialize)]
 enum ReadMode {
     /// Reading a byte from memory
-    ReadByte {
-        address: Word,
-        destination: Register,
-        volatile: bool,
-    },
+    ReadByte { address: Word, volatile: bool },
     /// Reading a short from memory
-    ReadShort {
-        address: Word,
-        destination: Register,
-        volatile: bool,
-    },
+    ReadShort { address: Word, volatile: bool },
     /// Reading a word from memory
-    ReadWord {
-        address: Word,
-        destination: Register,
-        volatile: bool,
-    },
+    ReadWord { address: Word, volatile: bool },
+}
+
+impl ReadMode {
+    fn execute(self, mem: &mut dyn MemoryModule) -> Result<Word, usize> {
+        match self {
+            ReadByte {
+                address, volatile, ..
+            } => {
+                match if volatile {
+                    mem.read_byte_volatile(address)
+                } else {
+                    mem.read_byte(address)
+                } {
+                    Ok(value) => Ok(value as Word),
+                    Err(MemStatus::Busy(clocks)) => Err(clocks),
+                    Err(MemStatus::Idle) => unreachable!(),
+                }
+            }
+            ReadShort {
+                address, volatile, ..
+            } => match if volatile {
+                mem.read_short_volatile(address)
+            } else {
+                mem.read_short(address)
+            } {
+                Ok(value) => Ok(value as Word),
+                Err(MemStatus::Busy(clocks)) => Err(clocks),
+                Err(MemStatus::Idle) => unreachable!(),
+            },
+            ReadWord {
+                address, volatile, ..
+            } => match if volatile {
+                mem.read_word_volatile(address)
+            } else {
+                mem.read_word(address)
+            } {
+                Ok(value) => Ok(value),
+                Err(MemStatus::Busy(clocks)) => Err(clocks),
+                Err(MemStatus::Idle) => unreachable!(),
+            },
+        }
+    }
 }
 use ReadMode::*;
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Copy, Serialize)]
 enum WriteMode {
     /// Writing a byte to memory
     WriteByte {
@@ -53,12 +83,70 @@ enum WriteMode {
 }
 use WriteMode::*;
 
-#[derive(Debug, Clone, Serialize, Default)]
+impl WriteMode {
+    fn execute(self, mem: &mut dyn MemoryModule) -> Option<usize> {
+        match self {
+            WriteByte {
+                address,
+                value,
+                volatile,
+            } => match if volatile {
+                mem.write_byte_volatile(address, value)
+            } else {
+                mem.write_byte(address, value)
+            } {
+                MemStatus::Busy(clocks) => Some(clocks),
+                MemStatus::Idle => None,
+            },
+            WriteShort {
+                address,
+                value,
+                volatile,
+            } => match if volatile {
+                mem.write_short_volatile(address, value)
+            } else {
+                mem.write_short(address, value)
+            } {
+                MemStatus::Busy(clocks) => Some(clocks),
+                MemStatus::Idle => None,
+            },
+            WriteWord {
+                address,
+                value,
+                volatile,
+            } => match if volatile {
+                mem.write_word_volatile(address, value)
+            } else {
+                mem.write_word(address, value)
+            } {
+                MemStatus::Busy(clocks) => Some(clocks),
+                MemStatus::Idle => None,
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize)]
+enum JsrPrepState {
+    WritingLp,
+    WritingBp,
+}
+use JsrPrepState::*;
+
+#[derive(Debug, Clone, Copy, Serialize)]
+enum RetPrepState {
+    ReadingBp,
+    ReadingLp(Word),
+}
+use RetPrepState::*;
+
+#[derive(Debug, Clone, Copy, Serialize, Default)]
 enum State {
     #[default]
     Idle,
     Reading {
         mode: ReadMode,
+        destination: Register,
         clocks: usize,
     },
     Writing {
@@ -71,20 +159,30 @@ enum State {
         clocks: usize,
     },
     Popping {
-        register: Register,
+        destination: Register,
         sp: Word,
         clocks: usize,
     },
+    DummyPop {
+        sp: Word,
+        clocks: usize,
+    },
+    /// Write the current BP value to where the SP is, increment the
+    /// SP by 4, and set BP to the current value of SP
     JsrPrep {
         address: Word,
         link: Word,
         sp: Word,
         bp: Word,
+        lp: Word,
+        state: JsrPrepState,
         clocks: usize,
     },
+    /// Write the current BP value to the SP, read the BP back in
     RetPrep {
         link: Word,
         bp: Word,
+        state: RetPrepState,
         clocks: usize,
     },
     Ready {
@@ -97,11 +195,11 @@ enum State {
 }
 
 impl State {
-    fn is_halted(&self) -> bool {
+    fn is_halted(self) -> bool {
         matches!(self, Halted)
     }
 
-    fn is_waiting(&self) -> bool {
+    fn is_waiting(self) -> bool {
         matches!(
             self,
             Reading { .. }
@@ -113,35 +211,71 @@ impl State {
         )
     }
 
-    fn wait_time(&self) -> usize {
+    fn wait_time(self) -> usize {
         match self {
-            &Reading { clocks, .. }
-            | &Writing { clocks, .. }
-            | &Pushing { clocks, .. }
-            | &Popping { clocks, .. }
-            | &JsrPrep { clocks, .. }
-            | &RetPrep { clocks, .. } => clocks,
+            Reading { clocks, .. }
+            | Writing { clocks, .. }
+            | Pushing { clocks, .. }
+            | Popping { clocks, .. }
+            | DummyPop { clocks, .. }
+            | JsrPrep { clocks, .. }
+            | RetPrep { clocks, .. } => clocks,
             _ => 1,
         }
     }
 
-    fn is_squashed(&self) -> bool {
+    fn is_squashed(self) -> bool {
         matches!(self, Squashed { .. })
     }
 
-    fn is_idle(&self) -> bool {
+    fn is_idle(self) -> bool {
         matches!(self, Idle)
+    }
+
+    fn get_wregs(self) -> RegisterFlags {
+        match self {
+            Idle => RegisterFlags::default(),
+            Reading { destination, .. } => [destination, ZF, OF, EPS, NAN, INF].into(),
+            Writing { .. } => [].into(),
+            Pushing { .. } => [SP].into(),
+            Popping { destination, .. } => [destination, SP, ZF, OF, EPS, NAN, INF].into(),
+            DummyPop { .. } => [SP, ZF, OF, EPS, NAN, INF].into(),
+            JsrPrep { .. } => [PC, SP, BP, LP].into(),
+            RetPrep { .. } => [PC, BP, SP].into(),
+            Ready { result } => match result {
+                MemoryResult::Squashed { wregs } | MemoryResult::Ignore { wregs } => wregs,
+                MemoryResult::WriteReg1 { destination, .. } => {
+                    [destination, ZF, OF, EPS, NAN, INF].into()
+                }
+                MemoryResult::WriteReg2 { register, .. } => {
+                    [register, SP, ZF, OF, EPS, NAN, INF].into()
+                }
+                MemoryResult::JumpSubroutine { .. } => [PC, SP, BP, LP].into(),
+                MemoryResult::Jump { .. } => [PC].into(),
+                MemoryResult::Return { .. } => [SP, BP, PC].into(),
+                MemoryResult::Halt => [].into(),
+                MemoryResult::WriteStatus { .. } => [ZF, OF, EPS, NAN, INF].into(),
+                _ => [].into(),
+            },
+            Squashed { wregs } => wregs,
+            Halted => [].into(),
+        }
     }
 }
 use State::*;
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Copy, Serialize)]
 pub enum MemoryResult {
     /// Nothing
     Nop,
     /// Squashed instruction
     Squashed {
         wregs: RegisterFlags,
+    },
+    /// Write data back to a register without any status information
+    WriteRegNoStatus {
+        destination: Register,
+        value: Word,
     },
     /// Write data back to a register
     WriteReg1 {
@@ -167,9 +301,6 @@ pub enum MemoryResult {
         inf: bool,
     },
     /// Jump to a subroutine
-    ///
-    /// Write the current BP value to where the SP is, copy SP to BP,
-    /// and increment the SP by 4
     JumpSubroutine {
         address: Word,
         link: Word,
@@ -181,12 +312,11 @@ pub enum MemoryResult {
         address: Word,
     },
     /// Return from a subroutine
-    ///
-    /// Write the current BP value to the SP, read the BP back in
     Return {
         address: Word,
         bp: Word,
         sp: Word,
+        lp: Word,
     },
     /// Stop execution
     Halt,
@@ -215,7 +345,7 @@ impl PipelineStage for Memory {
 
     fn clock(
         &mut self,
-        _: Clock,
+        clock: Clock,
         _: &mut Registers,
         _: &mut Locks,
         memory: &mut dyn MemoryModule,
@@ -223,7 +353,324 @@ impl PipelineStage for Memory {
         if self.state.is_halted() {
             Clock::Halt
         } else {
-            todo!()
+            if clock.is_squash() {
+                self.state = Squashed {
+                    wregs: self.state.get_wregs(),
+                };
+                self.forward = None;
+                clock
+            } else {
+                match self.state {
+                    Idle => clock.to_ready(),
+                    Reading {
+                        mode, destination, ..
+                    } => match mode.execute(memory) {
+                        Ok(value) => {
+                            if clock.is_ready() {
+                                self.forward = Some(MemoryResult::WriteReg1 {
+                                    destination,
+                                    value,
+                                    zf: value == 0,
+                                    of: false,
+                                    eps: false,
+                                    nan: false,
+                                    inf: false,
+                                });
+                                self.state = Idle;
+                                clock.to_ready()
+                            } else {
+                                self.state = Ready {
+                                    result: MemoryResult::WriteReg1 {
+                                        destination,
+                                        value,
+                                        zf: value == 0,
+                                        of: false,
+                                        eps: false,
+                                        nan: false,
+                                        inf: false,
+                                    },
+                                };
+                                clock.to_block()
+                            }
+                        }
+                        Err(clocks) => {
+                            self.state = Reading {
+                                mode,
+                                destination,
+                                clocks,
+                            };
+                            clock.to_block()
+                        }
+                    },
+                    Writing { mode, .. } => match mode.execute(memory) {
+                        Some(clocks) => {
+                            self.state = Writing { mode, clocks };
+                            clock.to_block()
+                        }
+                        None => {
+                            if clock.is_ready() {
+                                self.state = Idle;
+                                self.forward = Some(MemoryResult::Nop);
+                                clock.to_ready()
+                            } else {
+                                self.state = Ready {
+                                    result: MemoryResult::Nop,
+                                };
+                                self.forward = None;
+                                clock.to_ready()
+                            }
+                        }
+                    },
+                    Pushing { value, sp, .. } => match memory.write_word(sp, value) {
+                        MemStatus::Busy(clocks) => {
+                            self.state = Pushing { value, sp, clocks };
+                            clock.to_block()
+                        }
+                        MemStatus::Idle => {
+                            if clock.is_ready() {
+                                self.state = Idle;
+                                self.forward = Some(MemoryResult::WriteRegNoStatus {
+                                    destination: SP,
+                                    value: sp.wrapping_add(4),
+                                });
+                                clock.to_ready()
+                            } else {
+                                self.state = Ready {
+                                    result: MemoryResult::WriteRegNoStatus {
+                                        destination: SP,
+                                        value: sp.wrapping_add(4),
+                                    },
+                                };
+                                clock.to_block()
+                            }
+                        }
+                    },
+                    Popping {
+                        destination, sp, ..
+                    } => match memory.read_word(sp) {
+                        Err(MemStatus::Busy(clocks)) => {
+                            self.state = Popping {
+                                destination,
+                                sp,
+                                clocks,
+                            };
+                            clock.to_block()
+                        }
+                        Err(MemStatus::Idle) => unreachable!(),
+                        Ok(value) => {
+                            if clock.is_ready() {
+                                self.state = Idle;
+                                self.forward = Some(MemoryResult::WriteReg2 {
+                                    register: destination,
+                                    value,
+                                    sp,
+                                    zf: value == 0,
+                                    of: false,
+                                    eps: false,
+                                    nan: false,
+                                    inf: false,
+                                });
+                                clock.to_ready()
+                            } else {
+                                self.state = Ready {
+                                    result: MemoryResult::WriteReg2 {
+                                        register: destination,
+                                        value,
+                                        sp,
+                                        zf: value == 0,
+                                        of: false,
+                                        eps: false,
+                                        nan: false,
+                                        inf: false,
+                                    },
+                                };
+                                clock.to_block()
+                            }
+                        }
+                    },
+                    DummyPop { sp, .. } => match memory.read_word(sp) {
+                        Ok(_) => {
+                            if clock.is_ready() {
+                                self.state = Idle;
+                                self.forward = Some(MemoryResult::WriteRegNoStatus {
+                                    destination: SP,
+                                    value: sp,
+                                });
+                                clock.to_ready()
+                            } else {
+                                self.state = Ready {
+                                    result: MemoryResult::WriteRegNoStatus {
+                                        destination: SP,
+                                        value: sp,
+                                    },
+                                };
+                                clock.to_block()
+                            }
+                        }
+                        Err(MemStatus::Busy(clocks)) => {
+                            self.state = DummyPop { sp, clocks };
+                            clock.to_block()
+                        }
+                        Err(MemStatus::Idle) => unreachable!(),
+                    },
+                    JsrPrep {
+                        address,
+                        link,
+                        sp,
+                        bp,
+                        lp,
+                        state,
+                        ..
+                    } => match state {
+                        WritingLp => match memory.write_word(sp, link) {
+                            MemStatus::Idle => {
+                                self.state = JsrPrep {
+                                    address,
+                                    link,
+                                    sp,
+                                    bp,
+                                    lp,
+                                    state: WritingBp,
+                                    clocks: 1,
+                                };
+                                clock.to_block()
+                            }
+                            MemStatus::Busy(clocks) => {
+                                self.state = JsrPrep {
+                                    address,
+                                    link,
+                                    sp,
+                                    bp,
+                                    lp,
+                                    state,
+                                    clocks,
+                                };
+                                clock.to_block()
+                            }
+                        },
+                        WritingBp => match memory.write_word(sp, bp) {
+                            MemStatus::Idle => {
+                                if clock.is_ready() {
+                                    self.state = Idle;
+                                    self.forward = Some(MemoryResult::JumpSubroutine {
+                                        address,
+                                        link,
+                                        sp,
+                                        bp,
+                                    });
+                                    clock.to_ready()
+                                } else {
+                                    self.state = Ready {
+                                        result: MemoryResult::JumpSubroutine {
+                                            address,
+                                            link,
+                                            sp,
+                                            bp,
+                                        },
+                                    };
+                                    clock.to_block()
+                                }
+                            }
+                            MemStatus::Busy(clocks) => {
+                                self.state = JsrPrep {
+                                    address,
+                                    link,
+                                    sp,
+                                    bp,
+                                    lp,
+                                    state,
+                                    clocks,
+                                };
+                                clock.to_block()
+                            }
+                        },
+                    },
+                    RetPrep {
+                        link, bp, state, ..
+                    } => match state {
+                        ReadingBp => match memory.read_word(bp.wrapping_sub(4)) {
+                            Ok(value) => {
+                                self.state = RetPrep {
+                                    link,
+                                    bp,
+                                    state: ReadingLp(value),
+                                    clocks: 1,
+                                };
+                                clock.to_block()
+                            }
+                            Err(MemStatus::Busy(clocks)) => {
+                                self.state = RetPrep {
+                                    link,
+                                    bp,
+                                    state,
+                                    clocks,
+                                };
+                                clock.to_block()
+                            }
+                            Err(MemStatus::Idle) => unreachable!(),
+                        },
+                        ReadingLp(bpval) => match memory.read_word(bp.wrapping_sub(8)) {
+                            Ok(value) => {
+                                if clock.is_ready() {
+                                    self.state = Idle;
+                                    self.forward = Some(MemoryResult::Return {
+                                        address: link,
+                                        bp: bpval,
+                                        sp: bp.wrapping_sub(8),
+                                        lp: value,
+                                    });
+                                    clock.to_ready()
+                                } else {
+                                    self.state = Ready {
+                                        result: MemoryResult::Return {
+                                            address: link,
+                                            bp: bpval,
+                                            sp: bp.wrapping_sub(8),
+                                            lp: value,
+                                        },
+                                    };
+                                    clock.to_block()
+                                }
+                            }
+                            Err(MemStatus::Busy(clocks)) => {
+                                self.state = RetPrep {
+                                    link,
+                                    bp,
+                                    state,
+                                    clocks,
+                                };
+                                clock.to_block()
+                            }
+                            Err(MemStatus::Idle) => unreachable!(),
+                        },
+                    },
+                    Ready { result } => {
+                        if clock.is_ready() {
+                            if matches!(result, MemoryResult::Halt) {
+                                self.state = Halted;
+                            } else {
+                                self.state = Idle;
+                            }
+                            self.forward = Some(result);
+                            clock.to_ready()
+                        } else {
+                            self.state = Ready { result };
+                            clock.to_block()
+                        }
+                    }
+                    Squashed { wregs } => {
+                        if clock.is_ready() {
+                            self.forward = Some(MemoryResult::Squashed { wregs });
+                            self.state = Idle;
+                            clock.to_ready()
+                        } else {
+                            self.state = Squashed { wregs };
+                            clock.to_block()
+                        }
+                    }
+                    Halted => unreachable!(),
+                }
+            }
         }
     }
 
@@ -246,13 +693,16 @@ impl PipelineStage for Memory {
                         link,
                         sp,
                         bp,
+                        lp,
                     } => {
                         self.state = JsrPrep {
                             address,
                             link,
                             sp,
                             bp,
-                            clocks: 0,
+                            lp,
+                            state: WritingLp,
+                            clocks: 1,
                         };
                         1
                     }
@@ -266,7 +716,8 @@ impl PipelineStage for Memory {
                         self.state = RetPrep {
                             bp,
                             link,
-                            clocks: 0,
+                            state: ReadingBp,
+                            clocks: 1,
                         };
                         1
                     }
@@ -321,7 +772,7 @@ impl PipelineStage for Memory {
                                 value,
                                 volatile,
                             },
-                            clocks: 0,
+                            clocks: 1,
                         };
                         1
                     }
@@ -336,7 +787,7 @@ impl PipelineStage for Memory {
                                 value,
                                 volatile,
                             },
-                            clocks: 0,
+                            clocks: 1,
                         };
                         1
                     }
@@ -351,7 +802,7 @@ impl PipelineStage for Memory {
                                 value,
                                 volatile,
                             },
-                            clocks: 0,
+                            clocks: 1,
                         };
                         1
                     }
@@ -361,12 +812,9 @@ impl PipelineStage for Memory {
                         volatile,
                     } => {
                         self.state = Reading {
-                            mode: ReadByte {
-                                address,
-                                destination,
-                                volatile,
-                            },
-                            clocks: 0,
+                            mode: ReadByte { address, volatile },
+                            destination,
+                            clocks: 1,
                         };
                         1
                     }
@@ -376,12 +824,9 @@ impl PipelineStage for Memory {
                         volatile,
                     } => {
                         self.state = Reading {
-                            mode: ReadShort {
-                                address,
-                                destination,
-                                volatile,
-                            },
-                            clocks: 0,
+                            mode: ReadShort { address, volatile },
+                            destination,
+                            clocks: 1,
                         };
                         1
                     }
@@ -391,20 +836,17 @@ impl PipelineStage for Memory {
                         volatile,
                     } => {
                         self.state = Reading {
-                            mode: ReadWord {
-                                address,
-                                destination,
-                                volatile,
-                            },
-                            clocks: 0,
+                            mode: ReadWord { address, volatile },
+                            destination,
+                            clocks: 1,
                         };
                         1
                     }
                     ExecuteResult::ReadRegStack { register, sp } => {
                         self.state = Popping {
-                            register,
+                            destination: register,
                             sp,
-                            clocks: 0,
+                            clocks: 1,
                         };
                         1
                     }
@@ -412,7 +854,7 @@ impl PipelineStage for Memory {
                         self.state = Pushing {
                             value,
                             sp,
-                            clocks: 0,
+                            clocks: 1,
                         };
                         1
                     }
@@ -429,7 +871,13 @@ impl PipelineStage for Memory {
                         1
                     }
                     ExecuteResult::Halt => {
-                        self.state = Halted;
+                        self.state = Ready {
+                            result: MemoryResult::Halt,
+                        };
+                        1
+                    }
+                    ExecuteResult::PopStack { sp } => {
+                        self.state = DummyPop { sp, clocks: 1 };
                         1
                     }
                 },

@@ -102,8 +102,8 @@ impl PipelineStage for Decode {
                                 regvals: reads
                                     .registers()
                                     .map(|r| {
-                                        // PC must equal location of where instruction was fetched -- always one word behind
                                         if r == PC {
+                                            // PC must equal location of where instruction was fetched -- always one word behind
                                             (PC, registers[r].wrapping_sub(4))
                                         } else {
                                             (r, registers[r])
@@ -179,7 +179,7 @@ mod test {
     use libseis::{instruction_set::ControlOp, pages::PAGE_SIZE};
     use std::array::from_fn;
 
-    fn basic_setup() -> (SingleLevel<Associative>, Registers, Locks) {
+    fn basic_setup() -> (SingleLevel, Registers, Locks) {
         // Create a memoryspace where every byte is the index modulo 256
         let mut memory = Memory::new(4);
         memory.set_page::<PAGE_SIZE>(0x0000_0000, from_fn(|i| (i & 0xFF) as u8));
@@ -189,8 +189,8 @@ mod test {
 
         (
             SingleLevel::new(
-                Associative::new(3, 2),
-                Associative::new(3, 2),
+                Box::new(Associative::new(3, 2)),
+                Box::new(Associative::new(3, 2)),
                 memory,
                 10,
                 2,

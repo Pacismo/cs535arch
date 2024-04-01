@@ -6,7 +6,7 @@ use libseis::{
         RegisterOp,
     },
     pages::ZERO_PAGE,
-    registers::{BP, SP},
+    registers::{BP, COUNT, SP},
     types::{Byte, Register, Short, Word},
 };
 
@@ -141,15 +141,32 @@ impl Resolver for RegisterOp {
             RegisterOp::Tfr(RegOp {
                 source,
                 destination,
-            }) => ExecuteResult::WriteReg {
-                destination,
-                value: regvals[source],
-                zf: regvals[source] == 0,
-                of: false,
-                eps: false,
-                nan: false,
-                inf: false,
-            },
+            }) => {
+                let value = if source < COUNT as Register {
+                    regvals[source]
+                } else {
+                    0
+                };
+                if destination < COUNT as Register {
+                    ExecuteResult::WriteReg {
+                        destination,
+                        value,
+                        zf: value == 0,
+                        of: false,
+                        eps: false,
+                        nan: false,
+                        inf: false,
+                    }
+                } else {
+                    ExecuteResult::WriteStatus {
+                        zf: value == 0,
+                        of: false,
+                        eps: false,
+                        nan: false,
+                        inf: false,
+                    }
+                }
+            }
             RegisterOp::Ldr(imm) => match imm {
                 ImmOp::Immediate {
                     zero,
@@ -204,14 +221,26 @@ impl Resolver for RegisterOp {
             },
 
             RegisterOp::Push(reg) => ExecuteResult::WriteRegStack {
-                value: regvals[reg],
+                value: if reg < COUNT as Register {
+                    regvals[reg]
+                } else {
+                    0
+                },
                 sp: regvals[SP],
             },
 
-            RegisterOp::Pop(reg) => ExecuteResult::ReadRegStack {
-                register: reg,
-                sp: regvals[SP],
-            },
+            RegisterOp::Pop(reg) => {
+                if reg < COUNT as Register {
+                    ExecuteResult::ReadRegStack {
+                        register: reg,
+                        sp: regvals[SP],
+                    }
+                } else {
+                    ExecuteResult::PopStack {
+                        sp: regvals[SP].wrapping_sub(4),
+                    }
+                }
+            }
         }
     }
 
