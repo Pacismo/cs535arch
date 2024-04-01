@@ -570,8 +570,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             args.manual_clock = false;
 
             Box::new(SingleLevel::new(
-                NullCache::new(),
-                NullCache::new(),
+                Box::new(NullCache::new()),
+                Box::new(NullCache::new()),
                 Memory::new(args.pages),
                 args.miss_penalty,
                 args.volatile_penalty,
@@ -587,8 +587,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 return Err("set_bits + off_bits must sum up to 32".into());
             } else if ways == 1 {
                 Box::new(SingleLevel::new(
-                    Associative::new(off_bits, set_bits),
-                    Associative::new(off_bits, set_bits),
+                    Box::new(Associative::new(off_bits, set_bits)),
+                    Box::new(Associative::new(off_bits, set_bits)),
                     Memory::new(args.pages),
                     args.miss_penalty,
                     args.volatile_penalty,
@@ -596,8 +596,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 ))
             } else {
                 Box::new(SingleLevel::new(
-                    MultiAssociative::new(off_bits, set_bits, ways),
-                    MultiAssociative::new(off_bits, set_bits, ways),
+                    Box::new(MultiAssociative::new(off_bits, set_bits, ways)),
+                    Box::new(MultiAssociative::new(off_bits, set_bits, ways)),
                     Memory::new(args.pages),
                     args.miss_penalty,
                     args.volatile_penalty,

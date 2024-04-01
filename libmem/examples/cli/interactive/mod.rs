@@ -217,7 +217,7 @@ impl Command {
     /// Constructs a completer tree and returns a CommandCompleter
     pub fn autocompleter() -> CommandCompleter {
         static mut TREE: Option<Arc<[Arc<dyn Node>]>> = None;
-        if let Some(root) = unsafe { &TREE } {
+        if let Some(root) = unsafe { TREE.as_ref() } {
             CommandCompleter {
                 nodes: root.clone(),
             }

@@ -1,11 +1,10 @@
-use std::collections::HashMap;
-
 use super::{CacheData, MemoryModule, Result, Status};
 use crate::{
     cache::{self, Cache},
     memory::Memory,
 };
 use libseis::types::{Byte, Short, Word};
+use std::collections::HashMap;
 use Status::Busy;
 use Transaction::*;
 
@@ -57,12 +56,9 @@ impl Transaction {
 
 /// Represents a memory module with a single level of cache.
 #[derive(Debug)]
-pub struct SingleLevel<C>
-where
-    C: Cache,
-{
-    data_cache: Box<C>,
-    instruction_cache: Box<C>,
+pub struct SingleLevel {
+    data_cache: Box<dyn Cache>,
+    instruction_cache: Box<dyn Cache>,
     memory: Memory,
 
     read_miss_penalty: usize,
@@ -81,10 +77,7 @@ where
     evictions: usize,
 }
 
-impl<C> MemoryModule for SingleLevel<C>
-where
-    C: Cache,
-{
+impl MemoryModule for SingleLevel {
     fn clock(&mut self, amount: usize) {
         self.clocks = self.clocks.saturating_sub(amount);
 
@@ -740,10 +733,7 @@ where
     }
 }
 
-impl<C> SingleLevel<C>
-where
-    C: Cache,
-{
+impl SingleLevel {
     /// Creates a new single-level cache memory system.
     ///
     /// # Arguments
@@ -752,25 +742,23 @@ where
     /// - `instruction_cache` -- the cache to use for instructions
     /// - `memory` -- the memoryspace to use
     /// - `miss_penalty` -- the penalty of a cache miss
+    /// - `volatile_penalty` -- the penalty of a volatile access
     /// - `writethrough` -- whether the cache is *writethrough*, meaning uncached writes go straight to memory
     ///
     /// # Notes
     ///
     /// - A misaligned access has a clock penalty of 1 plus another miss penalty (multiple accesses)
     pub fn new(
-        data_cache: C,
-        instruction_cache: C,
+        data_cache: Box<dyn Cache>,
+        instruction_cache: Box<dyn Cache>,
         memory: Memory,
         miss_penalty: usize,
         volatile_penalty: usize,
         writethrough: bool,
-    ) -> Self
-    where
-        C: Sized,
-    {
+    ) -> Self {
         Self {
-            data_cache: Box::new(data_cache),
-            instruction_cache: Box::new(instruction_cache),
+            data_cache,
+            instruction_cache,
             memory,
 
             read_miss_penalty: miss_penalty,
