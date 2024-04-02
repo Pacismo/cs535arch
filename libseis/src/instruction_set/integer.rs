@@ -166,8 +166,8 @@ impl Display for UnaryOp {
 /// Comparison operation (explicitly different from [`UnaryOp`])
 #[derive(Debug, Clone, Copy)]
 pub enum CompOp {
-    Registers(Register, Register),
-    Immediate(Register, Word),
+    Registers(Register, Register, bool),
+    Immediate(Register, Word, bool),
 }
 
 impl CompOp {
@@ -186,11 +186,101 @@ impl CompOp {
     const LEFT_REG_MASK: Word = 0b0000_0000_0000_0000_0000_0000_1111_0000;
     /// Left register shift
     const LEFT_REG_SHIFT: Word = 4;
+    /// Signed mode bit
+    const SIGNED_MODE: Word = 0b0000_0000_0000_0000_0000_0000_0000_1000;
 }
 
 impl Decode for CompOp {
     fn decode(word: Word) -> DecodeResult<Self> {
         use CompOp::*;
+
+        if word & Self::IMMEDIATE_MASK == 0 {
+            let left = (word & Self::LEFT_REG_MASK) >> Self::LEFT_REG_SHIFT;
+            let right = (word & Self::RIGHT_REG_MASK) >> Self::RIGHT_PARAM_SHIFT;
+
+            Ok(Registers(
+                left as Register,
+                right as Register,
+                word & Self::SIGNED_MODE != 0,
+            ))
+        } else {
+            let left = (word & Self::LEFT_REG_MASK) >> Self::LEFT_REG_SHIFT;
+            let mut right = (word & Self::RIGHT_IMM_MASK) >> Self::RIGHT_PARAM_SHIFT;
+            if word & Self::RIGHT_IMM_SIGN != 0 {
+                right |= 0b1111_1111_1000_0000_0000_0000_0000_0000;
+            }
+
+            Ok(Immediate(
+                left as Register,
+                right,
+                word & Self::SIGNED_MODE != 0,
+            ))
+        }
+    }
+}
+
+impl Encode for CompOp {
+    fn encode(self) -> Word {
+        use CompOp::*;
+
+        match self {
+            Registers(left, right, signed) => {
+                ((left as Word) << Self::LEFT_REG_SHIFT)
+                    | ((right as Word) << Self::RIGHT_PARAM_SHIFT)
+                    | if signed { Self::SIGNED_MODE } else { 0 }
+            }
+            Immediate(left, right, signed) => {
+                ((left as Word) << Self::LEFT_REG_SHIFT)
+                    | ((right << Self::RIGHT_PARAM_SHIFT) & Self::RIGHT_IMM_MASK)
+                    | if signed { Self::SIGNED_MODE } else { 0 }
+            }
+        }
+    }
+}
+
+impl Display for CompOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use CompOp::*;
+
+        match self {
+            &Registers(left, right, signed) => {
+                write!(f, "{}V{left:X}, V{right:X}", if signed { " s" } else { "" })
+            }
+            &Immediate(left, right, signed) => {
+                write!(f, "{}V{left:X}, {right}", if signed { " s" } else { "" })
+            }
+        }
+    }
+}
+
+/// Comparison operation (explicitly different from [`UnaryOp`])
+#[derive(Debug, Clone, Copy)]
+pub enum TestOp {
+    Registers(Register, Register),
+    Immediate(Register, Word),
+}
+
+impl TestOp {
+    /// Immediate flag mask
+    const IMMEDIATE_MASK: Word = 0b0000_0000_1000_0000_0000_0000_0000_0000;
+
+    /// Right register mask
+    const RIGHT_REG_MASK: Word = 0b0000_0000_0000_0000_0000_1111_0000_0000;
+    /// Right immediate mask
+    const RIGHT_IMM_MASK: Word = 0b0000_0000_0111_1111_1111_1111_0000_0000;
+    const RIGHT_IMM_SIGN: Word = 0b0000_0000_0100_0000_0000_0000_0000_0000;
+    /// Right register shift
+    const RIGHT_PARAM_SHIFT: Word = 8;
+
+    /// Left register mask
+    const LEFT_REG_MASK: Word = 0b0000_0000_0000_0000_0000_0000_1111_0000;
+    /// Left register shift
+    const LEFT_REG_SHIFT: Word = 4;
+}
+
+impl Decode for TestOp {
+    fn decode(word: Word) -> DecodeResult<Self> {
+        use TestOp::*;
 
         if word & Self::IMMEDIATE_MASK == 0 {
             let left = (word & Self::LEFT_REG_MASK) >> Self::LEFT_REG_SHIFT;
@@ -209,9 +299,9 @@ impl Decode for CompOp {
     }
 }
 
-impl Encode for CompOp {
+impl Encode for TestOp {
     fn encode(self) -> Word {
-        use CompOp::*;
+        use TestOp::*;
 
         match self {
             Registers(left, right) => {
@@ -226,9 +316,9 @@ impl Encode for CompOp {
     }
 }
 
-impl Display for CompOp {
+impl Display for TestOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use CompOp::*;
+        use TestOp::*;
 
         match self {
             Registers(left, right) => write!(f, "V{left:X}, V{right:X}"),
@@ -255,7 +345,7 @@ pub enum IntegerOp {
     /// Compare
     Cmp(CompOp),
     /// Test
-    Tst(CompOp),
+    Tst(TestOp),
     /// And
     And(BinaryOp),
     /// Inclusive or
@@ -465,8 +555,8 @@ impl Info for IntegerOp {
             | Asr(BinaryOp::Registers(r0, r1, _))
             | Rol(BinaryOp::Registers(r0, r1, _))
             | Ror(BinaryOp::Registers(r0, r1, _))
-            | Cmp(CompOp::Registers(r0, r1))
-            | Tst(CompOp::Registers(r0, r1)) => [r0, r1].into(),
+            | Cmp(CompOp::Registers(r0, r1, _))
+            | Tst(TestOp::Registers(r0, r1)) => [r0, r1].into(),
 
             Add(BinaryOp::Immediate(r, _, _))
             | Sub(BinaryOp::Immediate(r, _, _))
@@ -482,8 +572,8 @@ impl Info for IntegerOp {
             | Asr(BinaryOp::Immediate(r, _, _))
             | Rol(BinaryOp::Immediate(r, _, _))
             | Ror(BinaryOp::Immediate(r, _, _))
-            | Cmp(CompOp::Immediate(r, _))
-            | Tst(CompOp::Immediate(r, _))
+            | Cmp(CompOp::Immediate(r, _, _))
+            | Tst(TestOp::Immediate(r, _))
             | Not(UnaryOp(r, _))
             | Sxt(SignExtendOp(_, r)) => [r].into(),
         }
