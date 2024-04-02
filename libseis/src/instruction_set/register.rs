@@ -629,16 +629,16 @@ impl Encode for RegisterOp {
         use RegisterOp::*;
 
         match self {
-            Lbr(m) => m.encode(),
-            Lsr(m) => m.encode(),
-            Llr(m) => m.encode(),
-            Sbr(m) => m.encode(),
-            Ssr(m) => m.encode(),
-            Slr(m) => m.encode(),
-            Tfr(r) => r.encode(),
-            Push(p) => p.encode(),
-            Pop(p) => p.encode(),
-            Ldr(i) => i.encode(),
+            Lbr(m) => (Self::LBR << Self::SHIFT) | m.encode(),
+            Lsr(m) => (Self::LSR << Self::SHIFT) | m.encode(),
+            Llr(m) => (Self::LLR << Self::SHIFT) | m.encode(),
+            Sbr(m) => (Self::SBR << Self::SHIFT) | m.encode(),
+            Ssr(m) => (Self::SSR << Self::SHIFT) | m.encode(),
+            Slr(m) => (Self::SLR << Self::SHIFT) | m.encode(),
+            Tfr(r) => (Self::TFR << Self::SHIFT) | r.encode(),
+            Push(p) => (Self::PUSH << Self::SHIFT) | p.encode(),
+            Pop(p) => (Self::POP << Self::SHIFT) | p.encode(),
+            Ldr(i) => (Self::LDR << Self::SHIFT) | i.encode(),
         }
     }
 }
