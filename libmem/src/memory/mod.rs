@@ -270,12 +270,12 @@ impl Memory {
             .flat_map(|(i, p)| p.map(|p| (i, p)))
     }
 
-    pub fn set_page<const LEN: usize>(&mut self, address: Word, data: [u8; LEN]) {
-        assert!(LEN <= PAGE_SIZE);
+    pub fn set_page(&mut self, address: Word, data: &[u8]) {
+        assert!(data.len() <= PAGE_SIZE);
 
         let page_id = ((address as usize) & 0xFFFF_0000) >> 16;
 
-        if LEN == 0 {
+        if data.len() == 0 {
             self.pages[page_id] = None;
         } else {
             let mut page = allocate_page();
