@@ -12,12 +12,12 @@ mod stages;
 mod unpiped;
 
 use libmem::module::MemoryModule;
+pub use piped::Pipelined;
 pub use reg_locks::Locks;
 pub use registers::Registers;
 pub use stages::*;
 use std::fmt::Debug;
 pub use unpiped::Unpipelined;
-pub use piped::Pipelined;
 
 pub struct PipelineStages<'a> {
     pub fetch: &'a Fetch,
@@ -51,9 +51,13 @@ pub trait Pipeline: Debug {
 
     /// Gets the memory module in the pipeline
     fn memory_module(&self) -> &dyn MemoryModule;
+    /// Get a mutable reference to the memory module
+    fn memory_module_mut(&mut self) -> &mut dyn MemoryModule;
 
     /// Gets the registers in the pipeline
     fn registers(&self) -> &Registers;
+    /// Get a mutable reference to the registers
+    fn registers_mut(&mut self) -> &mut Registers;
 
     /// Gets references to the pipeline stages
     fn stages(&self) -> PipelineStages;

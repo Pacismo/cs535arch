@@ -148,8 +148,16 @@ impl Pipeline for Unpipelined {
         self.memory_module.as_ref()
     }
 
+    fn memory_module_mut(&mut self) -> &mut dyn MemoryModule {
+        self.memory_module.as_mut()
+    }
+
     fn registers(&self) -> &crate::Registers {
         &self.registers
+    }
+
+    fn registers_mut(&mut self) -> &mut Registers {
+        &mut self.registers
     }
 
     fn stages(&self) -> PipelineStages {
@@ -159,6 +167,22 @@ impl Pipeline for Unpipelined {
             execute: &self.execute,
             memory: &self.memory,
             writeback: &self.writeback,
+        }
+    }
+}
+
+impl Unpipelined {
+    pub fn new(memory_module: Box<dyn MemoryModule>) -> Self {
+        Self {
+            memory_module,
+            registers: Default::default(),
+            locks: Default::default(),
+            stage: Default::default(),
+            fetch: Default::default(),
+            decode: Default::default(),
+            execute: Default::default(),
+            memory: Default::default(),
+            writeback: Default::default(),
         }
     }
 }
