@@ -11,6 +11,10 @@ pub struct SimulatorConfig {
     /// The binary image file to be used for the simulation
     #[arg(value_hint = FilePath)]
     pub image_file: PathBuf,
+
+    /// Enables backend mode
+    #[arg(short, long)]
+    pub backend_mode: bool
 }
 
 #[derive(Debug, Args)]

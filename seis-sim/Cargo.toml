@@ -28,3 +28,9 @@ path = "../libmem/"
 
 [dependencies.libpipe]
 path = "../libpipe/"
+
+[dependencies.ratatui]
+version = "0.26.1"
+
+[dependencies.crossterm]
+version = "0.27.0"
