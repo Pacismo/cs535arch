@@ -140,7 +140,7 @@ pub enum Instruction {
     Rol(IntBinaryOp),
     Ror(IntBinaryOp),
     Cmp(IntCompOp),
-    Tst(IntCompOp),
+    Tst(IntTestOp),
 
     Fadd(FloatBinaryOp),
     Fsub(FloatBinaryOp),

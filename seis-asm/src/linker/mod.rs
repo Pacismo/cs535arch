@@ -399,7 +399,7 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
     for (instruction, address, span) in expanded {
         use crate::parse::{
             ExpandableLoadOp::Label, Instruction as I, IntBinaryOp as IBO, IntCompOp as ICO,
-            Jump as J, MemoryLoadOp as MLO, MemoryStoreOp as MSO, StackOp as SO,
+            Jump as J, MemoryLoadOp as MLO, MemoryStoreOp as MSO, StackOp as SO, IntTestOp as ITO,
         };
         use libseis::instruction_set::{
             control::Jump,
@@ -425,7 +425,7 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
                     J::Label(label_name) => {
                         if let Some(label) = labels.get(&label_name) {
                             let laddr = label.address;
-                            let dist = (address - laddr) as SWord;
+                            let dist = (laddr.wrapping_sub(address)) as SWord;
                             if dist > -8_388_608 || dist < 8_388_607 {
                                 Ok(Jump::Relative(dist << 2))
                             } else {
@@ -491,9 +491,21 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
             };
             (ico $c:ident) => {
                 match $c {
-                    ICO::RegReg { left, right } => Ok(integer::CompOp::Registers(left, right)),
-                    ICO::RegImm { left, right } => Ok(integer::CompOp::Immediate(left, right)),
-                    ICO::RegConst { left, right } => {
+                    ICO::RegReg {
+                        left,
+                        right,
+                        signed,
+                    } => Ok(integer::CompOp::Registers(left, right, signed)),
+                    ICO::RegImm {
+                        left,
+                        right,
+                        signed,
+                    } => Ok(integer::CompOp::Immediate(left, right, signed)),
+                    ICO::RegConst {
+                        left,
+                        right,
+                        signed,
+                    } => {
                         if let Some(rvalue) = constants.get(&right) {
                             use crate::parse::ConstantValue as T;
                             let value = match rvalue.value {
@@ -512,7 +524,50 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
                                     span: span.clone(),
                                 })
                             } else {
-                                Ok(integer::CompOp::Immediate(left, value))
+                                Ok(integer::CompOp::Immediate(left, value, signed))
+                            }
+                        } else {
+                            Err(Error::NonExistingConstant {
+                                name: right,
+                                usage: span.clone(),
+                            })
+                        }
+                    }
+                }
+            };
+            (ito $c:ident) => {
+                match $c {
+                    ITO::RegReg {
+                        left,
+                        right,
+                    } => Ok(integer::TestOp::Registers(left, right)),
+                    ITO::RegImm {
+                        left,
+                        right,
+                    } => Ok(integer::TestOp::Immediate(left, right)),
+                    ITO::RegConst {
+                        left,
+                        right,
+                    } => {
+                        if let Some(rvalue) = constants.get(&right) {
+                            use crate::parse::ConstantValue as T;
+                            let value = match rvalue.value {
+                                T::Integer(i) => i,
+                                T::Float(_) => {
+                                    return Err(Error::IntTypeMismatch {
+                                        name: right,
+                                        span: span.clone(),
+                                    })
+                                }
+                            };
+
+                            if rvalue.bits > 15 {
+                                Err(Error::ConstTooLong {
+                                    name: right,
+                                    span: span.clone(),
+                                })
+                            } else {
+                                Ok(integer::TestOp::Immediate(left, value))
                             }
                         } else {
                             Err(Error::NonExistingConstant {
@@ -868,7 +923,7 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
                 .into_iter()
                 .zip(address..)
                 .for_each(write),
-            I::Tst(c) => Integer(Tst(transform!(ico c)?))
+            I::Tst(c) => Integer(Tst(transform!(ito c)?))
                 .encode()
                 .to_be_bytes()
                 .into_iter()

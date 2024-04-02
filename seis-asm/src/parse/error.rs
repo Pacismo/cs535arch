@@ -63,6 +63,7 @@ impl Display for ErrorSource {
         match self {
             ErrorSource::Pest(pest) => {
                 let renamed = pest.clone().renamed_rules(|rule| match rule {
+                    AsmRule::sig_flag => "s".into(),
                     AsmRule::program => "program".into(),
                     AsmRule::EOI => "end-of-input".into(),
                     AsmRule::WHITESPACE => "whitespace".into(),

@@ -167,7 +167,9 @@ tst = @{ ^"TST" ~ WHITESPACE+ ~ int_cmpop }
 
 int_binop = @{ vareg ~ WHITESPACE* ~ "," ~ WHITESPACE* ~ (vareg | integer | const) ~ WHITESPACE* ~ assign ~ WHITESPACE* ~ vareg }
 int_unop  = @{ vareg ~ WHITESPACE* ~ WHITESPACE* ~ assign ~ WHITESPACE* ~ vareg }
-int_cmpop = @{ vareg ~ WHITESPACE* ~ "," ~ WHITESPACE* ~ (vareg | integer | const) }
+
+sig_flag  = @{ "s" ~ WHITESPACE }
+int_cmpop = @{ sig_flag? ~ WHITESPACE* ~ vareg ~ WHITESPACE* ~ "," ~ WHITESPACE* ~ (vareg | integer | const) }
 
 fadd = @{ ^"FADD" ~ WHITESPACE+ ~ float_binop }
 fsub = @{ ^"FSUB" ~ WHITESPACE+ ~ float_binop }

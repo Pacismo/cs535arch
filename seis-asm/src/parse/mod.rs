@@ -345,9 +345,49 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
                 destination,
             }))
         }
-        x @ (Rule::cmp | Rule::tst) => {
+        Rule::cmp => {
             use lines::IntCompOp::*;
-            use Instruction::{Cmp, Tst};
+            use Instruction::Cmp;
+
+            let mut inner = instruction.into_inner();
+            let (signed, left) = {
+                let pair = inner.next().unwrap();
+                match pair.as_rule() {
+                    Rule::vareg => (false, registers::get_id(pair.as_str()).unwrap()),
+                    Rule::sig_flag => (
+                        true,
+                        registers::get_id(inner.next().unwrap().as_str()).unwrap(),
+                    ),
+                    _ => unreachable!(),
+                }
+            };
+            let right = inner.next().unwrap();
+
+            let mode = match right.as_rule() {
+                Rule::dec | Rule::oct | Rule::hex => RegImm {
+                    left,
+                    right: parse_integer!(right),
+                    signed,
+                },
+                Rule::vareg => RegReg {
+                    left,
+                    right: registers::get_id(right.as_str()).unwrap(),
+                    signed,
+                },
+                Rule::ident => RegConst {
+                    left,
+                    right: right.as_str().to_owned(),
+                    signed,
+                },
+                _ => unreachable!("{right:#?}"),
+            };
+
+            Ok(Cmp(mode))
+        }
+
+        Rule::tst => {
+            use lines::IntTestOp::*;
+            use Instruction::Tst;
 
             let mut inner = instruction.into_inner();
             let left = registers::get_id(inner.next().unwrap().as_str()).unwrap();
@@ -369,11 +409,7 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
                 _ => unreachable!(),
             };
 
-            Ok(match x {
-                Rule::cmp => Cmp(mode),
-                Rule::tst => Tst(mode),
-                _ => unreachable!(),
-            })
+            Ok(Tst(mode))
         }
 
         x @ (Rule::fadd | Rule::fsub | Rule::fmul | Rule::fdiv | Rule::fmod) => {

@@ -27,6 +27,25 @@ pub struct IntUnaryOp {
 
 #[derive(Debug)]
 pub enum IntCompOp {
+    RegReg {
+        left: Register,
+        right: Register,
+        signed: bool,
+    },
+    RegImm {
+        left: Register,
+        right: Word,
+        signed: bool,
+    },
+    RegConst {
+        left: Register,
+        right: String,
+        signed: bool,
+    },
+}
+
+#[derive(Debug)]
+pub enum IntTestOp {
     RegReg { left: Register, right: Register },
     RegImm { left: Register, right: Word },
     RegConst { left: Register, right: String },
