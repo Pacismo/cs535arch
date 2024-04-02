@@ -1,18 +1,22 @@
-.long = 250
-// comment
-.float = 1.0
-.char = 'c'
-.unsp = 250
-
 #[location = 0]
 main:
-    add v1, .char => v1
-    cmp v1, .unsp // comment!
-    jle 1
-    jmp main
-    fadd v1, v2, v1
-    fcmp v1, v2
-    ldr 12, v1
+    load 32, v0
+    load 16, v1
+
+loop:
+    add v1, v0, v1
+    sub v0, 1, v0
+
+    cmp s v0, 0
+    jgt loop
+
+    add v2, 1, v2
+    cmp v2, 4
+    jle loop
+
+    load 0, v0
+    load 0, v1
+    load 0, v2
+
+    nop
     halt
-    load main, v1
-    //LOAD .char => v1 cannot run.

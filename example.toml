@@ -1,0 +1,16 @@
+miss_penalty = 100
+pipelining = true
+volatile_penalty = 20
+writethrough = false
+
+[cache.data]
+mode = "associative"
+offset_bits = 2
+set_bits = 2
+ways = 2
+
+[cache.instruction]
+mode = "associative"
+offset_bits = 2
+set_bits = 2
+ways = 2
