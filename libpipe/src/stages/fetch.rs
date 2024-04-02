@@ -160,16 +160,31 @@ mod test {
         memory::Memory,
         module::{MemoryModule, SingleLevel},
     };
-    use libseis::{pages::PAGE_SIZE, types::Word};
+    use libseis::{
+        pages::PAGE_SIZE,
+        types::{Byte, Word},
+    };
     use std::array::from_fn;
 
     fn basic_setup() -> (SingleLevel, Registers, Locks) {
         // Create a memoryspace where every byte is the index modulo 256
         let mut memory = Memory::new(4);
-        memory.set_page::<PAGE_SIZE>(0x0000_0000, from_fn(|i| (i & 0xFF) as u8));
-        memory.set_page::<PAGE_SIZE>(0x0001_0000, from_fn(|i| (i & 0xFF) as u8));
-        memory.set_page::<PAGE_SIZE>(0x0002_0000, from_fn(|i| (i & 0xFF) as u8));
-        memory.set_page::<PAGE_SIZE>(0x0003_0000, from_fn(|i| (i & 0xFF) as u8));
+        memory.set_page(
+            0x0000_0000,
+            &from_fn::<Byte, PAGE_SIZE, _>(|i| (i & 0xFF) as u8),
+        );
+        memory.set_page(
+            0x0001_0000,
+            &from_fn::<Byte, PAGE_SIZE, _>(|i| (i & 0xFF) as u8),
+        );
+        memory.set_page(
+            0x0002_0000,
+            &from_fn::<Byte, PAGE_SIZE, _>(|i| (i & 0xFF) as u8),
+        );
+        memory.set_page(
+            0x0003_0000,
+            &from_fn::<Byte, PAGE_SIZE, _>(|i| (i & 0xFF) as u8),
+        );
 
         (
             SingleLevel::new(
