@@ -9,7 +9,7 @@ impl Interface for Backend {
 
     type Error = Box<dyn Error>;
 
-    fn run(self, pipeline: Box<dyn libpipe::Pipeline>) -> Result<Self::Ok, Self::Error> {
+    fn run(self, _: Box<dyn libpipe::Pipeline>) -> Result<Self::Ok, Self::Error> {
         todo!()
     }
 }
