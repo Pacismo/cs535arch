@@ -31,9 +31,6 @@ fn main() {
         Err(e) => panic!("{e}"),
     };
 
-    // TOKENS!
-    println!("{lines:#?}");
-
     let linked = link_symbols(lines).expect("Failed to link code");
 
     linked

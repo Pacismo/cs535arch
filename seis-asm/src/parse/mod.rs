@@ -727,8 +727,8 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
                     value: opt.as_str().parse().unwrap(),
                     destination,
                 },
-                Rule::integer => Integer {
-                    value: parse_integer!(opt.into_inner().next().unwrap()),
+                Rule::dec | Rule::oct | Rule::hex => Integer {
+                    value: parse_integer!(opt),
                     destination,
                 },
                 Rule::ident => Label {
@@ -739,7 +739,7 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
                     ident: opt.into_inner().next().unwrap().as_str().to_owned(),
                     destination,
                 },
-                _ => unreachable!(),
+                rule => unreachable!("Reached unreachable rule {rule:#?}"),
             }))
         }
 
