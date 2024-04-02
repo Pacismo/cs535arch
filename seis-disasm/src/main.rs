@@ -3,7 +3,7 @@ use libseis::{
     instruction_set::{decode, Instruction},
     types::Word,
 };
-use std::{fs::read, path::PathBuf};
+use std::{fs::read, io::{stdin, stdout, Write}, path::PathBuf};
 
 #[derive(Parser, Debug, Clone)]
 pub struct Cli {
@@ -19,21 +19,43 @@ fn main() {
 
     let content = read(file).expect("Failed to read file");
 
-    if binary {
-        println!(
-            "{:<10} | {:>8} | {:>8} | {:>8} | {:>8} | {}",
-            "Address", "+0", "+1", "+2", "+3", "Instruction"
-        );
-        println!("-----------|----------|----------|----------|----------|------------------");
+    let header = if binary {
+        format!(
+            "{:<10} | {:>8} | {:>8} | {:>8} | {:>8} | {}\n{}",
+            "Address",
+            "+0",
+            "+1",
+            "+2",
+            "+3",
+            "Instruction",
+            "-----------|----------|----------|----------|----------|------------------"
+        )
     } else {
-        println!(
-            "{:<10} | {:>2} | {:>2} | {:>2} | {:>2} | {}",
-            "Address", "+0", "+1", "+2", "+3", "Instruction"
-        );
-        println!("-----------|----|----|----|----|------------------");
-    }
+        format!(
+            "{:<10} | {:>2} | {:>2} | {:>2} | {:>2} | {}\n{}",
+            "Address",
+            "+0",
+            "+1",
+            "+2",
+            "+3",
+            "Instruction",
+            "-----------|----|----|----|----|------------------"
+        )
+    };
 
     for (i, word) in content.chunks(4).enumerate() {
+        if i * 4 % 0x28 == 0 {
+            if i != 0 {
+                print!("[PRESS ENTER]");
+                stdout().flush().expect("Failed to flush to stdout");
+                stdin()
+                    .read_line(&mut String::new())
+                    .expect("Failed to read a line");
+                println!();
+            }
+            println!("{header}");
+        }
+
         if word.len() == 4 {
             let instruction = match decode::<Instruction>(Word::from_be_bytes([
                 word[0], word[1], word[2], word[3],
