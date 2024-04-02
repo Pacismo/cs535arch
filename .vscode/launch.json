@@ -39,7 +39,10 @@
                 }
             },
             "args": [
-                "32", "associative", "1", "2"
+                "32",
+                "associative",
+                "1",
+                "2"
             ],
             "cwd": "${workspaceFolder}"
         },
@@ -153,7 +156,11 @@
                     "kind": "bin"
                 }
             },
-            "args": [],
+            "args": [
+                "test.asm",
+                "-o",
+                "test.bin"
+            ],
             "cwd": "${workspaceFolder}"
         },
         {
