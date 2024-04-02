@@ -1,7 +1,9 @@
 use super::Resolver;
 use crate::{regmap::RegMap, stages::execute::ExecuteResult};
 use libseis::{
-    instruction_set::integer::{BinaryOp as B, CompOp as C, SignExtendOp as S, UnaryOp as U},
+    instruction_set::integer::{
+        BinaryOp as B, CompOp as C, SignExtendOp as S, TestOp as T, UnaryOp as U,
+    },
     types::{SWord, Word},
 };
 use libseis::{instruction_set::IntegerOp, types::Register};
@@ -97,13 +99,26 @@ fn modulo(l: Word, r: Word, destination: Register) -> ExecuteResult {
 }
 
 #[inline]
-fn cmp(l: Word, r: Word) -> ExecuteResult {
-    WriteStatus {
-        zf: l == r,
-        of: l > r,
-        eps: false,
-        nan: false,
-        inf: false,
+fn cmp(l: Word, r: Word, signed: bool) -> ExecuteResult {
+    if signed {
+        let (value, overflow) = (l as SWord).overflowing_sub(r as SWord);
+        WriteStatus {
+            zf: value == 0,
+            of: overflow,
+            eps: false,
+            nan: false,
+            inf: false,
+        }
+    } else {
+        let (value, overflow) = l.overflowing_sub(r);
+
+        WriteStatus {
+            zf: value == 0,
+            of: overflow,
+            eps: false,
+            nan: false,
+            inf: false,
+        }
     }
 }
 
@@ -280,13 +295,15 @@ impl Resolver for IntegerOp {
                 modulo(regvals[operand], regvals[optional], destination)
             }
 
-            IntegerOp::Cmp(C::Immediate(operand, immediate)) => cmp(regvals[operand], immediate),
-            IntegerOp::Cmp(C::Registers(operand, optional)) => {
-                cmp(regvals[operand], regvals[optional])
+            IntegerOp::Cmp(C::Immediate(operand, immediate, signed)) => {
+                cmp(regvals[operand], immediate, signed)
+            }
+            IntegerOp::Cmp(C::Registers(operand, optional, signed)) => {
+                cmp(regvals[operand], regvals[optional], signed)
             }
 
-            IntegerOp::Tst(C::Immediate(operand, immediate)) => tst(regvals[operand], immediate),
-            IntegerOp::Tst(C::Registers(operand, optional)) => {
+            IntegerOp::Tst(T::Immediate(operand, immediate)) => tst(regvals[operand], immediate),
+            IntegerOp::Tst(T::Registers(operand, optional)) => {
                 tst(regvals[operand], regvals[optional])
             }
 
