@@ -449,15 +449,30 @@ impl MemoryModule for SingleLevel {
                 cache::Status::Conflict => {
                     self.conflict();
 
-                    self.set_if_idle(WriteByte(addr, value, false), self.write_miss_penalty)
+                    if !self.current_transaction.is_busy() {
+                        self.set_if_idle(WriteByte(addr, value, false), self.write_miss_penalty);
+                        Status::Idle
+                    } else {
+                        self.set_if_idle(WriteByte(addr, value, false), self.write_miss_penalty)
+                    }
                 }
                 cache::Status::Cold => {
                     self.cold();
 
-                    self.set_if_idle(WriteByte(addr, value, false), self.write_miss_penalty)
+                    if !self.current_transaction.is_busy() {
+                        self.set_if_idle(WriteByte(addr, value, false), self.write_miss_penalty);
+                        Status::Idle
+                    } else {
+                        self.set_if_idle(WriteByte(addr, value, false), self.write_miss_penalty)
+                    }
                 }
                 cache::Status::Disabled => {
-                    self.set_if_idle(WriteByte(addr, value, false), self.volatile_penalty)
+                    if !self.current_transaction.is_busy() {
+                        self.set_if_idle(WriteByte(addr, value, false), self.volatile_penalty);
+                        Status::Idle
+                    } else {
+                        self.set_if_idle(WriteByte(addr, value, false), self.volatile_penalty)
+                    }
                 }
             }
         }
@@ -485,24 +500,21 @@ impl MemoryModule for SingleLevel {
                     match self.data_cache.check_address(addr + 1) {
                         cache::Status::Conflict => {
                             self.conflict();
-                            if !self.writethrough {
-                                penalty += self.write_miss_penalty;
-                            } else {
-                                penalty += self.volatile_penalty
-                            }
+                            penalty = self.write_miss_penalty;
                         }
                         cache::Status::Cold => {
                             self.cold();
-                            if !self.writethrough {
-                                penalty += self.write_miss_penalty;
-                            } else {
-                                penalty += self.volatile_penalty
-                            }
+                            penalty = self.write_miss_penalty;
                         }
                         _ => (),
                     }
 
-                    self.set_if_idle(WriteShort(addr, value, false), penalty)
+                    if !self.current_transaction.is_busy() {
+                        self.set_if_idle(WriteShort(addr, value, false), penalty);
+                        Status::Idle
+                    } else {
+                        self.set_if_idle(WriteShort(addr, value, false), penalty)
+                    }
                 }
                 cache::Status::Cold => {
                     self.cold();
@@ -513,24 +525,21 @@ impl MemoryModule for SingleLevel {
                     match self.data_cache.check_address(addr + 1) {
                         cache::Status::Conflict => {
                             self.conflict();
-                            if !self.writethrough {
-                                penalty += self.write_miss_penalty;
-                            } else {
-                                penalty += self.volatile_penalty
-                            }
+                            penalty = self.write_miss_penalty;
                         }
                         cache::Status::Cold => {
                             self.cold();
-                            if !self.writethrough {
-                                penalty += self.write_miss_penalty;
-                            } else {
-                                penalty += self.volatile_penalty
-                            }
+                            penalty = self.write_miss_penalty;
                         }
                         _ => (),
                     }
 
-                    self.set_if_idle(WriteShort(addr, value, false), penalty)
+                    if !self.current_transaction.is_busy() {
+                        self.set_if_idle(WriteShort(addr, value, false), penalty);
+                        Status::Idle
+                    } else {
+                        self.set_if_idle(WriteShort(addr, value, false), penalty)
+                    }
                 }
                 cache::Status::Disabled => {
                     let mut penalty = self.volatile_penalty;
@@ -538,7 +547,12 @@ impl MemoryModule for SingleLevel {
                         penalty += self.volatile_penalty;
                     }
 
-                    self.set_if_idle(WriteShort(addr, value, false), penalty)
+                    if !self.current_transaction.is_busy() {
+                        self.set_if_idle(WriteShort(addr, value, false), penalty);
+                        Status::Idle
+                    } else {
+                        self.set_if_idle(WriteShort(addr, value, false), penalty)
+                    }
                 }
             }
         }
@@ -566,24 +580,21 @@ impl MemoryModule for SingleLevel {
                     match self.data_cache.check_address(addr + 3) {
                         cache::Status::Conflict => {
                             self.conflict();
-                            if !self.writethrough {
-                                penalty += self.write_miss_penalty;
-                            } else {
-                                penalty += self.volatile_penalty
-                            }
+                            penalty = self.write_miss_penalty;
                         }
                         cache::Status::Cold => {
                             self.cold();
-                            if !self.writethrough {
-                                penalty += self.write_miss_penalty;
-                            } else {
-                                penalty += self.volatile_penalty
-                            }
+                            penalty = self.write_miss_penalty;
                         }
                         _ => (),
                     }
 
-                    self.set_if_idle(WriteWord(addr, value, false), penalty)
+                    if !self.current_transaction.is_busy() {
+                        self.set_if_idle(WriteWord(addr, value, false), penalty);
+                        Status::Idle
+                    } else {
+                        self.set_if_idle(WriteWord(addr, value, false), penalty)
+                    }
                 }
                 cache::Status::Cold => {
                     self.cold();
@@ -594,24 +605,21 @@ impl MemoryModule for SingleLevel {
                     match self.data_cache.check_address(addr + 3) {
                         cache::Status::Conflict => {
                             self.conflict();
-                            if !self.writethrough {
-                                penalty += self.write_miss_penalty;
-                            } else {
-                                penalty += self.volatile_penalty
-                            }
+                            penalty = self.write_miss_penalty;
                         }
                         cache::Status::Cold => {
                             self.cold();
-                            if !self.writethrough {
-                                penalty += self.write_miss_penalty;
-                            } else {
-                                penalty += self.volatile_penalty
-                            }
+                            penalty = self.write_miss_penalty;
                         }
                         _ => (),
                     }
 
-                    self.set_if_idle(WriteWord(addr, value, false), penalty)
+                    if !self.current_transaction.is_busy() {
+                        self.set_if_idle(WriteWord(addr, value, false), penalty);
+                        Status::Idle
+                    } else {
+                        self.set_if_idle(WriteWord(addr, value, false), penalty)
+                    }
                 }
                 cache::Status::Disabled => {
                     let mut penalty = self.volatile_penalty;
@@ -619,7 +627,12 @@ impl MemoryModule for SingleLevel {
                         penalty += 1 + self.volatile_penalty;
                     }
 
-                    self.set_if_idle(WriteWord(addr, value, false), penalty)
+                    if !self.current_transaction.is_busy() {
+                        self.set_if_idle(WriteWord(addr, value, false), penalty);
+                        Status::Idle
+                    } else {
+                        self.set_if_idle(WriteWord(addr, value, false), penalty)
+                    }
                 }
             }
         }
