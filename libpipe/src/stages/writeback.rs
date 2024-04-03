@@ -44,6 +44,12 @@ impl PipelineStage for Writeback {
                     registers[EPS] = eps.then_some(1).unwrap_or(0);
                     registers[NAN] = nan.then_some(1).unwrap_or(0);
                     registers[INF] = inf.then_some(1).unwrap_or(0);
+
+                    locks[ZF] -= 1;
+                    locks[OF] -= 1;
+                    locks[EPS] -= 1;
+                    locks[NAN] -= 1;
+                    locks[INF] -= 1;
                 }
                 MemoryResult::WriteRegNoStatus { destination, value } => {
                     registers[destination] = value;
@@ -64,6 +70,13 @@ impl PipelineStage for Writeback {
                     registers[EPS] = eps.then_some(1).unwrap_or(0);
                     registers[NAN] = nan.then_some(1).unwrap_or(0);
                     registers[INF] = inf.then_some(1).unwrap_or(0);
+
+                    locks[register] -= 1;
+                    locks[ZF] -= 1;
+                    locks[OF] -= 1;
+                    locks[EPS] -= 1;
+                    locks[NAN] -= 1;
+                    locks[INF] -= 1;
                 }
                 MemoryResult::WriteReg2 {
                     register,
@@ -82,6 +95,14 @@ impl PipelineStage for Writeback {
                     registers[EPS] = eps.then_some(1).unwrap_or(0);
                     registers[NAN] = nan.then_some(1).unwrap_or(0);
                     registers[INF] = inf.then_some(1).unwrap_or(0);
+
+                    locks[register] -= 1;
+                    locks[SP] -= 1;
+                    locks[ZF] -= 1;
+                    locks[OF] -= 1;
+                    locks[EPS] -= 1;
+                    locks[NAN] -= 1;
+                    locks[INF] -= 1;
                 }
                 MemoryResult::JumpSubroutine {
                     address,
@@ -93,9 +114,16 @@ impl PipelineStage for Writeback {
                     registers[LP] = link;
                     registers[SP] = sp;
                     registers[BP] = bp;
+
+                    locks[PC] -= 1;
+                    locks[LP] -= 1;
+                    locks[SP] -= 1;
+                    locks[BP] -= 1;
                 }
                 MemoryResult::Jump { address } => {
                     registers[PC] = address;
+
+                    locks[PC] -= 1;
                 }
                 MemoryResult::Return {
                     address,
@@ -107,6 +135,11 @@ impl PipelineStage for Writeback {
                     registers[BP] = bp;
                     registers[SP] = sp;
                     registers[LP] = lp;
+
+                    locks[PC] -= 1;
+                    locks[BP] -= 1;
+                    locks[SP] -= 1;
+                    locks[LP] -= 1;
                 }
             }
         }

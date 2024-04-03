@@ -38,16 +38,17 @@ pub union Registers {
     by_id: Indexed,
 }
 
+impl Registers {
+    pub fn iter(&self) -> std::slice::Iter<Word> {
+        unsafe { self.by_id.iter() }
+    }
+}
+
 impl Default for Registers {
     fn default() -> Self {
-        let mut values = Self {
+        Self {
             by_id: Indexed::default(),
-        };
-
-        values.sp = 0x00001;
-        values.bp = 0x00001;
-
-        values
+        }
     }
 }
 

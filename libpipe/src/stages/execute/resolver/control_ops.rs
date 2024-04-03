@@ -74,7 +74,7 @@ impl Resolver for ControlOp {
                 }
             }
             ControlOp::Jgt(Jump::Register(reg)) => {
-                if regvals[ZF] == 0 && regvals[OF] == 1 {
+                if regvals[ZF] == 0 && regvals[OF] == 0 {
                     JumpTo {
                         address: regvals[reg],
                     }
@@ -83,7 +83,7 @@ impl Resolver for ControlOp {
                 }
             }
             ControlOp::Jgt(Jump::Relative(rel)) => {
-                if regvals[ZF] == 0 && regvals[OF] == 1 {
+                if regvals[ZF] == 0 && regvals[OF] == 0 {
                     JumpTo {
                         address: regvals[PC].wrapping_add_signed(rel),
                     }
@@ -92,7 +92,7 @@ impl Resolver for ControlOp {
                 }
             }
             ControlOp::Jlt(Jump::Register(reg)) => {
-                if regvals[ZF] == 0 && regvals[OF] == 0 {
+                if regvals[ZF] == 0 && regvals[OF] == 1 {
                     JumpTo {
                         address: regvals[reg],
                     }
@@ -101,7 +101,7 @@ impl Resolver for ControlOp {
                 }
             }
             ControlOp::Jlt(Jump::Relative(rel)) => {
-                if regvals[ZF] == 0 && regvals[OF] == 0 {
+                if regvals[ZF] == 0 && regvals[OF] == 1 {
                     JumpTo {
                         address: regvals[PC].wrapping_add_signed(rel),
                     }
@@ -110,7 +110,7 @@ impl Resolver for ControlOp {
                 }
             }
             ControlOp::Jge(Jump::Register(reg)) => {
-                if regvals[ZF] == 1 || regvals[OF] == 1 {
+                if regvals[ZF] == 1 || regvals[OF] == 0 {
                     JumpTo {
                         address: regvals[reg],
                     }
@@ -119,7 +119,7 @@ impl Resolver for ControlOp {
                 }
             }
             ControlOp::Jge(Jump::Relative(rel)) => {
-                if regvals[ZF] == 1 || regvals[OF] == 1 {
+                if regvals[ZF] == 1 || regvals[OF] == 0 {
                     JumpTo {
                         address: regvals[PC].wrapping_add_signed(rel),
                     }
@@ -128,7 +128,7 @@ impl Resolver for ControlOp {
                 }
             }
             ControlOp::Jle(Jump::Register(reg)) => {
-                if regvals[ZF] == 1 || regvals[OF] == 0 {
+                if regvals[ZF] == 1 || regvals[OF] == 1 {
                     JumpTo {
                         address: regvals[reg],
                     }
@@ -137,7 +137,7 @@ impl Resolver for ControlOp {
                 }
             }
             ControlOp::Jle(Jump::Relative(rel)) => {
-                if regvals[ZF] == 1 || regvals[OF] == 0 {
+                if regvals[ZF] == 1 || regvals[OF] == 1 {
                     JumpTo {
                         address: regvals[PC].wrapping_add_signed(rel),
                     }
@@ -150,17 +150,6 @@ impl Resolver for ControlOp {
 
     #[inline]
     fn clock_requirement(self) -> usize {
-        match self {
-            ControlOp::Jmp(Jump::Relative(_))
-            | ControlOp::Jsr(Jump::Relative(_))
-            | ControlOp::Jeq(Jump::Relative(_))
-            | ControlOp::Jne(Jump::Relative(_))
-            | ControlOp::Jgt(Jump::Relative(_))
-            | ControlOp::Jlt(Jump::Relative(_))
-            | ControlOp::Jge(Jump::Relative(_))
-            | ControlOp::Jle(Jump::Relative(_)) => 2,
-
-            _ => 1,
-        }
+        1
     }
 }

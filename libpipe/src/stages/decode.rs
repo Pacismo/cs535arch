@@ -2,7 +2,7 @@ use crate::{reg_locks::Locks, regmap::RegMap, Clock, PipelineStage, Registers, S
 use libmem::module::MemoryModule;
 use libseis::{
     instruction_set::{decode, Info, Instruction},
-    registers::{RegisterFlags, PC},
+    registers::{RegisterFlags, BP, PC, SP},
     types::Word,
 };
 use serde::Serialize;
@@ -105,6 +105,8 @@ impl PipelineStage for Decode {
                                         if r == PC {
                                             // PC must equal location of where instruction was fetched -- always one word behind
                                             (PC, registers[r].wrapping_sub(4))
+                                        } else if r == SP || r == BP {
+                                            (r, (registers[r] & 0x0000_FFFF) | 0x0001_0000)
                                         } else {
                                             (r, registers[r])
                                         }
@@ -115,7 +117,7 @@ impl PipelineStage for Decode {
 
                             self.state = Idle;
 
-                            clock
+                            clock.to_ready()
                         } else {
                             clock.to_block()
                         }

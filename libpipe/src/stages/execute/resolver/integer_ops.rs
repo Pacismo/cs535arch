@@ -101,10 +101,10 @@ fn modulo(l: Word, r: Word, destination: Register) -> ExecuteResult {
 #[inline]
 fn cmp(l: Word, r: Word, signed: bool) -> ExecuteResult {
     if signed {
-        let (value, overflow) = (l as SWord).overflowing_sub(r as SWord);
+        let value = (l as SWord).wrapping_sub(r as SWord);
         WriteStatus {
             zf: value == 0,
-            of: overflow,
+            of: r > l,
             eps: false,
             nan: false,
             inf: false,
