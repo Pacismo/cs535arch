@@ -192,6 +192,10 @@ impl MemoryModule for SingleLevel {
         }
     }
 
+    fn wait_time(&self) -> usize {
+        self.clocks
+    }
+
     fn read_byte(&mut self, addr: Word) -> Result<Byte> {
         if self.current_transaction.busy_data() {
             return Err(Busy(self.clocks));
@@ -686,6 +690,10 @@ impl MemoryModule for SingleLevel {
 
     fn accesses(&self) -> usize {
         self.accesses
+    }
+
+    fn evictions(&self) -> usize {
+        self.evictions
     }
 
     fn memory(&self) -> &Memory {

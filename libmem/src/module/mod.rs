@@ -52,6 +52,9 @@ pub trait MemoryModule: Debug {
     /// Clocks the module, decrementing any counters.
     fn clock(&mut self, amount: usize);
 
+    /// The number of clocks needed to unblock a blockage
+    fn wait_time(&self) -> usize;
+
     /// Reads a byte from memory. Returns value on cache hit
     fn read_byte(&mut self, addr: Word) -> Result<Byte>;
     /// Reads a short from memory. Returns value on cache hit
@@ -95,6 +98,8 @@ pub trait MemoryModule: Debug {
     fn cache_hits(&self) -> usize;
     /// Returns the total number of memory accesses that have occurred in the duration of the runtime.
     fn accesses(&self) -> usize;
+    /// Returns the total number of times a cache line was evicted
+    fn evictions(&self) -> usize;
 
     /// Get the memory structure
     fn memory(&self) -> &Memory;

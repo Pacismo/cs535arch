@@ -118,6 +118,8 @@ impl Cache for Associative {
                     set.data[off] = bytes[0];
                     set.data[off + 1] = bytes[1];
 
+                    set.dirty = true;
+
                     Status::Hit
                 } else {
                     Status::Conflict
@@ -162,7 +164,7 @@ impl Cache for Associative {
         let (tag, set, off) = self.split_address(address);
         let off_mask = (1 << self.off_bits) - 1;
 
-        if off < off_mask - 3 {
+        if off < off_mask - 2 {
             if let Some(set) = &mut self.sets[set] {
                 if set.tag == tag {
                     let bytes = data.to_be_bytes();
@@ -170,6 +172,8 @@ impl Cache for Associative {
                     set.data[off + 1] = bytes[1];
                     set.data[off + 2] = bytes[2];
                     set.data[off + 3] = bytes[3];
+
+                    set.dirty = true;
 
                     Status::Hit
                 } else {
