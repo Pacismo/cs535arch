@@ -1,5 +1,5 @@
 miss_penalty = 100
-pipelining = true
+pipelining = false
 volatile_penalty = 20
 writethrough = false
 
