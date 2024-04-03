@@ -162,7 +162,7 @@ impl Clock {
 /// The stage of the previous stage in the pipeline
 ///
 /// If there is a stall, [`Stall`](Status::Stall) *must* contain the shortest stall time
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub enum Status<T: Debug = ()> {
     /// Some previous stage has a stall
     ///
@@ -172,12 +172,17 @@ pub enum Status<T: Debug = ()> {
     /// The pipeline has completed a job and is forwarding a new job
     Flow(T),
     /// The stage is ready, but waiting
-    #[default]
-    Ready,
+    Ready(usize),
     /// The pipeline squashed an instruction
     Squashed,
     /// There are no new jobs
     Dry,
+}
+
+impl<T: Debug + Default> Default for Status<T> {
+    fn default() -> Self {
+        Self::Ready(0)
+    }
 }
 
 impl Status<()> {
@@ -197,7 +202,7 @@ impl<T: Debug> Status<T> {
     }
 
     pub fn is_ready(&self) -> bool {
-        matches!(self, Self::Ready)
+        matches!(self, Self::Ready(_))
     }
 
     pub fn is_squashed(&self) -> bool {

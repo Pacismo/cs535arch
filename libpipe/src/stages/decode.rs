@@ -12,9 +12,11 @@ use serde::Serialize;
 pub enum State {
     Decoding {
         word: Word,
+        pc: Word,
     },
     Ready {
         word: Word,
+        pc: Word,
     },
     #[default]
     Idle,
@@ -86,13 +88,15 @@ impl PipelineStage for Decode {
             self.forward = None;
             self.state = Squashed;
             clock
+        } else if self.state.is_halted() {
+            Clock::Halt
         } else {
-            if let Decoding { word } = self.state {
-                self.state = Ready { word }
+            if let Decoding { word, pc } = self.state {
+                self.state = Ready { word, pc }
             }
 
             match self.state {
-                Ready { word } => {
+                Ready { word, pc } => {
                     if clock.is_ready() {
                         let instruction: Instruction = decode(word).unwrap_or_default();
 
@@ -111,7 +115,7 @@ impl PipelineStage for Decode {
                                     .map(|r| {
                                         if r == PC {
                                             // PC must equal location of where instruction was fetched -- always one word behind
-                                            (PC, registers[r].wrapping_sub(4))
+                                            (PC, pc)
                                         } else if r == SP || r == BP {
                                             (r, (registers[r] & 0x0000_FFFF) | 0x0001_0000)
                                         } else {
@@ -137,7 +141,7 @@ impl PipelineStage for Decode {
                     }
                 }
                 Idle => clock.to_ready(),
-                Squashed => {
+                Squashed | PrevSquash => {
                     if clock.is_ready() {
                         self.forward = Some(DecodeResult::Squashed);
                         self.state = Idle;
@@ -157,22 +161,23 @@ impl PipelineStage for Decode {
         if self.state.is_halted() {
             Status::Dry
         } else {
-            let clocks = match input {
-                Status::Flow(FetchResult::Ready { word }) => {
-                    self.state = Decoding { word };
-                    1
+            let (clocks, rix) = match input {
+                Status::Flow(FetchResult::Ready { word, pc }) => {
+                    self.state = Decoding { word, pc };
+                    (1, 0)
                 }
                 Status::Flow(FetchResult::Squashed) => {
                     self.state = PrevSquash;
-                    1
+                    (1, 0)
                 }
-                Status::Stall(clocks) => clocks,
-                _ => 1,
+                Status::Stall(clocks) => (clocks, 0),
+                Status::Ready(r) => (1, r),
+                _ => (1, 0),
             };
 
             match take(&mut self.forward) {
                 Some(v) => Status::Flow(v),
-                None if self.state.is_ready() => Status::Ready,
+                None if self.state.is_ready() => Status::Ready(rix + 1),
                 None if self.state.is_squashed() => Status::Squashed,
                 None if self.state.is_idle() => Status::Stall(clocks),
                 None => Status::Stall(1),
@@ -251,7 +256,10 @@ mod test {
         // Forward a NOP word
 
         assert!(matches!(
-            decode.forward(Status::Flow(FetchResult::Ready { word: 0x0000_0000 })),
+            decode.forward(Status::Flow(FetchResult::Ready {
+                word: 0x0000_0000,
+                pc: 0
+            })),
             Status::Stall(1)
         ));
 
@@ -261,7 +269,10 @@ mod test {
             decode,
             Decode {
                 forward: None,
-                state: State::Decoding { word: 0x0000_0000 }
+                state: State::Decoding {
+                    word: 0x0000_0000,
+                    ..
+                }
             }
         ));
 
@@ -285,7 +296,7 @@ mod test {
         // Forward the value and make sure it is what we expect
 
         assert!(matches!(
-            decode.forward(Status::Flow(FetchResult::Ready { word: 0x0000_0000 })),
+            decode.forward(Status::Flow(FetchResult::Ready { word: 0x0000_0000, pc: 0 })),
             Status::Flow(DecodeResult::Forward {
                 instruction: Instruction::Control(ControlOp::Nop), // Nop
                 regvals, // No register values

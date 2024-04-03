@@ -8,7 +8,6 @@ use crate::{
 };
 use crate::{Pipeline, Registers};
 use libmem::module::MemoryModule;
-use std::mem::take;
 
 #[derive(Debug, Default, Clone)]
 enum Stage {
@@ -50,14 +49,14 @@ impl Pipeline for Unpipelined {
                     self.memory_module.as_mut(),
                 );
 
-                match self.fetch.forward(Status::Ready) {
+                match self.fetch.forward(Status::Ready(0)) {
                     Status::Stall(k) => ClockResult::Stall(k),
                     Status::Flow(r) => {
                         self.stage = Decode;
                         self.decode.forward(Status::Flow(r));
                         ClockResult::Flow
                     }
-                    Status::Ready => ClockResult::Stall(1),
+                    Status::Ready(_) => ClockResult::Stall(1),
                     Status::Squashed => ClockResult::Stall(1),
                     Status::Dry => ClockResult::Dry,
                 }
@@ -70,14 +69,14 @@ impl Pipeline for Unpipelined {
                     self.memory_module.as_mut(),
                 );
 
-                match self.decode.forward(Status::Ready) {
+                match self.decode.forward(Status::Ready(0)) {
                     Status::Stall(k) => ClockResult::Stall(k),
                     Status::Flow(r) => {
                         self.stage = Execute;
                         self.execute.forward(Status::Flow(r));
                         ClockResult::Flow
                     }
-                    Status::Ready => ClockResult::Stall(1),
+                    Status::Ready(_) => ClockResult::Stall(1),
                     Status::Squashed => ClockResult::Stall(1),
                     Status::Dry => ClockResult::Dry,
                 }
@@ -90,14 +89,14 @@ impl Pipeline for Unpipelined {
                     self.memory_module.as_mut(),
                 );
 
-                match self.execute.forward(Status::Ready) {
+                match self.execute.forward(Status::Ready(0)) {
                     Status::Stall(k) => ClockResult::Stall(k),
                     Status::Flow(r) => {
                         self.stage = Memory;
                         self.memory.forward(Status::Flow(r));
                         ClockResult::Flow
                     }
-                    Status::Ready => ClockResult::Stall(1),
+                    Status::Ready(_) => ClockResult::Stall(1),
                     Status::Squashed => ClockResult::Stall(1),
                     Status::Dry => ClockResult::Dry,
                 }
@@ -110,14 +109,14 @@ impl Pipeline for Unpipelined {
                     self.memory_module.as_mut(),
                 );
 
-                match self.memory.forward(Status::Ready) {
+                match self.memory.forward(Status::Ready(0)) {
                     Status::Stall(k) => ClockResult::Stall(k),
                     Status::Flow(r) => {
                         self.stage = Writeback;
                         self.writeback.forward(Status::Flow(r));
                         ClockResult::Flow
                     }
-                    Status::Ready => ClockResult::Stall(1),
+                    Status::Ready(_) => ClockResult::Stall(1),
                     Status::Squashed => ClockResult::Stall(1),
                     Status::Dry => ClockResult::Dry,
                 }
@@ -130,13 +129,12 @@ impl Pipeline for Unpipelined {
                     self.memory_module.as_mut(),
                 );
 
-                match self.writeback.forward(Status::Ready) {
+                self.stage = Fetch;
+
+                match self.writeback.forward(Status::Ready(0)) {
                     Status::Stall(k) => ClockResult::Stall(k),
-                    Status::Flow(()) => {
-                        self.stage = Fetch;
-                        ClockResult::Flow
-                    }
-                    Status::Ready => ClockResult::Stall(1),
+                    Status::Flow(()) => ClockResult::Flow,
+                    Status::Ready(_) => ClockResult::Stall(1),
                     Status::Squashed => ClockResult::Stall(1),
                     Status::Dry => ClockResult::Dry,
                 }

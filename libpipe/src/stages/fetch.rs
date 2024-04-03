@@ -49,7 +49,7 @@ impl State {
 
 #[derive(Debug, Clone, Copy, Serialize)]
 pub enum FetchResult {
-    Ready { word: Word },
+    Ready { word: Word, pc: Word },
     Squashed,
 }
 
@@ -97,7 +97,7 @@ impl PipelineStage for Fetch {
             }
         } else if let Squashed { ref mut clocks } = self.state {
             if clock.is_ready() {
-                *clocks = clocks.saturating_sub(clock.clocks());
+                *clocks = clocks.saturating_sub(1);
                 if *clocks == 0 {
                     self.state = Idle;
                 }
@@ -121,7 +121,10 @@ impl PipelineStage for Fetch {
 
         match self.state {
             Ready { instruction } if !clock.is_block() => {
-                self.forward = Some(FetchResult::Ready { word: instruction });
+                self.forward = Some(FetchResult::Ready {
+                    word: instruction,
+                    pc: registers.pc.wrapping_sub(4),
+                });
                 self.state = Idle;
                 clock.to_ready()
             }
@@ -146,7 +149,7 @@ impl PipelineStage for Fetch {
             None if self.state.is_waiting() => Status::Stall(self.state.clocks()),
             None if self.state.is_squashed() => Status::Squashed,
             None if self.state.is_halted() => Status::Dry,
-            None => Status::Ready,
+            None => Status::Ready(1),
         }
     }
 
@@ -233,25 +236,29 @@ mod test {
                 mem.clock(10);
                 result = fetch.clock(Clock::Ready(10), &mut reg, &mut lock, &mut mem);
                 assert!(matches!(result, Clock::Ready(10)));
-                assert!(matches!(fetch.forward, Some(FetchResult::Ready { word }) if word == v[0]));
+                assert!(
+                    matches!(fetch.forward, Some(FetchResult::Ready { word ,.. }) if word == v[0])
+                );
                 assert!(matches!(fetch.state, State::Idle));
 
                 state = fetch.forward(Status::default());
                 assert!(matches!(
                     state,
-                    Status::Flow(FetchResult::Ready { word }) if word == v[0]
+                    Status::Flow(FetchResult::Ready { word, .. }) if word == v[0]
                 ));
 
                 mem.clock(1);
                 result = fetch.clock(Clock::Ready(1), &mut reg, &mut lock, &mut mem);
                 assert!(matches!(result, Clock::Ready(1)));
-                assert!(matches!(fetch.forward, Some(FetchResult::Ready { word }) if word == v[1]));
+                assert!(
+                    matches!(fetch.forward, Some(FetchResult::Ready { word ,.. }) if word == v[1])
+                );
                 assert!(matches!(fetch.state, State::Idle));
 
                 state = fetch.forward(Status::default());
                 assert!(matches!(
                     state,
-                    Status::Flow(FetchResult::Ready { word }) if word == v[1]
+                    Status::Flow(FetchResult::Ready { word ,.. }) if word == v[1]
                 ))
             })
     }

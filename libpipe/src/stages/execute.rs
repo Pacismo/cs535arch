@@ -126,8 +126,11 @@ pub enum ExecuteResult {
 
 impl ExecuteResult {
     #[inline]
-    pub fn is_squash(&self) -> bool {
-        matches!(self, ExecuteResult::Squash { .. })
+    pub fn should_squash(&self) -> bool {
+        matches!(
+            self,
+            Self::JumpTo { .. } | Self::Subroutine { .. } | Self::Return { .. }
+        )
     }
 
     #[inline]
@@ -218,15 +221,17 @@ impl PipelineStage for Execute {
                     clocks = clocks.saturating_sub(clock.clocks());
                     if clocks == 0 {
                         let result = instruction.execute(rvals);
-                        let squash = result.is_squash();
+                        let squash = result.should_squash();
 
-                        if result.is_halt() {
-                            self.forward = None;
-                            self.state = Halted;
-                            Clock::Halt
-                        } else if clock.is_ready() {
+                        if clock.is_ready() {
+                            let is_halt = result.is_halt();
+
                             self.forward = Some(result);
-                            self.state = Idle;
+                            if is_halt {
+                                self.state = Halted;
+                            } else {
+                                self.state = Idle;
+                            }
 
                             if squash {
                                 clock.to_squash()
@@ -254,17 +259,19 @@ impl PipelineStage for Execute {
                 }
             }
             Ready { result, wregs } => {
-                if result.is_halt() {
-                    self.forward = None;
-                    self.state = Halted;
-                    Clock::Halt
-                } else if clock.is_squash() {
+                if clock.is_squash() {
                     self.forward = None;
                     self.state = Squashed { wregs };
                     clock
                 } else if clock.is_ready() {
+                    let is_halt = result.is_halt();
+
                     self.forward = Some(result);
-                    self.state = Idle;
+                    if is_halt {
+                        self.state = Halted;
+                    } else {
+                        self.state = Idle;
+                    }
                     clock
                 } else {
                     self.state = Ready { result, wregs };
@@ -281,16 +288,19 @@ impl PipelineStage for Execute {
                     clock.to_block()
                 }
             }
-            Halted => Clock::Halt,
+            Halted => {
+                self.state = Halted;
+                Clock::Halt
+            }
         }
     }
 
     fn forward(&mut self, input: Status<Self::Prev>) -> Status<Self::Next> {
-        if self.state.is_halted() {
+        if self.state.is_halted() && self.forward.is_none() {
             Status::Dry
         } else {
-            let clocks = match input {
-                Status::Stall(clocks) => clocks,
+            let (clocks, rix) = match input {
+                Status::Stall(clocks) => (clocks, 0),
                 Status::Flow(DecodeResult::Forward {
                     instruction,
                     regvals,
@@ -303,27 +313,30 @@ impl PipelineStage for Execute {
                         rvals: regvals,
                         clocks,
                     };
-                    clocks
+                    (clocks, 0)
                 }
                 Status::Flow(DecodeResult::Squashed) => {
                     self.state = Squashed {
                         wregs: Default::default(),
                     };
-                    1
+                    (1, 0)
                 }
-                Status::Ready => 1,
-                Status::Squashed => 1,
+                Status::Ready(r) => (1, r),
+                Status::Squashed => (1, 0),
                 Status::Dry => unreachable!(),
             };
 
             match take(&mut self.forward) {
                 Some(xr) => Status::Flow(xr),
+                None if self.state.is_waiting() && rix == 2 => {
+                    Status::Stall(self.state.wait_time())
+                }
                 None if self.state.is_waiting() => {
                     Status::Stall(clocks.min(self.state.wait_time()))
                 }
                 None if self.state.is_squashed() => Status::Squashed,
                 None if self.state.is_idle() => Status::Stall(clocks),
-                None => Status::Ready,
+                None => Status::Ready(rix + 1),
             }
         }
     }

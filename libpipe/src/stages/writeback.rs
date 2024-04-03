@@ -154,7 +154,7 @@ impl PipelineStage for Writeback {
                 self.job = Some(input);
                 Status::Flow(())
             }
-            Status::Ready => Status::Stall(1),
+            Status::Ready(_) => Status::Stall(1),
             Status::Squashed => Status::Squashed,
             Status::Dry => Status::Dry,
         }
