@@ -214,7 +214,7 @@ ldr = @{ ^"LDR" ~ WHITESPACE+ ~ (zpaload | immload) }
 
 /// `LOAD constant => vareg`, where `constant` is an `integer`, a `float`, an `ident`, or a `const` (or a reference to it).
 /// This expands to at least one LDR to load the value
-load = ${ ^"LOAD" ~ WHITESPACE+ ~ (float | integer | const | ident) ~ WHITESPACE* ~ assign ~ WHITESPACE* ~ vareg }
+load = ${ ^"LOAD" ~ WHITESPACE+ ~ (const | float | integer | ident) ~ WHITESPACE* ~ assign ~ WHITESPACE* ~ vareg }
 
 zpaload = !{ zpgref ~ assign ~ vareg }
 immload = !{ integer ~ assign ~ vareg ~ ("." ~ part)? }
