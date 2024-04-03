@@ -198,7 +198,7 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
                                     span.clone(),
                                 ));
                                 if left == 0 {
-                                    ip += 1;
+                                    ip += 4;
                                 } else {
                                     expanded.push_back((
                                         Instruction::Ldr(L::Immediate {
@@ -210,7 +210,7 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
                                         ip,
                                         span,
                                     ));
-                                    ip += 2;
+                                    ip += 4;
                                 }
                             }
                             E::ConstantVal { ident, destination } => {
@@ -233,9 +233,8 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
                                         ip,
                                         span.clone(),
                                     ));
-                                    if left == 0 {
-                                        ip += 1;
-                                    } else {
+                                    ip += 4;
+                                    if left != 0 {
                                         expanded.push_back((
                                             Instruction::Ldr(L::Immediate {
                                                 value: left,
@@ -243,10 +242,10 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
                                                 location: 1,
                                                 zero: true,
                                             }),
-                                            ip + 1,
+                                            ip,
                                             span,
                                         ));
-                                        ip += 2;
+                                        ip += 4;
                                     }
                                 }
                             }
