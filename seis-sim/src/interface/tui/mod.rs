@@ -1,19 +1,16 @@
 mod init;
+mod ui;
 
-use self::init::{deinitialize, initialize};
+use libpipe::Pipeline;
 
+use crate::config::SimulationConfiguration;
+
+use self::{
+    init::{deinitialize, initialize},
+    ui::Runtime,
+};
 use super::Interface;
-use crossterm::{
-    event::{self, KeyCode, KeyEventKind},
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-    ExecutableCommand,
-};
-use ratatui::{
-    prelude::{CrosstermBackend, Stylize, Terminal},
-    widgets::Paragraph,
-};
 use std::error::Error;
-use std::io::{stdout, Stdout};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Tui;
@@ -23,25 +20,16 @@ impl Interface for Tui {
 
     type Error = Box<dyn Error>;
 
-    fn run(self, _pipeline: Box<dyn libpipe::Pipeline>) -> Result<Self::Ok, Self::Error> {
+    fn run(self, mut pipeline: Box<dyn Pipeline>, config: SimulationConfiguration) -> Result<Self::Ok, Self::Error> {
         // Initialize the terminal
         let mut terminal = initialize()?;
 
-        loop {
-            // Handle input events, update pipeline, and draw UI
-            println!("Implement TUI");
-
-            terminal.draw(|frame| {
-                let area = frame.size();
-                frame.render_widget(Paragraph::new("Hello, World!").white().on_blue(), area);
-            })?;
-
-            break;
-        }
+        let mut runtime = Runtime::new(pipeline.as_mut(), config);
+        let result = runtime.run(&mut terminal);
 
         // Restore terminal state
         deinitialize()?;
 
-        Ok(())
+        result
     }
 }

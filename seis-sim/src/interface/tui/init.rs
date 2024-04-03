@@ -1,7 +1,11 @@
-use std::ops::Deref;
+use crossterm::{
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    ExecutableCommand,
+};
+use ratatui::prelude::{CrosstermBackend, Terminal};
 
-use super::*;
-
+use std::error::Error;
+use std::io::{stdout, Stdout};
 pub fn initialize() -> Result<Terminal<CrosstermBackend<Stdout>>, Box<dyn Error>> {
     let mut stdout = stdout();
 

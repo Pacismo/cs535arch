@@ -13,9 +13,12 @@ use std::{error::Error, fs::read, path::PathBuf};
 /// However many pages of memory are supported by the simulator
 const PAGES: usize = 16;
 
-fn prepare_config(conf: PathBuf, bin: PathBuf) -> Result<Box<dyn Pipeline>, Box<dyn Error>> {
+fn prepare_config(
+    conf: PathBuf,
+    bin: PathBuf,
+) -> Result<(Box<dyn Pipeline>, SimulationConfiguration), Box<dyn Error>> {
     let conf = SimulationConfiguration::from_toml_file(conf)?;
-    let mut pipeline = conf.into_boxed_pipeline();
+    let mut pipeline = conf.clone().into_boxed_pipeline();
 
     let memory = pipeline.memory_module_mut().memory_mut();
 
@@ -29,7 +32,7 @@ fn prepare_config(conf: PathBuf, bin: PathBuf) -> Result<Box<dyn Pipeline>, Box<
         memory.set_page((page << 16) as Word, data)
     }
 
-    Ok(pipeline)
+    Ok((pipeline, conf))
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -69,12 +72,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         backend_mode,
     }) = cli.config
     {
-        let pipeline = prepare_config(configuration, image_file)?;
+        let (pipeline, config) = prepare_config(configuration, image_file)?;
 
         if backend_mode {
-            interface::Backend.run(pipeline)?;
+            interface::Backend.run(pipeline, config)?;
         } else {
-            interface::Tui.run(pipeline)?;
+            interface::Tui.run(pipeline, config)?;
         }
     }
 

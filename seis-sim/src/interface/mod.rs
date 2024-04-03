@@ -6,6 +6,8 @@ use libpipe::Pipeline;
 use std::fmt::Debug;
 pub use tui::Tui;
 
+use crate::config::SimulationConfiguration;
+
 /// Represents a means of running an interface.
 ///
 /// Perhaps additional configuration is necessary; thus, using a datastructure
@@ -15,5 +17,9 @@ pub trait Interface: Debug {
     type Ok: Debug;
     type Error: Debug;
 
-    fn run(self, pipeline: Box<dyn Pipeline>) -> Result<Self::Ok, Self::Error>;
+    fn run(
+        self,
+        pipeline: Box<dyn Pipeline>,
+        config: SimulationConfiguration,
+    ) -> Result<Self::Ok, Self::Error>;
 }
