@@ -210,7 +210,7 @@ pub enum WriteOp {
 }
 
 impl WriteOp {
-    const DST_REG_MASK: Word = 0b0000_0000_0000_0000_0000_0000_0000_1111;
+    const SRC_REG_MASK: Word = 0b0000_0000_0000_0000_0000_0000_0000_1111;
 
     const ZPG_ADDR_MASK: Word = 0b0000_0000_0000_1111_1111_1111_1111_0000;
     const ZPG_ADDR_SHIFT: Word = 4;
@@ -221,7 +221,7 @@ impl WriteOp {
     const ADDRESS_REG_MASK: Word = 0b0000_0000_0000_0000_0000_0000_1111_0000;
     const ADDRESS_REG_SHIFT: Word = 4;
     const INDEX_REG_MASK: Word = 0b0000_0000_0000_0000_0000_1111_0000_0000;
-    const INDEX_REG_SHIFT: Word = 12;
+    const INDEX_REG_SHIFT: Word = 8;
     const OFFSET_MASK: Word = 0b0000_0000_0000_1111_1111_1111_0000_0000;
     const OFFSET_SHIFT: Word = 8;
 
@@ -238,7 +238,7 @@ impl Decode for WriteOp {
     fn decode(word: Word) -> DecodeResult<Self> {
         use WriteOp::*;
         let addr_mode = (word & Self::ADDR_MODE_MASK) >> Self::ADDR_MODE_SHIFT;
-        let source = (word & Self::DST_REG_MASK) as Register;
+        let source = (word & Self::SRC_REG_MASK) as Register;
 
         match addr_mode {
             Self::INDIRECT_MODE => Ok(Indirect {
@@ -310,13 +310,13 @@ impl Encode for WriteOp {
                 volatile,
                 address,
                 index,
-                source: destination,
+                source,
             } => {
                 (Self::INDEXED_MODE << Self::ADDR_MODE_SHIFT)
                     | if volatile { Self::VOLATILE_BIT } else { 0 }
                     | ((address as Word) << Self::ADDRESS_REG_SHIFT)
                     | ((index as Word) << Self::INDEX_REG_SHIFT)
-                    | (destination as Word)
+                    | (source as Word)
             }
             StackOffset {
                 offset,
