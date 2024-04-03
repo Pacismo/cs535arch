@@ -41,7 +41,7 @@ impl Pipeline for Unpipelined {
     fn clock(&mut self, clocks: usize) -> ClockResult {
         self.memory_module.clock(clocks);
 
-        match take(&mut self.stage) {
+        match self.stage {
             Stage::Fetch => {
                 self.fetch.clock(
                     Clock::Ready(clocks),
