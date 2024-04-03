@@ -1,10 +1,11 @@
 .array_base = 0x00030000
+.loops = 4
 
 #[location = 0]
 main:
-    load 32, v0
+    load 8, v0
     load 16, v1
-    load 0x00030000, v5
+    load .array_base, v3
 
 loop:
     add v1, v0, v1
@@ -13,17 +14,13 @@ loop:
     cmp v0, 0
     jgt loop
 
-    mul v2, 4, v3
-    slr v1, v3[v2]
+    mul v2, 4, v4
+    slr v1, v3[v4]
 
     add v2, 1, v2
-    load 32, v0
-    cmp v2, 4
+    load 8, v0
+    cmp v2, .loops
     jle loop
-
-    load 0, v0
-    load 0, v1
-    load 0, v2
 
     nop
     halt

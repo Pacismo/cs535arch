@@ -3,6 +3,7 @@ use crossterm::event;
 use libpipe::{Pipeline, PipelineStage};
 use libseis::{
     instruction_set::{decode, Instruction},
+    pages::PAGE_SIZE,
     registers::{get_name, PC},
     types::{Register, Word},
 };
@@ -21,6 +22,9 @@ use ratatui::{
 use std::{error::Error, io::Stdout};
 
 pub type Term = Terminal<CrosstermBackend<Stdout>>;
+
+const BYTES_PER_ROW_HEXDEC: usize = 32;
+const BYTES_PER_ROW_BINARY: usize = 8;
 
 #[derive(Default, Debug, Clone, Copy)]
 enum View {
@@ -155,18 +159,46 @@ impl<'a> Runtime<'a> {
 
                     KeyCode::Up => {
                         if matches!(self.view, View::Memory) {
-                            self.page_offset = self.page_offset.saturating_sub(1);
+                            self.page_offset = self
+                                .page_offset
+                                .saturating_sub(1)
+                                .clamp(0, PAGE_SIZE / if self.disassembly { 4 } else { 8 });
                         }
 
                         Ok(true)
                     }
                     KeyCode::Down => {
                         if matches!(self.view, View::Memory) {
-                            self.page_offset = self.page_offset.saturating_add(1);
+                            self.page_offset = self
+                                .page_offset
+                                .saturating_add(1)
+                                .clamp(0, PAGE_SIZE / if self.disassembly { 4 } else { 8 });
                         }
 
                         Ok(true)
                     }
+
+                    KeyCode::PageUp => {
+                        if matches!(self.view, View::Memory) {
+                            self.page_offset = self
+                                .page_offset
+                                .saturating_sub(16)
+                                .clamp(0, PAGE_SIZE / if self.disassembly { 4 } else { 8 });
+                        }
+
+                        Ok(true)
+                    }
+                    KeyCode::PageDown => {
+                        if matches!(self.view, View::Memory) {
+                            self.page_offset = self
+                                .page_offset
+                                .saturating_add(16)
+                                .clamp(0, PAGE_SIZE / if self.disassembly { 4 } else { 8 });
+                        }
+
+                        Ok(true)
+                    }
+
                     KeyCode::Left => {
                         if matches!(self.view, View::Memory) {
                             self.page_offset = 0;
@@ -197,12 +229,36 @@ impl<'a> Runtime<'a> {
                             self.disassembly = !self.disassembly;
                         }
 
+                        if self.disassembly {
+                            if self.binary {
+                                self.page_offset *= BYTES_PER_ROW_BINARY / 4;
+                            } else {
+                                self.page_offset *= BYTES_PER_ROW_HEXDEC / 4;
+                            }
+                        } else {
+                            if self.binary {
+                                self.page_offset /= BYTES_PER_ROW_BINARY / 4;
+                            } else {
+                                self.page_offset /= BYTES_PER_ROW_HEXDEC / 4;
+                            }
+                        }
+
                         Ok(true)
                     }
 
                     KeyCode::Char('b') => {
                         if matches!(self.view, View::Memory) {
                             self.binary = !self.binary;
+                        }
+
+                        if !self.disassembly {
+                            if self.binary {
+                                self.page_offset *=
+                                    (BYTES_PER_ROW_HEXDEC / BYTES_PER_ROW_BINARY).max(1);
+                            } else {
+                                self.page_offset /=
+                                    (BYTES_PER_ROW_HEXDEC / BYTES_PER_ROW_BINARY).max(1)
+                            }
                         }
 
                         Ok(true)
@@ -213,7 +269,9 @@ impl<'a> Runtime<'a> {
                             self.clocks_required = match self.pipeline.clock(1) {
                                 libpipe::ClockResult::Stall(clocks) => clocks,
                                 libpipe::ClockResult::Flow => 1,
-                                libpipe::ClockResult::Dry => 0,
+                                libpipe::ClockResult::Dry => {
+                                    self.pipeline.memory_module().wait_time()
+                                }
                             };
                             self.clocks += 1;
                         }
@@ -226,7 +284,9 @@ impl<'a> Runtime<'a> {
                             self.clocks_required = match self.pipeline.clock(self.clocks_required) {
                                 libpipe::ClockResult::Stall(clocks) => clocks,
                                 libpipe::ClockResult::Flow => 1,
-                                libpipe::ClockResult::Dry => 0,
+                                libpipe::ClockResult::Dry => {
+                                    self.pipeline.memory_module().wait_time()
+                                }
                             };
                         }
 
@@ -283,6 +343,8 @@ impl<'a> Widget for &mut Runtime<'a> {
                     module.total_misses().to_string().red().bold(),
                     " | Accesses: ".into(),
                     module.accesses().to_string().red().bold(),
+                    " | Evictions: ".into(),
+                    module.evictions().to_string().red().bold(),
                     " ".into(),
                 ])
                 .alignment(Alignment::Right),
@@ -312,7 +374,7 @@ impl<'a> Widget for &mut Runtime<'a> {
         match &self.view {
             View::Registers => {
                 let lines = chunks[1].height as usize;
-                let splits = Layout::horizontal(vec![Constraint::Fill(1); lines]).split(chunks[1]);
+                let splits = Layout::horizontal([Constraint::Min(16); 6]).split(chunks[1]);
 
                 self.pipeline
                     .registers()
@@ -336,7 +398,23 @@ impl<'a> Widget for &mut Runtime<'a> {
                     });
             }
             View::Memory => {
-                self.page_offset = self.page_offset.clamp(0, (chunks[1].height - 1) as usize);
+                if self.disassembly {
+                    self.page_offset = self
+                        .page_offset
+                        .clamp(0, (PAGE_SIZE / 4) - (chunks[1].height - 1) as usize);
+                } else {
+                    if self.binary {
+                        self.page_offset = self.page_offset.clamp(
+                            0,
+                            (PAGE_SIZE / BYTES_PER_ROW_BINARY) - (chunks[1].height - 1) as usize,
+                        );
+                    } else {
+                        self.page_offset = self.page_offset.clamp(
+                            0,
+                            (PAGE_SIZE / BYTES_PER_ROW_HEXDEC) - (chunks[1].height - 1) as usize,
+                        );
+                    }
+                }
 
                 Paragraph::new(Line::from(vec![
                     "↕".blue().bold(),
@@ -358,26 +436,26 @@ impl<'a> Widget for &mut Runtime<'a> {
 
                 if let Some(page) = self.pipeline.memory_module().memory().get_page(self.page) {
                     if self.disassembly {
-                        const BYTES: usize = 4;
+                        let bytes: usize = 4;
                         let pc = self.pipeline.registers().pc.wrapping_sub(4);
 
                         let mut headers = vec!["Address".to_string()];
-                        headers.extend((0..BYTES).into_iter().map(|i| format!("{i:02X}")));
+                        headers.extend((0..bytes).into_iter().map(|i| format!("{i:02X}")));
                         headers.push("Instruction".to_string());
                         let mut columns = vec![Constraint::Max(10)];
                         columns.extend(
-                            (0..BYTES).map(|_| Constraint::Max(if self.binary { 8 } else { 2 })),
+                            (0..bytes).map(|_| Constraint::Max(if self.binary { 8 } else { 2 })),
                         );
                         columns.push(Constraint::Fill(1));
 
                         let table = Table::new(
-                            page.chunks(BYTES)
+                            page.chunks(bytes)
                                 .enumerate()
                                 .skip(self.page_offset)
                                 .take((chunks[1].height - 1) as usize)
                                 .enumerate()
                                 .map(|(rid, (i, row))| {
-                                    let mut result = vec![format!("{:#010X}", i * BYTES)];
+                                    let mut result = vec![format!("{:#010X}", i * bytes)];
                                     result.extend(row.into_iter().map(|v| {
                                         if self.binary {
                                             format!("{v:08b}")
@@ -393,7 +471,7 @@ impl<'a> Widget for &mut Runtime<'a> {
                                         .unwrap_or_default(),
                                     );
 
-                                    if i * BYTES == pc as usize {
+                                    if i * bytes == pc as usize {
                                         Row::new(result).on_red()
                                     } else if rid % 2 == 0 {
                                         Row::new(result).on_light_blue()
@@ -407,22 +485,27 @@ impl<'a> Widget for &mut Runtime<'a> {
 
                         table.render(chunks[1], buf);
                     } else {
-                        const BYTES: usize = 16;
+                        let bytes: usize = if self.binary {
+                            BYTES_PER_ROW_BINARY
+                        } else {
+                            BYTES_PER_ROW_HEXDEC
+                        };
+
                         let mut headers = vec!["Address".to_string()];
-                        headers.extend((0..BYTES).into_iter().map(|i| format!("{i:02X}")));
+                        headers.extend((0..bytes).into_iter().map(|i| format!("{i:02X}")));
                         let mut columns = vec![Constraint::Max(10)];
                         columns.extend(
-                            (0..BYTES).map(|_| Constraint::Max(if self.binary { 8 } else { 2 })),
+                            (0..bytes).map(|_| Constraint::Max(if self.binary { 8 } else { 2 })),
                         );
 
                         let table = Table::new(
-                            page.chunks(BYTES)
+                            page.chunks(bytes)
                                 .enumerate()
                                 .skip(self.page_offset)
                                 .take((chunks[1].height - 1) as usize)
                                 .enumerate()
                                 .map(|(rid, (i, row))| {
-                                    let mut result = vec![format!("{:#010X}", i * BYTES)];
+                                    let mut result = vec![format!("{:#010X}", i * bytes)];
                                     result.extend(row.into_iter().map(|v| {
                                         if self.binary {
                                             format!("{v:08b}")
@@ -617,7 +700,7 @@ impl<'a> Widget for &mut Runtime<'a> {
                 .render(splits[0], buf);
 
                 match stages.decode.get_state() {
-                    libpipe::decode::State::Decoding { word } => List::new(
+                    libpipe::decode::State::Decoding { word, .. } => List::new(
                         [
                             Line::from(vec!["State: ".into(), "Decoding".red().bold()]),
                             Line::from(vec!["Word: ".into(), word.to_string().red().bold()]),
@@ -633,7 +716,7 @@ impl<'a> Widget for &mut Runtime<'a> {
                         .into_iter()
                         .map(ListItem::new),
                     ),
-                    libpipe::decode::State::Ready { word } => List::new(
+                    libpipe::decode::State::Ready { word, .. } => List::new(
                         [
                             Line::from(vec!["State: ".into(), "Ready".red().bold()]),
                             Line::from(vec!["Word: ".into(), word.to_string().red().bold()]),
