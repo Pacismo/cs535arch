@@ -197,7 +197,10 @@
                     "kind": "bin"
                 }
             },
-            "args": [],
+            "args": [
+                "./example.toml",
+                "./test.bin"
+            ],
             "cwd": "${workspaceFolder}"
         },
         {
@@ -218,6 +221,6 @@
             },
             "args": [],
             "cwd": "${workspaceFolder}"
-        }
+        },
     ]
 }
