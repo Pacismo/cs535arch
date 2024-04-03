@@ -79,7 +79,7 @@ main:
                     value: 1,
                     destination: 0,
                     location: 0,
-                    insert: false,
+                    zero: false,
                 }),
                 _,
             ),
@@ -95,7 +95,7 @@ main:
                     value: 2,
                     destination: 1,
                     location: 0,
-                    insert: false
+                    zero: false
                 }),
                 _
             )
@@ -111,7 +111,7 @@ main:
                     value: 3,
                     destination: 1,
                     location: 1,
-                    insert: true
+                    zero: true
                 }),
                 _
             )

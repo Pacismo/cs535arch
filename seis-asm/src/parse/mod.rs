@@ -717,14 +717,14 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
                             value: parse_integer!(value.into_inner().next().unwrap()),
                             destination,
                             location: part.as_str().parse().unwrap(),
-                            insert: true,
+                            zero: true,
                         }))
                     } else {
                         Ok(Ldr(Immediate {
                             value: parse_integer!(value.into_inner().next().unwrap()),
                             destination,
                             location: 0,
-                            insert: false,
+                            zero: false,
                         }))
                     }
                 }

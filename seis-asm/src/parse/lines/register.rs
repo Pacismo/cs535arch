@@ -86,7 +86,7 @@ pub enum ImmediateLoadOp {
         value: Short,
         destination: Register,
         location: Byte,
-        insert: bool,
+        zero: bool,
     },
 }
 

@@ -24,6 +24,7 @@ macro_rules! byte_len {
     };
 }
 
+#[derive(Debug)]
 pub struct Page {
     data: [u8; PAGE_SIZE],
     len: Word,
@@ -52,6 +53,7 @@ impl Page {
     }
 }
 
+#[derive(Debug)]
 pub struct PageSet(HashMap<Short, Page>);
 
 impl PageSet {
@@ -161,7 +163,7 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
                                         value: right,
                                         destination,
                                         location: 0,
-                                        insert: false,
+                                        zero: false,
                                     }),
                                     ip,
                                     span.clone(),
@@ -173,7 +175,7 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
                                             value: left,
                                             destination,
                                             location: 1,
-                                            insert: true,
+                                            zero: true,
                                         }),
                                         ip,
                                         span,
@@ -190,7 +192,7 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
                                         value: right,
                                         destination,
                                         location: 0,
-                                        insert: false,
+                                        zero: false,
                                     }),
                                     ip,
                                     span.clone(),
@@ -203,7 +205,7 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
                                             value: left,
                                             destination,
                                             location: 1,
-                                            insert: true,
+                                            zero: true,
                                         }),
                                         ip,
                                         span,
@@ -226,7 +228,7 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
                                             value: right,
                                             destination,
                                             location: 0,
-                                            insert: false,
+                                            zero: false,
                                         }),
                                         ip,
                                         span.clone(),
@@ -239,7 +241,7 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
                                                 value: left,
                                                 destination,
                                                 location: 1,
-                                                insert: true,
+                                                zero: true,
                                             }),
                                             ip + 1,
                                             span,
@@ -399,7 +401,7 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
     for (instruction, address, span) in expanded {
         use crate::parse::{
             ExpandableLoadOp::Label, Instruction as I, IntBinaryOp as IBO, IntCompOp as ICO,
-            Jump as J, MemoryLoadOp as MLO, MemoryStoreOp as MSO, StackOp as SO, IntTestOp as ITO,
+            IntTestOp as ITO, Jump as J, MemoryLoadOp as MLO, MemoryStoreOp as MSO, StackOp as SO,
         };
         use libseis::instruction_set::{
             control::Jump,
@@ -421,13 +423,13 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
             (jump $j:ident) => {
                 match $j {
                     J::Absolute(reg) => Ok(Jump::Register(reg)),
-                    J::Relative(rel) => Ok(Jump::Relative(rel as SWord)),
+                    J::Relative(rel) => Ok(Jump::Relative((rel as SWord) << 2)),
                     J::Label(label_name) => {
                         if let Some(label) = labels.get(&label_name) {
                             let laddr = label.address;
                             let dist = (laddr.wrapping_sub(address)) as SWord;
                             if dist > -8_388_608 || dist < 8_388_607 {
-                                Ok(Jump::Relative(dist << 2))
+                                Ok(Jump::Relative(dist))
                             } else {
                                 Err(Error::JumpTooLong {
                                     label: label_name,
@@ -537,18 +539,9 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
             };
             (ito $c:ident) => {
                 match $c {
-                    ITO::RegReg {
-                        left,
-                        right,
-                    } => Ok(integer::TestOp::Registers(left, right)),
-                    ITO::RegImm {
-                        left,
-                        right,
-                    } => Ok(integer::TestOp::Immediate(left, right)),
-                    ITO::RegConst {
-                        left,
-                        right,
-                    } => {
+                    ITO::RegReg { left, right } => Ok(integer::TestOp::Registers(left, right)),
+                    ITO::RegImm { left, right } => Ok(integer::TestOp::Immediate(left, right)),
+                    ITO::RegConst { left, right } => {
                         if let Some(rvalue) = constants.get(&right) {
                             use crate::parse::ConstantValue as T;
                             let value = match rvalue.value {
@@ -1103,9 +1096,9 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
                         value,
                         destination,
                         location,
-                        insert,
+                        zero,
                     } => Register(Ldr(Immediate {
-                        zero: !insert,
+                        zero,
                         shift: location,
                         immediate: value,
                         destination,
