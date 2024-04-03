@@ -43,10 +43,10 @@ impl Decode for BinaryOp {
         let src = (word & Self::SRC_REG_MASK) >> Self::SRC_REG_SHIFT;
 
         if (word & Self::IMM_FLAG_MASK) == Self::IMM_FLAG_MASK {
-            let param = (word & Self::REG_PARAM_MASK) >> Self::PARAM_SHIFT;
+            let param = (word & Self::IMM_CONST_MASK) >> Self::PARAM_SHIFT;
             Ok(Immediate(src as Register, param, dest as Register))
         } else {
-            let param = (word & Self::IMM_CONST_MASK) >> Self::PARAM_SHIFT;
+            let param = (word & Self::REG_PARAM_MASK) >> Self::PARAM_SHIFT;
             Ok(Registers(
                 src as Register,
                 param as Register,
@@ -62,7 +62,7 @@ impl Encode for BinaryOp {
 
         match self {
             Immediate(src, opt, dst) => {
-                Self::IMM_CONST_MASK
+                Self::IMM_FLAG_MASK
                     | ((src as Word) << Self::SRC_REG_SHIFT)
                     | (opt << Self::PARAM_SHIFT)
                     | ((dst as Word) << Self::DST_REG_SHIFT)
@@ -233,6 +233,7 @@ impl Encode for CompOp {
                 ((left as Word) << Self::LEFT_REG_SHIFT)
                     | ((right << Self::RIGHT_PARAM_SHIFT) & Self::RIGHT_IMM_MASK)
                     | if signed { Self::SIGNED_MODE } else { 0 }
+                    | Self::IMMEDIATE_MASK
             }
         }
     }
@@ -244,10 +245,10 @@ impl Display for CompOp {
 
         match self {
             &Registers(left, right, signed) => {
-                write!(f, "{}V{left:X}, V{right:X}", if signed { " s" } else { "" })
+                write!(f, "{}V{left:X}, V{right:X}", if signed { "s " } else { "" })
             }
             &Immediate(left, right, signed) => {
-                write!(f, "{}V{left:X}, {right}", if signed { " s" } else { "" })
+                write!(f, "{}V{left:X}, {right}", if signed { "s " } else { "" })
             }
         }
     }
@@ -311,6 +312,7 @@ impl Encode for TestOp {
             Immediate(left, right) => {
                 ((left as Word) << Self::LEFT_REG_SHIFT)
                     | ((right << Self::RIGHT_PARAM_SHIFT) & Self::RIGHT_IMM_MASK)
+                    | Self::IMMEDIATE_MASK
             }
         }
     }

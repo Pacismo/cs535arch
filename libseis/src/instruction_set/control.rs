@@ -67,7 +67,7 @@ impl Display for Jump {
 
         match self {
             Register(reg) => write!(f, "V{reg:X}"),
-            Relative(off) => write!(f, "{:+}", off >> 2),
+            Relative(off) => write!(f, "{:+}", off),
         }
     }
 }

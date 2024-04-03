@@ -15,12 +15,12 @@ pub const BP: Register = 0x11;
 pub const LP: Register = 0x12;
 pub const PC: Register = 0x13;
 pub const ZF: Register = 0x14;
-pub const OF: Register = 0x14;
-pub const EPS: Register = 0x15;
-pub const NAN: Register = 0x16;
-pub const INF: Register = 0x17;
+pub const OF: Register = 0x15;
+pub const EPS: Register = 0x16;
+pub const NAN: Register = 0x17;
+pub const INF: Register = 0x18;
 
-pub const COUNT: usize = 25;
+pub const COUNT: usize = (INF as usize) + 1;
 
 pub const NAME: [&'static str; COUNT] = [
     "V0", "V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "VA", "VB", "VC", "VD", "VE", "VF",
