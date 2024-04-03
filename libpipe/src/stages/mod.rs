@@ -6,22 +6,22 @@
 //! This ensures that the stages may be consistently serialized for
 //! display to the user in the frontend.
 
+pub mod decode;
+pub mod execute;
+pub mod fetch;
+pub mod memory;
+pub mod writeback;
+
 use crate::{reg_locks::Locks, ClockResult, Registers};
 use libmem::module::MemoryModule;
 use serde::Serialize;
 use std::fmt::Debug;
 
-pub use decode::*;
-pub use execute::*;
-pub use fetch::*;
-pub use memory::*;
-pub use writeback::*;
-
-mod decode;
-mod execute;
-mod fetch;
-mod memory;
-mod writeback;
+pub use decode::Decode;
+pub use execute::Execute;
+pub use fetch::Fetch;
+pub use memory::Memory;
+pub use writeback::Writeback;
 
 /// Trait representing a pipeline stage.
 ///
@@ -38,6 +38,8 @@ where
     type Prev: Debug + Serialize;
     /// What the stage outputs as a result of taking a clock.
     type Next: Debug + Serialize;
+    /// What tracks the state.
+    type State: Debug + Serialize;
 
     /// Called when the clock sends a new clock.
     ///
@@ -62,6 +64,9 @@ where
 
     /// Called after all stages have been clocked.
     fn forward(&mut self, input: Status<Self::Prev>) -> Status<Self::Next>;
+
+    /// Called to query state.
+    fn get_state(&self) -> &Self::State;
 }
 
 #[derive(Debug, Clone, Copy)]

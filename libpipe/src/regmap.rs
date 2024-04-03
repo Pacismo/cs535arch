@@ -57,6 +57,10 @@ impl RegMap {
     pub fn len(&self) -> usize {
         self.0.len()
     }
+
+    pub fn iter(&self) -> std::slice::Iter<RegMapPair> {
+        self.0.iter()
+    }
 }
 
 impl FromIterator<(Register, Word)> for RegMap {

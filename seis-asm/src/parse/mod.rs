@@ -763,8 +763,8 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
                     value: opt.as_str().parse().unwrap(),
                     destination,
                 },
-                Rule::dec | Rule::oct | Rule::hex => Integer {
-                    value: parse_integer!(opt),
+                Rule::integer => Integer {
+                    value: parse_integer!(opt.into_inner().next().unwrap()),
                     destination,
                 },
                 Rule::ident => Label {

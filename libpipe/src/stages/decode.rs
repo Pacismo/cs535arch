@@ -9,7 +9,7 @@ use serde::Serialize;
 
 /// The state of the [`Decode`] object
 #[derive(Debug, Clone, Copy, Serialize, Default)]
-enum State {
+pub enum State {
     Decoding {
         word: Word,
     },
@@ -60,9 +60,16 @@ pub struct Decode {
     state: State,
 }
 
+impl Decode {
+    pub fn get_state(&self) -> &State {
+        &self.state
+    }
+}
+
 impl PipelineStage for Decode {
     type Prev = FetchResult;
     type Next = DecodeResult;
+    type State = State;
 
     fn clock(
         &mut self,
@@ -171,6 +178,10 @@ impl PipelineStage for Decode {
                 None => Status::Stall(1),
             }
         }
+    }
+
+    fn get_state(&self) -> &State {
+        &self.state
     }
 }
 

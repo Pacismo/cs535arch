@@ -1,37 +1,26 @@
+use crate::{config::SimulationConfiguration, PAGES};
 use crossterm::event;
-use libpipe::Pipeline;
+use libpipe::{Pipeline, PipelineStage};
 use libseis::{
-    instruction_set::decode,
-    registers::{get_name, COUNT, PC},
+    instruction_set::{decode, Instruction},
+    registers::{get_name, PC},
     types::{Register, Word},
 };
 use ratatui::{
-    backend::Backend,
     layout::{Alignment, Constraint, Layout, Rect},
     prelude::{Buffer, CrosstermBackend, Stylize, Terminal},
     style::Style,
     symbols::border,
-    text::{self, Line, Text},
+    text::Line,
     widgets::{
-        self, block::Title, Block, Borders, List, ListItem, Padding, Paragraph, Row, Table, Tabs,
-        Widget,
+        block::Title, Block, BorderType, Borders, List, ListItem, Padding, Paragraph, Row, Table,
+        Tabs, Widget,
     },
     Frame,
 };
-use std::{borrow::Cow, error::Error, io::Stdout, mem::take, time::Duration};
-
-use crate::{config::SimulationConfiguration, PAGES};
+use std::{error::Error, io::Stdout};
 
 pub type Term = Terminal<CrosstermBackend<Stdout>>;
-
-#[derive(Debug, Clone, Copy)]
-enum PipelineStage {
-    Fetch,
-    Decode,
-    Execute,
-    Memory,
-    Writeback,
-}
 
 #[derive(Default, Debug, Clone, Copy)]
 enum View {
@@ -49,6 +38,24 @@ impl View {
             View::Memory => 1,
             View::Cache => 2,
             View::PipelineStages => 3,
+        }
+    }
+
+    fn next(self) -> Self {
+        match self {
+            Self::Registers => Self::Memory,
+            Self::Memory => Self::Cache,
+            Self::Cache => Self::PipelineStages,
+            Self::PipelineStages => Self::Registers,
+        }
+    }
+
+    fn previous(self) -> Self {
+        match self {
+            Self::Registers => Self::PipelineStages,
+            Self::Memory => Self::Registers,
+            Self::Cache => Self::Memory,
+            Self::PipelineStages => Self::Cache,
         }
     }
 }
@@ -119,13 +126,29 @@ impl<'a> Runtime<'a> {
                 KeyEventKind::Press => match key.code {
                     KeyCode::Char('q') => Ok(false),
 
+                    KeyCode::Char('1') => {
+                        self.view = View::Registers;
+                        Ok(true)
+                    }
+                    KeyCode::Char('2') => {
+                        self.view = View::Memory;
+                        Ok(true)
+                    }
+                    KeyCode::Char('3') => {
+                        self.view = View::Cache;
+                        Ok(true)
+                    }
+                    KeyCode::Char('4') => {
+                        self.view = View::PipelineStages;
+                        Ok(true)
+                    }
+
                     KeyCode::Tab => {
-                        self.view = match self.view {
-                            View::Registers => View::Memory,
-                            View::Memory => View::Cache,
-                            View::Cache => View::PipelineStages,
-                            View::PipelineStages => View::Registers,
-                        };
+                        if key.modifiers.contains(KeyModifiers::SHIFT) {
+                            self.view = self.view.previous()
+                        } else {
+                            self.view = self.view.next();
+                        }
 
                         Ok(true)
                     }
@@ -245,13 +268,22 @@ impl<'a> Widget for &mut Runtime<'a> {
             },
         ]);
 
+        let module = self.pipeline.memory_module();
+
         let application_block = Block::new()
             .title(title)
             .title_bottom(instructions)
             .title_bottom(
                 Line::from(vec![
                     " Clocks: ".into(),
-                    format!("{} ", self.clocks).red().bold(),
+                    self.clocks.to_string().red().bold(),
+                    " | Hits: ".into(),
+                    module.cache_hits().to_string().red().bold(),
+                    " | Misses: ".into(),
+                    module.total_misses().to_string().red().bold(),
+                    " | Accesses: ".into(),
+                    module.accesses().to_string().red().bold(),
+                    " ".into(),
                 ])
                 .alignment(Alignment::Right),
             )
@@ -264,12 +296,14 @@ impl<'a> Widget for &mut Runtime<'a> {
             Constraint::Length(2),
         ])
         .split(application_block.inner(area));
+        application_block.render(area, buf);
 
-        let tabs = Tabs::new(vec!["Registers", "Memory", "Cache", "Pipeline"])
+        Tabs::new(["Registers", "Memory", "Cache", "Pipeline"])
             .block(Block::new().borders(Borders::BOTTOM))
             .style(Style::default().white())
             .highlight_style(Style::default().white().on_blue().bold())
-            .select(self.view.index());
+            .select(self.view.index())
+            .render(chunks[0], buf);
 
         let help_block = Block::new()
             .padding(Padding::new(1, 1, 0, 0))
@@ -520,10 +554,509 @@ impl<'a> Widget for &mut Runtime<'a> {
                 )
                 .render(chunks[2], buf);
             }
-            View::PipelineStages => {}
-        }
+            View::PipelineStages => {
+                let stages = self.pipeline.stages();
 
-        application_block.render(area, buf);
-        tabs.render(chunks[0], buf);
+                let splits: Vec<_> = Layout::horizontal([Constraint::Fill(1); 5])
+                    .split(chunks[1])
+                    .into_iter()
+                    .zip(["Fetch", "Decode", "Execute", "Memory", "Writeback"])
+                    .map(|(split, stage)| {
+                        let block = Block::new()
+                            .border_type(BorderType::Rounded)
+                            .borders(Borders::ALL)
+                            .title(Line::from(vec!["Stage: ".into(), stage.red().bold()]));
+
+                        let area = block.inner(*split);
+                        block.render(*split, buf);
+
+                        area
+                    })
+                    .collect();
+
+                match stages.fetch.get_state() {
+                    libpipe::fetch::State::Idle => List::new(
+                        [Line::from(vec!["State: ".into(), "Idle".red().bold()])]
+                            .into_iter()
+                            .map(ListItem::new),
+                    ),
+                    libpipe::fetch::State::Waiting { clocks } => List::new(
+                        [
+                            Line::from(vec!["State: ".into(), "Waiting".red().bold()]),
+                            Line::from(vec!["clocks: ".into(), clocks.to_string().red().bold()]),
+                        ]
+                        .into_iter()
+                        .map(ListItem::new),
+                    ),
+                    libpipe::fetch::State::Ready { instruction } => List::new(
+                        [
+                            Line::from(vec!["State: ".into(), "Ready".red().bold()]),
+                            Line::from(vec!["Word: ".into(), instruction.to_string().red().bold()]),
+                        ]
+                        .into_iter()
+                        .map(ListItem::new),
+                    ),
+                    libpipe::fetch::State::Squashed { clocks } => List::new(
+                        [
+                            Line::from(vec!["State: ".into(), "Squashed".red().bold()]),
+                            Line::from(vec![
+                                "But waiting for ".into(),
+                                clocks.to_string().red().bold(),
+                                " clocks".into(),
+                            ]),
+                        ]
+                        .into_iter()
+                        .map(ListItem::new),
+                    ),
+                    libpipe::fetch::State::Halted => List::new(
+                        [Line::from(vec!["State: ".into(), "Halted".red().bold()])]
+                            .into_iter()
+                            .map(ListItem::new),
+                    ),
+                }
+                .render(splits[0], buf);
+
+                match stages.decode.get_state() {
+                    libpipe::decode::State::Decoding { word } => List::new(
+                        [
+                            Line::from(vec!["State: ".into(), "Decoding".red().bold()]),
+                            Line::from(vec!["Word: ".into(), word.to_string().red().bold()]),
+                            Line::from(vec![
+                                "As Instruction: ".into(),
+                                decode::<Instruction>(*word)
+                                    .map(|i| i.to_string())
+                                    .unwrap_or("<UNKNOWN>".to_string())
+                                    .red()
+                                    .bold(),
+                            ]),
+                        ]
+                        .into_iter()
+                        .map(ListItem::new),
+                    ),
+                    libpipe::decode::State::Ready { word } => List::new(
+                        [
+                            Line::from(vec!["State: ".into(), "Ready".red().bold()]),
+                            Line::from(vec!["Word: ".into(), word.to_string().red().bold()]),
+                            Line::from(vec![
+                                "As Instruction: ".into(),
+                                decode::<Instruction>(*word)
+                                    .map(|i| i.to_string())
+                                    .unwrap_or("<UNKNOWN>".to_string())
+                                    .red()
+                                    .bold(),
+                            ]),
+                        ]
+                        .into_iter()
+                        .map(ListItem::new),
+                    ),
+                    libpipe::decode::State::Idle => List::new(
+                        [Line::from(vec!["State: ".into(), "Idle".red().bold()])]
+                            .into_iter()
+                            .map(ListItem::new),
+                    ),
+                    libpipe::decode::State::Squashed => List::new(
+                        [Line::from(vec!["State: ".into(), "Squashed".red().bold()])]
+                            .into_iter()
+                            .map(ListItem::new),
+                    ),
+                    libpipe::decode::State::PrevSquash => List::new(
+                        [Line::from(vec!["State: ".into(), "Squashed".red().bold()])]
+                            .into_iter()
+                            .map(ListItem::new),
+                    ),
+                    libpipe::decode::State::Halted => List::new(
+                        [Line::from(vec!["State: ".into(), "Halted".red().bold()])]
+                            .into_iter()
+                            .map(ListItem::new),
+                    ),
+                }
+                .render(splits[1], buf);
+
+                match stages.execute.get_state() {
+                    libpipe::execute::State::Idle => List::new(
+                        [Line::from(vec!["State: ".into(), "Idle".red().bold()])]
+                            .into_iter()
+                            .map(ListItem::new),
+                    ),
+                    libpipe::execute::State::Waiting {
+                        instruction,
+                        wregs,
+                        rvals,
+                        clocks,
+                    } => List::new(
+                        [
+                            Line::from(vec!["State: ".into(), "Waiting".red().bold()]),
+                            Line::from(vec![
+                                "Expected wait time: ".into(),
+                                clocks.to_string().red().bold(),
+                            ]),
+                            Line::from(vec![
+                                "Instruction: ".into(),
+                                instruction.to_string().red().bold(),
+                            ]),
+                            Line::from(
+                                ["Write: ".into()]
+                                    .into_iter()
+                                    .chain(wregs.registers().enumerate().flat_map(|(i, r)| {
+                                        if i == wregs.count() {
+                                            vec![get_name(r).unwrap_or("<?>").red().bold()]
+                                        } else {
+                                            vec![
+                                                get_name(r).unwrap_or("<?>").red().bold(),
+                                                ", ".into(),
+                                            ]
+                                        }
+                                    }))
+                                    .collect::<Vec<_>>(),
+                            ),
+                        ]
+                        .into_iter()
+                        .chain(
+                            rvals
+                                .iter()
+                                .enumerate()
+                                .map(|(i, r)| {
+                                    if i == wregs.count().saturating_sub(1) {
+                                        vec![
+                                            get_name(r.register).unwrap_or("<?>").red().bold(),
+                                            " = ".into(),
+                                            r.value.to_string().red().bold(),
+                                        ]
+                                    } else {
+                                        vec![
+                                            get_name(r.register).unwrap_or("<?>").red().bold(),
+                                            " = ".into(),
+                                            r.value.to_string().red().bold(),
+                                            ", ".into(),
+                                        ]
+                                    }
+                                })
+                                .map(Line::from),
+                        )
+                        .map(ListItem::new),
+                    ),
+                    libpipe::execute::State::Ready { wregs, .. } => List::new(
+                        [
+                            Line::from(vec!["State: ".into(), "Ready".red().bold()]),
+                            Line::from(
+                                ["Write: ".into()]
+                                    .into_iter()
+                                    .chain(wregs.registers().enumerate().flat_map(|(i, r)| {
+                                        if i == wregs.count().saturating_sub(1) {
+                                            vec![get_name(r).unwrap_or("<?>").red().bold()]
+                                        } else {
+                                            vec![
+                                                get_name(r).unwrap_or("<?>").red().bold(),
+                                                ", ".into(),
+                                            ]
+                                        }
+                                    }))
+                                    .collect::<Vec<_>>(),
+                            ),
+                        ]
+                        .into_iter()
+                        .map(ListItem::new),
+                    ),
+                    libpipe::execute::State::Squashed { wregs } => List::new(
+                        [
+                            Line::from(vec!["State: ".into(), "Squashed".red().bold()]),
+                            Line::from(
+                                ["Write: ".into()]
+                                    .into_iter()
+                                    .chain(wregs.registers().enumerate().flat_map(|(i, r)| {
+                                        if i == wregs.count().saturating_sub(1) {
+                                            vec![get_name(r).unwrap_or("<?>").red().bold()]
+                                        } else {
+                                            vec![
+                                                get_name(r).unwrap_or("<?>").red().bold(),
+                                                ", ".into(),
+                                            ]
+                                        }
+                                    }))
+                                    .collect::<Vec<_>>(),
+                            ),
+                        ]
+                        .into_iter()
+                        .map(ListItem::new),
+                    ),
+                    libpipe::execute::State::Halted => List::new(
+                        [Line::from(vec!["State: ".into(), "Halted".red().bold()])]
+                            .into_iter()
+                            .map(ListItem::new),
+                    ),
+                }
+                .render(splits[2], buf);
+
+                match stages.memory.get_state() {
+                    libpipe::memory::State::Idle => List::new(
+                        [Line::from(vec!["State: ".into(), "Idle".red().bold()])]
+                            .into_iter()
+                            .map(ListItem::new),
+                    ),
+                    libpipe::memory::State::Reading {
+                        mode,
+                        destination,
+                        clocks,
+                    } => List::new(
+                        [
+                            Line::from(vec!["State: ".into(), "Reading".red().bold()]),
+                            Line::from(vec![
+                                "Destination: ".into(),
+                                get_name(*destination).unwrap_or("<?>").red().bold(),
+                            ]),
+                            Line::from(vec![
+                                "Expected wait time: ".into(),
+                                clocks.to_string().red().bold(),
+                            ]),
+                            Line::from(match mode {
+                                libpipe::memory::ReadMode::ReadByte { volatile, .. } => {
+                                    vec![
+                                        "Mode: ".into(),
+                                        "byte".red().bold(),
+                                        if *volatile { " volatile" } else { "" }.blue().bold(),
+                                    ]
+                                }
+                                libpipe::memory::ReadMode::ReadShort { volatile, .. } => {
+                                    vec![
+                                        "Mode: ".into(),
+                                        "short".red().bold(),
+                                        if *volatile { " volatile" } else { "" }.blue().bold(),
+                                    ]
+                                }
+                                libpipe::memory::ReadMode::ReadWord { volatile, .. } => {
+                                    vec![
+                                        "Mode: ".into(),
+                                        "word".red().bold(),
+                                        if *volatile { " volatile" } else { "" }.blue().bold(),
+                                    ]
+                                }
+                            }),
+                            Line::from(match mode {
+                                libpipe::memory::ReadMode::ReadByte { address, .. }
+                                | libpipe::memory::ReadMode::ReadShort { address, .. }
+                                | libpipe::memory::ReadMode::ReadWord { address, .. } => {
+                                    vec!["Address: ".into(), address.to_string().red().bold()]
+                                }
+                            }),
+                        ]
+                        .into_iter()
+                        .map(ListItem::new),
+                    ),
+                    libpipe::memory::State::Writing { mode, clocks } => List::new(
+                        [
+                            Line::from(vec!["State: ".into(), "Writing".red().bold()]),
+                            Line::from(vec![
+                                "Expected wait time: ".into(),
+                                clocks.to_string().red().bold(),
+                            ]),
+                            Line::from(match mode {
+                                libpipe::memory::WriteMode::WriteByte { volatile, .. } => {
+                                    vec![
+                                        "Mode: ".into(),
+                                        "byte".red().bold(),
+                                        if *volatile { " volatile" } else { "" }.blue().bold(),
+                                    ]
+                                }
+                                libpipe::memory::WriteMode::WriteShort { volatile, .. } => {
+                                    vec![
+                                        "Mode: ".into(),
+                                        "short".red().bold(),
+                                        if *volatile { " volatile" } else { "" }.blue().bold(),
+                                    ]
+                                }
+                                libpipe::memory::WriteMode::WriteWord { volatile, .. } => {
+                                    vec![
+                                        "Mode: ".into(),
+                                        "word".red().bold(),
+                                        if *volatile { " volatile" } else { "" }.blue().bold(),
+                                    ]
+                                }
+                            }),
+                            Line::from(match mode {
+                                libpipe::memory::WriteMode::WriteByte { address, .. }
+                                | libpipe::memory::WriteMode::WriteShort { address, .. }
+                                | libpipe::memory::WriteMode::WriteWord { address, .. } => {
+                                    vec!["Address: ".into(), address.to_string().red().bold()]
+                                }
+                            }),
+                            Line::from(match mode {
+                                libpipe::memory::WriteMode::WriteByte { value, .. } => {
+                                    vec!["Value: ".into(), value.to_string().red().bold()]
+                                }
+                                libpipe::memory::WriteMode::WriteShort { value, .. } => {
+                                    vec!["Value: ".into(), value.to_string().red().bold()]
+                                }
+                                libpipe::memory::WriteMode::WriteWord { value, .. } => {
+                                    vec!["Value: ".into(), value.to_string().red().bold()]
+                                }
+                            }),
+                        ]
+                        .into_iter()
+                        .map(ListItem::new),
+                    ),
+                    libpipe::memory::State::Pushing { value, sp, clocks } => List::new(
+                        [
+                            Line::from(vec!["State: ".into(), "Pushing".red().bold()]),
+                            Line::from(vec![
+                                "Expected wait time: ".into(),
+                                clocks.to_string().red().bold(),
+                            ]),
+                            Line::from(vec!["Value: ".into(), value.to_string().red().bold()]),
+                            Line::from(vec![
+                                "SP".red().bold(),
+                                " = ".into(),
+                                sp.to_string().red().bold(),
+                            ]),
+                        ]
+                        .into_iter()
+                        .map(ListItem::new),
+                    ),
+                    libpipe::memory::State::Popping {
+                        destination,
+                        sp,
+                        clocks,
+                    } => List::new(
+                        [
+                            Line::from(vec!["State: ".into(), "Popping".red().bold()]),
+                            Line::from(vec![
+                                "Expected wait time: ".into(),
+                                clocks.to_string().red().bold(),
+                            ]),
+                            Line::from(vec![
+                                "Destination: ".into(),
+                                get_name(*destination).unwrap_or("<?>").red().bold(),
+                            ]),
+                            Line::from(vec![
+                                "SP".red().bold(),
+                                " = ".into(),
+                                sp.to_string().red().bold(),
+                            ]),
+                        ]
+                        .into_iter()
+                        .map(ListItem::new),
+                    ),
+                    libpipe::memory::State::DummyPop { sp, clocks } => List::new(
+                        [
+                            Line::from(vec!["State: ".into(), "Popping".red().bold()]),
+                            Line::from(vec![
+                                "Expected wait time: ".into(),
+                                clocks.to_string().red().bold(),
+                            ]),
+                            Line::from(vec!["Destination: ".into(), "invalid".red().bold()]),
+                            Line::from(vec![
+                                "SP".red().bold(),
+                                " = ".into(),
+                                sp.to_string().red().bold(),
+                            ]),
+                        ]
+                        .into_iter()
+                        .map(ListItem::new),
+                    ),
+                    libpipe::memory::State::JsrPrep {
+                        address,
+                        link,
+                        sp,
+                        bp,
+                        lp,
+                        state,
+                        clocks,
+                    } => List::new(
+                        [
+                            Line::from(vec!["State: ".into(), "Preparing for JSR".red().bold()]),
+                            Line::from(vec![
+                                "Expected wait time: ".into(),
+                                clocks.to_string().red().bold(),
+                            ]),
+                            Line::from(vec!["Address: ".into(), address.to_string().red().bold()]),
+                            Line::from(vec!["Link: ".into(), link.to_string().red().bold()]),
+                            Line::from(vec!["State: ".into(), state.to_string().red().bold()]),
+                            Line::from(vec![
+                                "SP".red().bold(),
+                                " = ".into(),
+                                sp.to_string().red().bold(),
+                            ]),
+                            Line::from(vec![
+                                "BP".red().bold(),
+                                " = ".into(),
+                                bp.to_string().red().bold(),
+                            ]),
+                            Line::from(vec![
+                                "LP".red().bold(),
+                                " = ".into(),
+                                lp.to_string().red().bold(),
+                            ]),
+                        ]
+                        .into_iter()
+                        .map(ListItem::new),
+                    ),
+                    libpipe::memory::State::RetPrep {
+                        link,
+                        bp,
+                        state,
+                        clocks,
+                    } => List::new(
+                        [
+                            Line::from(vec!["State: ".into(), "Preparing for JSR".red().bold()]),
+                            Line::from(vec![
+                                "Expected wait time: ".into(),
+                                clocks.to_string().red().bold(),
+                            ]),
+                            Line::from(vec!["Link: ".into(), link.to_string().red().bold()]),
+                            Line::from(vec!["State: ".into(), state.to_string().red().bold()]),
+                            Line::from(vec![
+                                "BP".red().bold(),
+                                " = ".into(),
+                                bp.to_string().red().bold(),
+                            ]),
+                        ]
+                        .into_iter()
+                        .map(ListItem::new),
+                    ),
+                    libpipe::memory::State::Ready { .. } => List::new(
+                        [Line::from(vec!["State: ".into(), "Ready".red().bold()])]
+                            .into_iter()
+                            .map(ListItem::new),
+                    ),
+                    libpipe::memory::State::Squashed { wregs } => List::new(
+                        [
+                            Line::from(vec!["State: ".into(), "Squashed".red().bold()]),
+                            ["Locks: ".into()]
+                                .into_iter()
+                                .chain(wregs.registers().enumerate().flat_map(|(i, r)| {
+                                    if i == wregs.count().saturating_sub(1) {
+                                        vec![get_name(r).unwrap_or("<?>").red().bold()]
+                                    } else {
+                                        vec![get_name(r).unwrap_or("<?>").red().bold(), ", ".into()]
+                                    }
+                                }))
+                                .collect::<Vec<_>>()
+                                .into(),
+                        ]
+                        .into_iter()
+                        .map(ListItem::new),
+                    ),
+                    libpipe::memory::State::Halted => List::new(
+                        [Line::from(vec!["State: ".into(), "Halted".red().bold()])]
+                            .into_iter()
+                            .map(ListItem::new),
+                    ),
+                }
+                .render(splits[3], buf);
+
+                match stages.writeback.get_state() {
+                    Some(_) => List::new(
+                        [Line::from(vec!["State: ".into(), "Busy".red().bold()])]
+                            .into_iter()
+                            .map(ListItem::new),
+                    ),
+                    None => List::new(
+                        [Line::from(vec!["State: ".into(), "Idle".red().bold()])]
+                            .into_iter()
+                            .map(ListItem::new),
+                    ),
+                }
+                .render(splits[4], buf);
+            }
+        }
     }
 }

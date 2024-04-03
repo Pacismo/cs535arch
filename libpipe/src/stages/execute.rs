@@ -137,7 +137,7 @@ impl ExecuteResult {
 }
 
 #[derive(Debug, Clone, Serialize, Default)]
-enum State {
+pub enum State {
     #[default]
     Idle,
     Waiting {
@@ -193,6 +193,7 @@ pub struct Execute {
 impl PipelineStage for Execute {
     type Prev = DecodeResult;
     type Next = ExecuteResult;
+    type State = State;
 
     fn clock(
         &mut self,
@@ -325,6 +326,10 @@ impl PipelineStage for Execute {
                 None => Status::Ready,
             }
         }
+    }
+
+    fn get_state(&self) -> &State {
+        &self.state
     }
 }
 

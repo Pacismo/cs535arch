@@ -6,9 +6,10 @@ use libseis::{
     types::{Byte, Register, Short, Word},
 };
 use serde::Serialize;
+use std::fmt::Display;
 
 #[derive(Debug, Clone, Copy, Serialize)]
-enum ReadMode {
+pub enum ReadMode {
     /// Reading a byte from memory
     ReadByte { address: Word, volatile: bool },
     /// Reading a short from memory
@@ -61,7 +62,7 @@ impl ReadMode {
 use ReadMode::*;
 
 #[derive(Debug, Clone, Copy, Serialize)]
-enum WriteMode {
+pub enum WriteMode {
     /// Writing a byte to memory
     WriteByte {
         address: Word,
@@ -127,21 +128,39 @@ impl WriteMode {
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]
-enum JsrPrepState {
+pub enum JsrPrepState {
     WritingLp,
     WritingBp,
 }
 use JsrPrepState::*;
 
+impl Display for JsrPrepState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            WritingLp => write!(f, "Writing the LP"),
+            WritingBp => write!(f, "Writing the BP"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, Serialize)]
-enum RetPrepState {
+pub enum RetPrepState {
     ReadingBp,
     ReadingLp(Word),
 }
 use RetPrepState::*;
 
+impl Display for RetPrepState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ReadingLp(_) => write!(f, "Reading the LP"),
+            ReadingBp => write!(f, "Reading the BP"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Default)]
-enum State {
+pub enum State {
     #[default]
     Idle,
     Reading {
@@ -340,8 +359,8 @@ pub struct Memory {
 
 impl PipelineStage for Memory {
     type Prev = ExecuteResult;
-
     type Next = MemoryResult;
+    type State = State;
 
     fn clock(
         &mut self,
@@ -896,5 +915,9 @@ impl PipelineStage for Memory {
                 None => Status::Ready,
             }
         }
+    }
+
+    fn get_state(&self) -> &State {
+        &self.state
     }
 }

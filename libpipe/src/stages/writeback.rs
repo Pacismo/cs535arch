@@ -14,8 +14,8 @@ pub type WritebackResult = ();
 
 impl PipelineStage for Writeback {
     type Prev = MemoryResult;
-
     type Next = WritebackResult;
+    type State = Option<MemoryResult>;
 
     fn clock(
         &mut self,
@@ -158,5 +158,9 @@ impl PipelineStage for Writeback {
             Status::Squashed => Status::Squashed,
             Status::Dry => Status::Dry,
         }
+    }
+
+    fn get_state(&self) -> &Self::State {
+        &self.job
     }
 }

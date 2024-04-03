@@ -5,7 +5,7 @@ use serde::Serialize;
 
 /// The state of the [`Fetch`] object
 #[derive(Debug, Clone, Copy, Serialize, Default)]
-enum State {
+pub enum State {
     /// The stage is waiting for the next job
     #[default]
     Idle,
@@ -70,8 +70,8 @@ impl Default for Fetch {
 
 impl PipelineStage for Fetch {
     type Prev = ();
-
     type Next = FetchResult;
+    type State = State;
 
     fn clock(
         &mut self,
@@ -148,6 +148,10 @@ impl PipelineStage for Fetch {
             None if self.state.is_halted() => Status::Dry,
             None => Status::Ready,
         }
+    }
+
+    fn get_state(&self) -> &State {
+        &self.state
     }
 }
 
