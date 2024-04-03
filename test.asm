@@ -7,10 +7,11 @@ loop:
     add v1, v0, v1
     sub v0, 1, v0
 
-    cmp s v0, 0
+    cmp v0, 0
     jgt loop
 
     add v2, 1, v2
+    load 32, v0
     cmp v2, 4
     jle loop
 
