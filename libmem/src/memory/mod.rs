@@ -247,7 +247,7 @@ impl Memory {
     }
 
     pub fn read_words_to(&self, address: Word, to: &mut [u8]) {
-        (address..(address + to.len() as Word))
+        (address..(address.saturating_add(to.len() as Word)))
             .enumerate()
             .for_each(|(i, a)| to[i] = self.read_byte(a))
     }
@@ -279,9 +279,13 @@ impl Memory {
             self.pages[page_id] = None;
         } else {
             let mut page = allocate_page();
-            page.copy_from_slice(&data);
+            page[..data.len()].copy_from_slice(&data);
             self.pages[page_id] = Some(page);
         }
+    }
+
+    pub fn get_page(&self, index: usize) -> Option<&Page> {
+        self.pages[index].as_ref().map(|p| p.as_ref())
     }
 }
 
