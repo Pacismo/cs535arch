@@ -234,7 +234,7 @@ impl<'a> Runtime<'a> {
 
         let block = Block::bordered()
             .title(Title::from(Line::from(
-                " Running Program ".rapid_blink().on_blue(),
+                " Running Program... ".rapid_blink().on_blue(),
             )))
             .title_bottom(Line::from(vec![
                 " Press ".into(),
@@ -274,8 +274,8 @@ impl<'a> Runtime<'a> {
     }
 
     fn draw_app_frame(&self, area: Rect, buf: &mut Buffer) -> Rect {
-        let title =
-            Title::from(" SEIS Simulation Terminal Fronend ".bold()).alignment(Alignment::Center);
+        let title = Title::from(" SEIS Simulation Terminal Fronend ".bold().on_blue())
+            .alignment(Alignment::Center);
         let instructions = [
             [" q".blue().bold(), " to quit ".into()],
             [" c".blue().bold(), " to clock ".into()],

@@ -5,8 +5,6 @@ impl<'a> Runtime<'a> {
     pub fn process_input(&mut self) -> Result<bool, Box<dyn Error>> {
         if self.running.enabled {
             self.running_event_handler()
-        } else if !event::poll(Duration::from_millis(100))? {
-            Ok(true)
         } else {
             self.handle_event()
         }
