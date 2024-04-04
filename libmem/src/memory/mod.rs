@@ -16,6 +16,17 @@ use std::{
     slice::Iter,
 };
 
+pub struct AllocatedPage<'a> {
+    pub id: usize,
+    pub data: &'a [u8],
+}
+
+impl<'a> From<(usize, &'a [u8])> for AllocatedPage<'a> {
+    fn from((id, data): (usize, &'a [u8])) -> Self {
+        Self { id, data }
+    }
+}
+
 type Page = [Byte; PAGE_SIZE];
 /// An iterator over the pages of the [`Memory`] datastructure
 pub type PageIterator<'a> =
@@ -23,8 +34,8 @@ pub type PageIterator<'a> =
 /// An iterator over the allocated pages of the [`Memory`] datastructure
 pub type AllocatedPageIterator<'a> = FlatMap<
     Enumerate<PageIterator<'a>>,
-    Option<(usize, &'a [u8])>,
-    fn((usize, Option<&'a [u8]>)) -> Option<(usize, &'a [u8])>,
+    Option<AllocatedPage<'a>>,
+    fn((usize, Option<&'a [u8]>)) -> Option<AllocatedPage<'a>>,
 >;
 
 #[repr(transparent)]
@@ -267,7 +278,7 @@ impl Memory {
     pub fn allocated_pages(&self) -> AllocatedPageIterator {
         self.pages()
             .enumerate()
-            .flat_map(|(i, p)| p.map(|p| (i, p)))
+            .flat_map(|(i, p)| p.map(|p| AllocatedPage::from((i, p))))
     }
 
     pub fn set_page(&mut self, address: Word, data: &[u8]) {
