@@ -92,6 +92,28 @@ impl CacheConfiguration {
 
         table
     }
+
+    pub fn to_json(self) -> serde_json::Map<String, serde_json::Value> {
+        let mut map = serde_json::Map::new();
+
+        match self {
+            CacheConfiguration::Disabled => {
+                map.insert("mode".to_string(), "Disabled".into());
+            }
+            CacheConfiguration::Associative {
+                set_bits,
+                offset_bits,
+                ways,
+            } => {
+                map.insert("mode".to_string(), "Associative".into());
+                map.insert("set_bits".to_string(), set_bits.into());
+                map.insert("offset_bits".to_string(), offset_bits.into());
+                map.insert("ways".to_string(), ways.into());
+            }
+        }
+
+        map
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default)]
