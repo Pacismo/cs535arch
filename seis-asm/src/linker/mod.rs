@@ -91,6 +91,7 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
     let mut constants: HashMap<String, Constant> = HashMap::new();
     let mut non_const = Lines::new();
 
+    // MARK: constant resolution
     // Step 1: resolve constants
 
     for line in lines.into_iter() {
@@ -139,7 +140,9 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
 
     let mut ip = 0;
 
-    // Step 2: resolve labels, expand LOAD instructions (as they're the only instructions that are expanded by the assembler).
+    // MARK: resolution and expansion
+    // Step 2: resolve labels, expand LOAD instructions
+    // (as they're the only instructions that are expanded by the assembler).
 
     for line in non_const {
         use crate::parse::LineType as T;
@@ -395,6 +398,7 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
         }
     }
 
+    // MARK: write instructions
     // Stage 3: transform into instructions
 
     for (instruction, address, span) in expanded {
@@ -1149,6 +1153,8 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
             _ => unreachable!("Non-label LOAD instructions have already been evaluated."),
         }
     }
+
+    // MARK: transform into a page set
 
     for (data, address, span) in data {
         if pages.page_of(address).len > address & 0x0000_FFFF {
