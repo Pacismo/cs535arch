@@ -1,6 +1,10 @@
 mod cmd;
+mod input;
 
-use self::cmd::{Command, Info};
+use self::{
+    cmd::{Command, Info},
+    input::InputHandler,
+};
 use super::Interface;
 use crate::{config::SimulationConfiguration, PAGES};
 use clap::Parser;
@@ -9,7 +13,6 @@ use libseis::pages::PAGE_SIZE;
 use serde_json as json;
 use std::{
     error::Error,
-    io::{stdin, BufRead},
     time::{Duration, Instant},
 };
 
@@ -29,6 +32,7 @@ impl Interface for Backend {
         let mut state = BackendState {
             pipeline,
             config,
+            input_handler: InputHandler::new(),
 
             clocks: 0,
             clocks_required: 1,
@@ -36,26 +40,42 @@ impl Interface for Backend {
         };
 
         loop {
-            let mut command = String::new();
-            stdin().lock().read_line(&mut command)?;
-
-            match Command::try_parse_from(command.split_whitespace()) {
-                Ok(command) => {
-                    if state.execute(command)? {
-                        continue;
-                    } else {
-                        break Ok(());
-                    }
-                }
-                Err(e) => eprintln!("{e}"),
+            match state.read_input() {
+                Ok(true) => continue,
+                Ok(false) => break,
+                Err(BackendError::ClapError(e)) => eprintln!("{e}"),
+                Err(BackendError::OtherError(e)) => return Err(e),
             }
         }
+
+        Ok(())
+    }
+}
+
+pub enum BackendError {
+    ClapError(clap::Error),
+    OtherError(Box<dyn Error>),
+}
+impl From<clap::Error> for BackendError {
+    fn from(e: clap::Error) -> Self {
+        Self::ClapError(e)
+    }
+}
+impl From<Box<dyn Error>> for BackendError {
+    fn from(e: Box<dyn Error>) -> Self {
+        Self::OtherError(e)
+    }
+}
+impl From<json::Error> for BackendError {
+    fn from(e: json::Error) -> Self {
+        Self::OtherError(Box::new(e))
     }
 }
 
 struct BackendState {
     pipeline: Box<dyn Pipeline>,
     config: SimulationConfiguration,
+    input_handler: InputHandler,
 
     clocks: usize,
     clocks_required: usize,
@@ -63,10 +83,10 @@ struct BackendState {
 }
 
 impl BackendState {
-    fn execute(&mut self, command: Command) -> Result<bool, Box<dyn Error>> {
+    fn read_input(&mut self) -> Result<bool, BackendError> {
         use Command::*;
 
-        match command {
+        match Command::try_parse_from(self.input_handler.get_next().split_whitespace())? {
             Clock { mut count } => {
                 while count > 0 && !self.finished {
                     let min = self.clocks_required.min(count);
@@ -95,8 +115,8 @@ impl BackendState {
                 while !self.finished {
                     let now = Instant::now();
                     if now.duration_since(last) >= Duration::from_millis(rate_millis) {
-                        self.clocks += self.clocks_required;
-                        match self.pipeline.clock(self.clocks_required) {
+                        self.clocks += 1;
+                        match self.pipeline.clock(1) {
                             ClockResult::Stall(clocks) => {
                                 self.clocks_required = clocks;
                             }
@@ -111,15 +131,15 @@ impl BackendState {
                         last = now;
                     }
 
-                    // TODO: make nonblocking
-                    let mut input = String::new();
-                    stdin().lock().read_line(&mut input)?;
-                    let command = Command::try_parse_from(input.split_whitespace())?;
-
-                    if matches!(command, Command::Stop {}) {
-                        break;
-                    } else if matches!(command, Command::Terminate {}) {
-                        return Ok(false);
+                    if let Some(command) =
+                        self.input_handler.get_next_timeout(Duration::from_nanos(1))
+                    {
+                        let command = Command::try_parse_from(command.split_whitespace());
+                        if matches!(command, Ok(Command::Stop {})) {
+                            break;
+                        } else if matches!(command, Ok(Command::Terminate {})) {
+                            return Ok(false);
+                        }
                     }
                 }
 
@@ -140,13 +160,11 @@ impl BackendState {
                         }
                     }
 
-                    let mut input = String::new();
-                    stdin().lock().read_line(&mut input)?;
-                    let command = Command::try_parse_from(input.split_whitespace())?;
-
-                    if matches!(command, Command::Stop {}) {
+                    let command =
+                        Command::try_parse_from(self.input_handler.get_next().split_whitespace());
+                    if matches!(command, Ok(Command::Stop {})) {
                         break;
-                    } else if matches!(command, Command::Terminate {}) {
+                    } else if matches!(command, Ok(Command::Terminate {})) {
                         return Ok(false);
                     }
                 }
