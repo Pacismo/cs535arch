@@ -4,12 +4,13 @@ use self::cmd::{Command, Info};
 use super::Interface;
 use crate::{config::SimulationConfiguration, PAGES};
 use clap::Parser;
-use libpipe::Pipeline;
+use libpipe::{ClockResult, Pipeline};
 use libseis::pages::PAGE_SIZE;
 use serde_json as json;
 use std::{
     error::Error,
     io::{stdin, BufRead},
+    time::{Duration, Instant},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -25,16 +26,18 @@ impl Interface for Backend {
         pipeline: Box<dyn Pipeline>,
         config: SimulationConfiguration,
     ) -> Result<Self::Ok, Self::Error> {
-        let mut input = stdin().lock();
         let mut state = BackendState {
             pipeline,
             config,
+
             clocks: 0,
+            clocks_required: 1,
+            finished: false,
         };
 
         loop {
             let mut command = String::new();
-            input.read_line(&mut command)?;
+            stdin().lock().read_line(&mut command)?;
 
             match Command::try_parse_from(command.split_whitespace()) {
                 Ok(command) => {
@@ -55,6 +58,8 @@ struct BackendState {
     config: SimulationConfiguration,
 
     clocks: usize,
+    clocks_required: usize,
+    finished: bool,
 }
 
 impl BackendState {
@@ -62,7 +67,93 @@ impl BackendState {
         use Command::*;
 
         match command {
-            Clock {} => todo!(),
+            Clock { mut count } => {
+                while count > 0 && !self.finished {
+                    let min = self.clocks_required.min(count);
+                    self.clocks += min;
+                    count -= min;
+
+                    match self.pipeline.clock(min) {
+                        ClockResult::Stall(clocks) => {
+                            self.clocks_required = clocks;
+                        }
+                        ClockResult::Flow => {
+                            self.clocks_required = 1;
+                        }
+                        ClockResult::Dry => {
+                            self.finished = true;
+                        }
+                    }
+                }
+
+                Ok(true)
+            }
+            Run {
+                clock_rate: Some(rate_millis),
+            } => {
+                let mut last = Instant::now();
+                while !self.finished {
+                    let now = Instant::now();
+                    if now.duration_since(last) >= Duration::from_millis(rate_millis) {
+                        self.clocks += self.clocks_required;
+                        match self.pipeline.clock(self.clocks_required) {
+                            ClockResult::Stall(clocks) => {
+                                self.clocks_required = clocks;
+                            }
+                            ClockResult::Flow => {
+                                self.clocks_required = 1;
+                            }
+                            ClockResult::Dry => {
+                                self.finished = true;
+                            }
+                        }
+
+                        last = now;
+                    }
+
+                    // TODO: make nonblocking
+                    let mut input = String::new();
+                    stdin().lock().read_line(&mut input)?;
+                    let command = Command::try_parse_from(input.split_whitespace())?;
+
+                    if matches!(command, Command::Stop {}) {
+                        break;
+                    } else if matches!(command, Command::Terminate {}) {
+                        return Ok(false);
+                    }
+                }
+
+                Ok(true)
+            }
+            Run { clock_rate: None } => {
+                while !self.finished {
+                    self.clocks += self.clocks_required;
+                    match self.pipeline.clock(self.clocks_required) {
+                        ClockResult::Stall(clocks) => {
+                            self.clocks_required = clocks;
+                        }
+                        ClockResult::Flow => {
+                            self.clocks_required = 1;
+                        }
+                        ClockResult::Dry => {
+                            self.finished = true;
+                        }
+                    }
+
+                    let mut input = String::new();
+                    stdin().lock().read_line(&mut input)?;
+                    let command = Command::try_parse_from(input.split_whitespace())?;
+
+                    if matches!(command, Command::Stop {}) {
+                        break;
+                    } else if matches!(command, Command::Terminate {}) {
+                        return Ok(false);
+                    }
+                }
+
+                Ok(true)
+            }
+            Stop {} => Ok(true),
             Information { what } => {
                 self.information(what)?;
                 Ok(true)
@@ -82,13 +173,23 @@ impl BackendState {
                 );
                 Ok(true)
             }
-            ShowPipeline {} => todo!(),
+            ShowPipeline {} => {
+                self.show_pipeline()?;
+
+                Ok(true)
+            }
             Statistics {} => {
                 self.statistics()?;
                 Ok(true)
             }
             Terminate {} => Ok(false),
         }
+    }
+
+    fn show_pipeline(&self) -> Result<(), Box<dyn Error>> {
+        println!("{}", json::to_string(&self.pipeline.stages())?);
+
+        Ok(())
     }
 
     fn show_page(&self, page: usize) -> Result<(), Box<dyn Error>> {

@@ -13,7 +13,9 @@ pub enum Info {
 pub enum Command {
     Information { what: Info },
     ReadPage { page: usize },
-    Clock {},
+    Clock { count: usize },
+    Run { clock_rate: Option<u64> },
+    Stop {},
     ShowRegs {},
     ShowCache {},
     ShowPipeline {},

@@ -164,14 +164,14 @@ impl<'a> Runtime<'a> {
                     .into_iter()
                     .map(ListItem::new),
             ),
-            libpipe::execute::State::Waiting {
+            libpipe::execute::State::Executing {
                 instruction,
                 wregs,
                 rvals,
                 clocks,
             } => List::new(
                 [
-                    Line::from(vec!["State: ".into(), "Waiting".red().bold()]),
+                    Line::from(vec!["State: ".into(), "Executing".red().bold()]),
                     Line::from(vec![
                         "Expected wait time: ".into(),
                         clocks.to_string().red().bold(),
