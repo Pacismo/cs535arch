@@ -8,7 +8,7 @@ use libseis::{
 use serde::Serialize;
 use std::fmt::Display;
 
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy)]
 pub enum ReadMode {
     /// Reading a byte from memory
     ReadByte { address: Word, volatile: bool },
@@ -17,6 +17,37 @@ pub enum ReadMode {
     /// Reading a word from memory
     ReadWord { address: Word, volatile: bool },
 }
+
+impl Serialize for ReadMode {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+        let mut map = serializer.serialize_map(Some(3))?;
+
+        match self {
+            ReadByte { address, volatile } => {
+                map.serialize_entry("mode", "byte")?;
+                map.serialize_entry("address", address)?;
+                map.serialize_entry("volatile", volatile)?;
+            }
+            ReadShort { address, volatile } => {
+                map.serialize_entry("mode", "short")?;
+                map.serialize_entry("address", address)?;
+                map.serialize_entry("volatile", volatile)?;
+            }
+            ReadWord { address, volatile } => {
+                map.serialize_entry("mode", "word")?;
+                map.serialize_entry("address", address)?;
+                map.serialize_entry("volatile", volatile)?;
+            }
+        }
+
+        map.end()
+    }
+}
+use ReadMode::*;
 
 impl ReadMode {
     fn execute(self, mem: &mut dyn MemoryModule) -> Result<Word, usize> {
@@ -59,9 +90,8 @@ impl ReadMode {
         }
     }
 }
-use ReadMode::*;
 
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy)]
 pub enum WriteMode {
     /// Writing a byte to memory
     WriteByte {
@@ -83,6 +113,51 @@ pub enum WriteMode {
     },
 }
 use WriteMode::*;
+
+impl Serialize for WriteMode {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+        let mut map = serializer.serialize_map(Some(4))?;
+
+        match self {
+            WriteByte {
+                address,
+                value,
+                volatile,
+            } => {
+                map.serialize_entry("mode", "byte")?;
+                map.serialize_entry("value", value)?;
+                map.serialize_entry("address", address)?;
+                map.serialize_entry("volatile", volatile)?;
+            }
+            WriteShort {
+                address,
+                value,
+                volatile,
+            } => {
+                map.serialize_entry("mode", "short")?;
+                map.serialize_entry("value", value)?;
+                map.serialize_entry("address", address)?;
+                map.serialize_entry("volatile", volatile)?;
+            }
+            WriteWord {
+                address,
+                value,
+                volatile,
+            } => {
+                map.serialize_entry("mode", "word")?;
+                map.serialize_entry("value", value)?;
+                map.serialize_entry("address", address)?;
+                map.serialize_entry("volatile", volatile)?;
+            }
+        }
+
+        map.end()
+    }
+}
 
 impl WriteMode {
     fn execute(self, mem: &mut dyn MemoryModule) -> Option<usize> {
@@ -127,12 +202,24 @@ impl WriteMode {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy)]
 pub enum JsrPrepState {
     WritingLp,
     WritingBp,
 }
 use JsrPrepState::*;
+
+impl Serialize for JsrPrepState {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            WritingLp => serializer.serialize_str("writing_lp"),
+            WritingBp => serializer.serialize_str("writing_bp"),
+        }
+    }
+}
 
 impl Display for JsrPrepState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -143,12 +230,24 @@ impl Display for JsrPrepState {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy)]
 pub enum RetPrepState {
     ReadingBp,
     ReadingLp(Word),
 }
 use RetPrepState::*;
+
+impl Serialize for RetPrepState {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            ReadingBp => serializer.serialize_str("reading_bp"),
+            ReadingLp(..) => serializer.serialize_str("reading_lp"),
+        }
+    }
+}
 
 impl Display for RetPrepState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -159,7 +258,7 @@ impl Display for RetPrepState {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub enum State {
     #[default]
     Idle,
@@ -211,6 +310,108 @@ pub enum State {
         wregs: RegisterFlags,
     },
     Halted,
+}
+use State::*;
+
+impl Serialize for State {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+
+        match self {
+            Idle => serializer.collect_map([("state", "idle")]),
+            Reading {
+                mode,
+                destination,
+                clocks,
+            } => {
+                let mut map = serializer.serialize_map(Some(4))?;
+                map.serialize_entry("state", "reading")?;
+                map.serialize_entry("mode", mode)?;
+                map.serialize_entry("destination", destination)?;
+                map.serialize_entry("clocks", clocks)?;
+                map.end()
+            }
+            Writing { mode, clocks } => {
+                let mut map = serializer.serialize_map(Some(3))?;
+                map.serialize_entry("state", "writing")?;
+                map.serialize_entry("mode", mode)?;
+                map.serialize_entry("clocks", clocks)?;
+                map.end()
+            }
+            Pushing { value, sp, clocks } => {
+                let mut map = serializer.serialize_map(Some(4))?;
+                map.serialize_entry("state", "pushing")?;
+                map.serialize_entry("value", value)?;
+                map.serialize_entry("sp", sp)?;
+                map.serialize_entry("clocks", clocks)?;
+                map.end()
+            }
+            Popping {
+                destination,
+                sp,
+                clocks,
+            } => {
+                let mut map = serializer.serialize_map(Some(4))?;
+                map.serialize_entry("state", "popping")?;
+                map.serialize_entry("destination", destination)?;
+                map.serialize_entry("sp", sp)?;
+                map.serialize_entry("clocks", clocks)?;
+                map.end()
+            }
+            DummyPop { sp, clocks } => {
+                let mut map = serializer.serialize_map(Some(3))?;
+                map.serialize_entry("state", "dummy_pop")?;
+                map.serialize_entry("sp", sp)?;
+                map.serialize_entry("clocks", clocks)?;
+                map.end()
+            }
+            JsrPrep {
+                address,
+                link,
+                sp,
+                bp,
+                lp,
+                state,
+                clocks,
+            } => {
+                let mut map = serializer.serialize_map(Some(8))?;
+                map.serialize_entry("state", "jsr_prep")?;
+                map.serialize_entry("address", address)?;
+                map.serialize_entry("link", link)?;
+                map.serialize_entry("bp", bp)?;
+                map.serialize_entry("sp", sp)?;
+                map.serialize_entry("lp", lp)?;
+                map.serialize_entry("state", state)?;
+                map.serialize_entry("clocks", clocks)?;
+                map.end()
+            }
+            RetPrep {
+                link,
+                bp,
+                state,
+                clocks,
+            } => {
+                let mut map = serializer.serialize_map(Some(5))?;
+                map.serialize_entry("state", "return_prep")?;
+                map.serialize_entry("link", link)?;
+                map.serialize_entry("bp", bp)?;
+                map.serialize_entry("state", state)?;
+                map.serialize_entry("clocks", clocks)?;
+                map.end()
+            }
+            Ready { .. } => serializer.collect_map([("state", "ready")]),
+            Squashed { wregs } => {
+                let mut map = serializer.serialize_map(Some(2))?;
+                map.serialize_entry("state", "squashed")?;
+                map.serialize_entry("write_regs", wregs)?;
+                map.end()
+            }
+            Halted => serializer.collect_map([("state", "halted")]),
+        }
+    }
 }
 
 impl State {
@@ -281,7 +482,6 @@ impl State {
         }
     }
 }
-use State::*;
 
 #[derive(Debug, Clone, Copy, Serialize)]
 pub enum MemoryResult {

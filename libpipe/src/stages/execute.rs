@@ -16,7 +16,7 @@ use std::mem::take;
 
 /// Represents the steps that must be taken by the next stage of the pipeline
 /// to complete an instruction
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
 pub enum ExecuteResult {
     /// Nothing
     Nop,
@@ -139,11 +139,11 @@ impl ExecuteResult {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Default)]
+#[derive(Debug, Clone, Default)]
 pub enum State {
     #[default]
     Idle,
-    Waiting {
+    Executing {
         instruction: Instruction,
         wregs: RegisterFlags,
         rvals: RegMap,
@@ -158,12 +158,59 @@ pub enum State {
     },
     Halted,
 }
-
 use State::*;
+
+impl Serialize for State {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+
+        match self {
+            Idle => {
+                let mut map = serializer.serialize_map(Some(1))?;
+                map.serialize_entry("state", "idle")?;
+                map.end()
+            }
+            Executing {
+                instruction,
+                wregs,
+                rvals,
+                clocks,
+            } => {
+                let mut map = serializer.serialize_map(Some(5))?;
+                map.serialize_entry("state", "executing")?;
+                map.serialize_entry("instruction", &instruction.to_string())?;
+                map.serialize_entry("write_regs", wregs)?;
+                map.serialize_entry("reg_values", rvals)?;
+                map.serialize_entry("clocks", clocks)?;
+                map.end()
+            }
+            Ready { wregs, .. } => {
+                let mut map = serializer.serialize_map(Some(2))?;
+                map.serialize_entry("state", "ready")?;
+                map.serialize_entry("write_regs", wregs)?;
+                map.end()
+            }
+            Squashed { wregs, .. } => {
+                let mut map = serializer.serialize_map(Some(2))?;
+                map.serialize_entry("state", "squashed")?;
+                map.serialize_entry("write_regs", wregs)?;
+                map.end()
+            }
+            Halted => {
+                let mut map = serializer.serialize_map(Some(1))?;
+                map.serialize_entry("state", "halted")?;
+                map.end()
+            }
+        }
+    }
+}
 
 impl State {
     fn is_waiting(&self) -> bool {
-        matches!(self, Waiting { .. })
+        matches!(self, Executing { .. })
     }
 
     fn is_squashed(&self) -> bool {
@@ -171,7 +218,7 @@ impl State {
     }
 
     fn wait_time(&self) -> usize {
-        if let Waiting { clocks, .. } = self {
+        if let Executing { clocks, .. } = self {
             *clocks
         } else {
             1
@@ -187,10 +234,19 @@ impl State {
     }
 }
 
-#[derive(Debug, Serialize, Default)]
+#[derive(Debug, Default)]
 pub struct Execute {
     state: State,
     forward: Option<ExecuteResult>,
+}
+
+impl Serialize for Execute {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.state.serialize(serializer)
+    }
 }
 
 impl PipelineStage for Execute {
@@ -207,7 +263,7 @@ impl PipelineStage for Execute {
     ) -> Clock {
         match take(&mut self.state) {
             Idle => clock.to_ready(),
-            Waiting {
+            Executing {
                 instruction,
                 wregs,
                 rvals,
@@ -248,7 +304,7 @@ impl PipelineStage for Execute {
                             }
                         }
                     } else {
-                        self.state = Waiting {
+                        self.state = Executing {
                             instruction,
                             wregs,
                             rvals,
@@ -307,7 +363,7 @@ impl PipelineStage for Execute {
                     reglocks,
                 }) => {
                     let clocks = instruction.clock_requirement();
-                    self.state = State::Waiting {
+                    self.state = State::Executing {
                         instruction,
                         wregs: reglocks,
                         rvals: regvals,

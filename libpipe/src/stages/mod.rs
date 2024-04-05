@@ -35,9 +35,9 @@ where
     Self: Debug + Serialize + Default,
 {
     /// What the stage takes in when forwarding a clock.
-    type Prev: Debug + Serialize;
+    type Prev: Debug;
     /// What the stage outputs as a result of taking a clock.
-    type Next: Debug + Serialize;
+    type Next: Debug;
     /// What tracks the state.
     type State: Debug + Serialize;
 

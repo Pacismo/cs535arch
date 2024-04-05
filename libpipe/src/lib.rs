@@ -15,16 +15,37 @@ use libmem::module::MemoryModule;
 pub use piped::Pipelined;
 pub use reg_locks::Locks;
 pub use registers::Registers;
+use serde::Serialize;
 pub use stages::*;
 use std::fmt::Debug;
 pub use unpiped::Unpipelined;
 
+#[derive(Debug)]
 pub struct PipelineStages<'a> {
     pub fetch: &'a Fetch,
     pub decode: &'a Decode,
     pub execute: &'a Execute,
     pub memory: &'a Memory,
     pub writeback: &'a Writeback,
+}
+
+impl<'a> Serialize for PipelineStages<'a> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+
+        let mut map = serializer.serialize_map(Some(5))?;
+
+        map.serialize_entry("fetch", self.fetch)?;
+        map.serialize_entry("decode", self.decode)?;
+        map.serialize_entry("execute", self.execute)?;
+        map.serialize_entry("memory", self.memory)?;
+        map.serialize_entry("writeback", self.writeback)?;
+
+        map.end()
+    }
 }
 
 /// The result of clocking the pipeline.

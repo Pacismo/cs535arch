@@ -8,7 +8,7 @@ use libseis::{
 use serde::Serialize;
 
 /// The state of the [`Decode`] object
-#[derive(Debug, Clone, Copy, Serialize, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub enum State {
     Decoding {
         word: Word,
@@ -25,6 +25,53 @@ pub enum State {
     Halted,
 }
 use State::*;
+
+impl Serialize for State {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+
+        match self {
+            Decoding { word, .. } => {
+                let mut map = serializer.serialize_map(Some(2))?;
+                map.serialize_entry("state", "decoding")?;
+                map.serialize_entry("word", word)?;
+                map.end()
+            }
+            Ready { word, .. } => {
+                let mut map = serializer.serialize_map(Some(2))?;
+                map.serialize_entry("state", "ready")?;
+                map.serialize_entry(
+                    "instruction",
+                    &decode::<Instruction>(*word).unwrap_or_default().to_string(),
+                )?;
+                map.end()
+            }
+            Idle => {
+                let mut map = serializer.serialize_map(Some(1))?;
+                map.serialize_entry("state", "idle")?;
+                map.end()
+            }
+            Squashed => {
+                let mut map = serializer.serialize_map(Some(1))?;
+                map.serialize_entry("state", "squashed")?;
+                map.end()
+            }
+            PrevSquash => {
+                let mut map = serializer.serialize_map(Some(1))?;
+                map.serialize_entry("state", "squashed")?;
+                map.end()
+            }
+            Halted => {
+                let mut map = serializer.serialize_map(Some(1))?;
+                map.serialize_entry("state", "halted")?;
+                map.end()
+            }
+        }
+    }
+}
 
 use super::fetch::FetchResult;
 
@@ -46,7 +93,7 @@ impl State {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
 pub enum DecodeResult {
     Forward {
         instruction: Instruction,
@@ -56,10 +103,19 @@ pub enum DecodeResult {
     Squashed,
 }
 
-#[derive(Debug, Serialize, Default)]
+#[derive(Debug, Default)]
 pub struct Decode {
-    forward: Option<DecodeResult>,
     state: State,
+    forward: Option<DecodeResult>,
+}
+
+impl Serialize for Decode {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.state.serialize(serializer)
+    }
 }
 
 impl Decode {

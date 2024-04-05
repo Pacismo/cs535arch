@@ -4,7 +4,7 @@ use libseis::types::Word;
 use serde::Serialize;
 
 /// The state of the [`Fetch`] object
-#[derive(Debug, Clone, Copy, Serialize, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub enum State {
     /// The stage is waiting for the next job
     #[default]
@@ -19,6 +19,45 @@ pub enum State {
     Halted,
 }
 use State::*;
+
+impl Serialize for State {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+
+        match self {
+            Idle => {
+                let mut map = serializer.serialize_map(Some(1))?;
+                map.serialize_entry("state", "idle")?;
+                map.end()
+            }
+            Waiting { clocks } => {
+                let mut map = serializer.serialize_map(Some(2))?;
+                map.serialize_entry("state", "waiting")?;
+                map.serialize_entry("clocks", clocks)?;
+                map.end()
+            }
+            Ready { instruction } => {
+                let mut map = serializer.serialize_map(Some(2))?;
+                map.serialize_entry("state", "ready")?;
+                map.serialize_entry("word", instruction)?;
+                map.end()
+            }
+            Squashed { .. } => {
+                let mut map = serializer.serialize_map(Some(1))?;
+                map.serialize_entry("state", "squashed")?;
+                map.end()
+            }
+            Halted => {
+                let mut map = serializer.serialize_map(Some(1))?;
+                map.serialize_entry("state", "halted")?;
+                map.end()
+            }
+        }
+    }
+}
 
 impl State {
     /// The number of clocks required until the state can move on
@@ -47,16 +86,25 @@ impl State {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy)]
 pub enum FetchResult {
     Ready { word: Word, pc: Word },
     Squashed,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub struct Fetch {
     state: State,
     forward: Option<FetchResult>,
+}
+
+impl Serialize for Fetch {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.state.serialize(serializer)
+    }
 }
 
 impl Default for Fetch {

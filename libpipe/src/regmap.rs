@@ -1,4 +1,7 @@
-use libseis::types::{Register, Word};
+use libseis::{
+    registers::get_name,
+    types::{Register, Word},
+};
 use serde::Serialize;
 use std::ops::{Index, IndexMut};
 
@@ -9,8 +12,21 @@ pub struct RegMapPair {
 }
 
 /// Simple, low-budget map that uses a binary search to find a desired value.
-#[derive(Debug, Clone, Serialize, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct RegMap(Vec<RegMapPair>);
+
+impl Serialize for RegMap {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.collect_map(
+            self.0.iter().filter_map(|&RegMapPair { register, value }| {
+                get_name(register).map(|s| (s, value))
+            }),
+        )
+    }
+}
 
 impl IntoIterator for RegMap {
     type Item = RegMapPair;
