@@ -206,6 +206,28 @@
         {
             "type": "lldb",
             "request": "launch",
+            "name": "Debug executable 'seis-sim' in backend mode",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=seis-sim",
+                    "--package=seis-sim"
+                ],
+                "filter": {
+                    "name": "seis-sim",
+                    "kind": "bin"
+                }
+            },
+            "args": [
+                "./sim-pipelined.toml",
+                "./test.bin",
+                "-b"
+            ],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
             "name": "Debug unit tests in executable 'seis-sim'",
             "cargo": {
                 "args": [
