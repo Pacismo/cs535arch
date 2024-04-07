@@ -4,49 +4,112 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:gui"
+        xmlns:controls="clr-namespace:gui.Controls"
         mc:Ignorable="d"
-        Title="SEIS Simulation Frontend" Height="450" Width="800">
+        Title="SEIS Simulation Frontend" Height="450" Width="800"
+        Loaded="Window_Loaded"
+        Closed="Window_Closed">
     <Grid>
-        <Menu>
-            <MenuItem Name="File" Header="File">
-                <MenuItem Name="NewSimulation" Header="Create New Configuration" Click="NewSimulation_Click"/>
-                <MenuItem Name="OpenSimulation" Header="Open Configuration"/>
-                <MenuItem Name="SaveSimulation" Header="Save Configuration"/>
+        <Menu VerticalAlignment="Top" Height="20">
+            <MenuItem Header="File">
+                <MenuItem Name="SaveConfiguration" Header="Save Configuration" Click="SaveConfiguration_Click"/>
+                <MenuItem Name="OpenConfiguration" Header="Open Configuration" Click="OpenConfiguration_Click"/>
                 <Separator/>
-                <MenuItem Name="OpenBinary" Header="Open Binary File"/>
+                <MenuItem Name="OpenBinary" Header="Open Binary File" Click="OpenBinary_Click"/>
                 <Separator/>
                 <MenuItem Name="Exit" Header="Exit" Click="Exit_Click"/>
             </MenuItem>
-            <MenuItem Name="Simulation" Header="Simulation">
-                <MenuItem Name="StartSim" Header="Start"/>
-                <MenuItem Name="StopSim" Header="Stop"/>
-                <MenuItem Name="ResetSim" Header="Reset"/>
+            <MenuItem Header="Simulation">
+                <MenuItem Name="StartSim" Header="Start" Click="StartSim_Click"/>
+                <MenuItem Name="StopSim" Header="Stop" Click="StopSim_Click"/>
+                <MenuItem Name="ResetSim" Header="Reset" Click="ResetSim_Click"/>
                 <Separator/>
-                <MenuItem Name="Clock" Header="Clock" StaysOpenOnClick="True"/>
-                <MenuItem Name="Run" Header="Run"/>
+                <MenuItem Name="Clock" Header="Clock" StaysOpenOnClick="True" Click="Clock_Click"/>
+                <MenuItem Name="Run" Header="Run" Click="Run_Click"/>
             </MenuItem>
-            <MenuItem Name="Help" Header="Help">
+            <MenuItem Header="Help">
                 <MenuItem Name="About" Header="About"/>
             </MenuItem>
         </Menu>
 
-        <TabControl Margin="0,20,0,0">
+        <TabControl Name="Tabs" Margin="0,20,0,0">
+            <TabItem Name="Tabs_Config" Header="Configuration">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Name="Tabs_Config_Content">
+                        <GroupBox Header="General Simulation Settings">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <Label Content="Enable Pipelining" Width="125" HorizontalContentAlignment="Right"/>
+                                    <CheckBox Name="Pipelining_Enable" VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <Label Content="Enable Writethrough" Width="125" HorizontalContentAlignment="Right"/>
+                                    <CheckBox Name="Writethrough_Enable" VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <Label Name="Penalty_CacheMiss_L" Content="Cache Miss Penalty" Width="125" HorizontalContentAlignment="Right"/>
+                                    <TextBox Name="Penalty_CacheMiss" Width="100" Height="20" TextChanged="Penalty_CacheMiss_TextChanged"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <Label Name="Penalty_Volatile_L" Content="Volatile Penalty" Width="125" HorizontalContentAlignment="Right"/>
+                                    <TextBox Name="Penalty_Volatile" Width="100" Height="20" TextChanged="Penalty_Volatile_TextChanged"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </GroupBox>
+                        <GroupBox Header="Cache Settings">
+                            <ScrollViewer VerticalScrollBarVisibility="Disabled" HorizontalScrollBarVisibility="Auto">
+                                <StackPanel Orientation="Horizontal">
+                                    <controls:CacheConfigurator x:Name="Conf_Cache_Data" Title="Data Cache"/>
+                                    <controls:CacheConfigurator x:Name="Conf_Cache_Instruction" Title="Instruction Cache"/>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </GroupBox>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="Overview">
+
+            </TabItem>
+            <TabItem Header="Registers">
+                <controls:RegisterView/>
+            </TabItem>
             <TabItem Header="Cache">
                 <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition/>
-                    </Grid.ColumnDefinitions>
-                    <DataGrid HorizontalAlignment="Left" Width="397"/>
                 </Grid>
             </TabItem>
             <TabItem Header="Memory">
                 <Grid>
-                    <DataGrid HorizontalAlignment="Left" Width="397"/>
+                    <ToolBar Height="30" VerticalAlignment="Top">
+                        <ToggleButton Name="MemoryView_Binary" Content="Binary View" Click="MemoryView_BinaryView_Checked"/>
+                        <Separator/>
+                        <Button x:Name="MemoryView_Previous" Content="◀️" Width="20"/>
+                        <TextBlock Text="0" TextAlignment="Center" VerticalAlignment="Center" Width="20"/>
+                        <Button x:Name="MemoryView_Next" Content="▶️" Width="20"/>
+                    </ToolBar>
+                    <controls:MemoryView x:Name="MemoryView" Margin="0,30,0,0"/>
                 </Grid>
             </TabItem>
             <TabItem Header="Pipeline">
                 <Grid>
-
+                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                        <StackPanel Orientation="Horizontal">
+                            <GroupBox Header="Fetch" HorizontalAlignment="Left" Width="250">
+                                <ListBox Name="fetch_list" BorderThickness="0,0,0,0"/>
+                            </GroupBox>
+                            <GroupBox Header="Decode" HorizontalAlignment="Left" Width="250">
+                                <ListBox Name="decode_list" BorderThickness="0,0,0,0"/>
+                            </GroupBox>
+                            <GroupBox Header="Execute" HorizontalAlignment="Left" Width="250">
+                                <ListBox Name="execute_list" BorderThickness="0,0,0,0"/>
+                            </GroupBox>
+                            <GroupBox Header="Memory" HorizontalAlignment="Left" Width="250">
+                                <ListBox Name="memory_list" BorderThickness="0,0,0,0"/>
+                            </GroupBox>
+                            <GroupBox Header="Writeback" HorizontalAlignment="Left" Width="250">
+                                <ListBox Name="writeback_list" BorderThickness="0,0,0,0"/>
+                            </GroupBox>
+                        </StackPanel>
+                    </ScrollViewer>
                 </Grid>
             </TabItem>
         </TabControl>
