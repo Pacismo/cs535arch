@@ -9,7 +9,10 @@ use super::Interface;
 use crate::{config::SimulationConfiguration, PAGES};
 use clap::Parser;
 use libpipe::{ClockResult, Pipeline};
-use libseis::pages::PAGE_SIZE;
+use libseis::{
+    instruction_set::{Decode, Instruction},
+    pages::PAGE_SIZE,
+};
 use serde_json as json;
 use std::{
     error::Error,
@@ -136,12 +139,14 @@ impl BackendState {
                     {
                         let command = Command::try_parse_from(command.split_whitespace());
                         if matches!(command, Ok(Command::Stop {})) {
-                            break;
+                            return Ok(true);
                         } else if matches!(command, Ok(Command::Terminate {})) {
                             return Ok(false);
                         }
                     }
                 }
+
+                println!("done");
 
                 Ok(true)
             }
@@ -160,14 +165,17 @@ impl BackendState {
                         }
                     }
 
-                    let command =
-                        Command::try_parse_from(self.input_handler.get_next().split_whitespace());
-                    if matches!(command, Ok(Command::Stop {})) {
-                        break;
-                    } else if matches!(command, Ok(Command::Terminate {})) {
-                        return Ok(false);
+                    if let Some(command) =
+                        self.input_handler.get_next_timeout(Duration::from_nanos(0))
+                    {
+                        let command = Command::try_parse_from(command.split_whitespace());
+                        if matches!(command, Ok(Command::Terminate {})) {
+                            return Ok(false);
+                        }
                     }
                 }
+
+                println!("done");
 
                 Ok(true)
             }
@@ -201,6 +209,21 @@ impl BackendState {
                 Ok(true)
             }
             Terminate {} => Ok(false),
+            Decode { value } => {
+                let map: json::Map<String, json::Value> = [(
+                    "decoded".to_string(),
+                    Instruction::decode(value)
+                        .map(|i| i.to_string())
+                        .ok()
+                        .into(),
+                )]
+                .into_iter()
+                .collect();
+
+                println!("{}", json::to_string(&map)?);
+
+                Ok(true)
+            }
         }
     }
 
@@ -213,12 +236,15 @@ impl BackendState {
     fn show_page(&self, page: usize) -> Result<(), Box<dyn Error>> {
         let mut map = json::Map::new();
 
-        if let Some(page) = self.pipeline.memory_module().memory().get_page(page) {
-            map.insert("allocated".to_string(), true.into());
-            map.insert("data".to_string(), page.to_vec().into());
-        } else {
-            map.insert("allocated".to_string(), false.into());
-        }
+        map.insert(
+            "data".to_string(),
+            self.pipeline
+                .memory_module()
+                .memory()
+                .get_page(page)
+                .map(|p| p.to_vec())
+                .into(),
+        );
 
         println!("{}", json::to_string(&map)?);
 

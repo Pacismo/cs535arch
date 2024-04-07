@@ -19,6 +19,9 @@ pub enum Info {
     disable_help_subcommand = true
 )]
 pub enum Command {
+    Decode {
+        value: u32,
+    },
     #[command(alias = "info")]
     Information {
         what: Info,
