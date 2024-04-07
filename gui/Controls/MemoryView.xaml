@@ -1,0 +1,37 @@
+﻿<UserControl x:Class="gui.Controls.MemoryView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:gui.Controls"
+             mc:Ignorable="d" >
+    <DataGrid Name="Data" 
+              AlternationCount="2" 
+              RowBackground="WhiteSmoke" 
+              AlternatingRowBackground="LightGray"
+              IsReadOnly="True"
+              CanUserAddRows="False" CanUserDeleteRows="False" 
+              CanUserResizeRows="False" CanUserReorderColumns="False" 
+              CanUserResizeColumns="False" CanUserSortColumns="False"
+              SelectionMode="Single" SelectionUnit="Cell">
+        <DataGrid.Columns>
+            <DataGridTextColumn Header="Address" Binding="{Binding Address}"/>
+            <DataGridTextColumn Header="0" Binding="{Binding Byte[0]}"/>
+            <DataGridTextColumn Header="1" Binding="{Binding Byte[1]}"/>
+            <DataGridTextColumn Header="2" Binding="{Binding Byte[2]}"/>
+            <DataGridTextColumn Header="3" Binding="{Binding Byte[3]}"/>
+            <DataGridTextColumn Header="4" Binding="{Binding Byte[4]}"/>
+            <DataGridTextColumn Header="5" Binding="{Binding Byte[5]}"/>
+            <DataGridTextColumn Header="6" Binding="{Binding Byte[6]}"/>
+            <DataGridTextColumn Header="7" Binding="{Binding Byte[7]}"/>
+            <DataGridTextColumn Header="8" Binding="{Binding Byte[8]}"/>
+            <DataGridTextColumn Header="9" Binding="{Binding Byte[9]}"/>
+            <DataGridTextColumn Header="A" Binding="{Binding Byte[10]}"/>
+            <DataGridTextColumn Header="B" Binding="{Binding Byte[11]}"/>
+            <DataGridTextColumn Header="C" Binding="{Binding Byte[12]}"/>
+            <DataGridTextColumn Header="D" Binding="{Binding Byte[13]}"/>
+            <DataGridTextColumn Header="E" Binding="{Binding Byte[14]}"/>
+            <DataGridTextColumn Header="F" Binding="{Binding Byte[15]}"/>
+        </DataGrid.Columns>
+    </DataGrid>
+</UserControl>
