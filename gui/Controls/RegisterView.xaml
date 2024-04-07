@@ -12,9 +12,10 @@
               AlternatingRowBackground="LightGray"
               IsReadOnly="True"
               CanUserAddRows="False" CanUserDeleteRows="False" 
-              CanUserResizeRows="False" CanUserReorderColumns="False" 
+              CanUserResizeRows="False" FrozenColumnCount="1"
               CanUserResizeColumns="False" CanUserSortColumns="False"
-              SelectionMode="Single" SelectionUnit="Cell">
+              SelectionMode="Single" SelectionUnit="Cell"
+              FontFamily="Consolas" FontSize="12">
         <DataGrid.Columns>
             <DataGridTextColumn Header="Register" Binding="{Binding Register}"/>
             <DataGridTextColumn Header="Binary" Binding="{Binding Binary}"/>

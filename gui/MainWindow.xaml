@@ -32,7 +32,7 @@
             </MenuItem>
         </Menu>
 
-        <TabControl Name="Tabs" Margin="0,20,0,0">
+        <TabControl Name="Tabs" Margin="0,20,0,0" SelectionChanged="Tabs_SelectionChanged">
             <TabItem Name="Tabs_Config" Header="Configuration">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Name="Tabs_Config_Content">
@@ -71,7 +71,7 @@
 
             </TabItem>
             <TabItem Header="Registers">
-                <controls:RegisterView/>
+                <controls:RegisterView x:Name="RegisterView_Table"/>
             </TabItem>
             <TabItem Header="Cache">
                 <Grid>
@@ -80,13 +80,13 @@
             <TabItem Header="Memory">
                 <Grid>
                     <ToolBar Height="30" VerticalAlignment="Top">
-                        <ToggleButton Name="MemoryView_Binary" Content="Binary View" Click="MemoryView_BinaryView_Checked"/>
+                        <ToggleButton Name="MemoryView_BinaryView" Content="Binary View" Click="MemoryView_BinaryView_Checked"/>
                         <Separator/>
-                        <Button x:Name="MemoryView_Previous" Content="◀️" Width="20"/>
-                        <TextBlock Text="0" TextAlignment="Center" VerticalAlignment="Center" Width="20"/>
-                        <Button x:Name="MemoryView_Next" Content="▶️" Width="20"/>
+                        <Button x:Name="MemoryView_Previous" Content="◀️" Width="20" Click="MemoryView_Previous_Click"/>
+                        <TextBlock Name="MemoryView_PageID" Text="0" TextAlignment="Center" VerticalAlignment="Center" Width="20"/>
+                        <Button x:Name="MemoryView_Next" Content="▶️" Width="20" Click="MemoryView_Next_Click"/>
                     </ToolBar>
-                    <controls:MemoryView x:Name="MemoryView" Margin="0,30,0,0"/>
+                    <controls:MemoryView x:Name="MemoryView_Grid" Margin="0,30,0,0"/>
                 </Grid>
             </TabItem>
             <TabItem Header="Pipeline">
@@ -111,6 +111,11 @@
                         </StackPanel>
                     </ScrollViewer>
                 </Grid>
+            </TabItem>
+            <TabItem Header="Output">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                    <TextBlock Name="Output_TextBlock" Margin="1" FontFamily="Consolas" Background="Black" Foreground="White"/>
+                </ScrollViewer>
             </TabItem>
         </TabControl>
     </Grid>

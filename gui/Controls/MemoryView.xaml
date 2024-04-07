@@ -13,7 +13,10 @@
               CanUserAddRows="False" CanUserDeleteRows="False" 
               CanUserResizeRows="False" CanUserReorderColumns="False" 
               CanUserResizeColumns="False" CanUserSortColumns="False"
-              SelectionMode="Single" SelectionUnit="Cell">
+              SelectionMode="Single" SelectionUnit="Cell"
+              ColumnWidth="Auto"
+              FontFamily="Consolas" FontSize="12" 
+              FrozenColumnCount="1">
         <DataGrid.Columns>
             <DataGridTextColumn Header="Address" Binding="{Binding Address}"/>
             <DataGridTextColumn Header="0" Binding="{Binding Byte[0]}"/>

@@ -19,6 +19,7 @@ using gui.Controls;
 using Tomlyn;
 using Tomlyn.Model;
 using System.Security.Cryptography.X509Certificates;
+using Newtonsoft.Json;
 
 namespace gui
 {
@@ -64,8 +65,8 @@ namespace gui
                 data_cache = CacheConfig.FromToml(caches["data"] as TomlTable),
                 instruction_cache = CacheConfig.FromToml(caches["instruction"] as TomlTable),
 
-                miss_penalty = (uint)(table["miss_penalty"] as long? ?? throw new InvalidDataException("Type mismatch for field \"miss_penalty\" (expected an integer)")),
-                volatile_penalty = (uint)(table["volatile_penalty"] as long? ?? throw new InvalidDataException("Type mismatch for field \"volatile_penalty_penalty\" (expected an integer)")),
+                miss_penalty = (uint) (table["miss_penalty"] as long? ?? throw new InvalidDataException("Type mismatch for field \"miss_penalty\" (expected an integer)")),
+                volatile_penalty = (uint) (table["volatile_penalty"] as long? ?? throw new InvalidDataException("Type mismatch for field \"volatile_penalty_penalty\" (expected an integer)")),
                 pipelining = (table["pipelining"] as bool? ?? throw new InvalidDataException("Type mismatch for field \"pipelining\" (expected a boolean)")) == true,
                 writethrough = (table["writethrough"] as bool? ?? throw new InvalidDataException("Type mismatch for field \"writethrough\" (expected a boolean)")) == true
             };
@@ -79,6 +80,73 @@ namespace gui
         public bool cache = true;
         public bool memory = true;
         public bool pipeline = true;
+
+        public void NeedUpdate()
+        {
+            overview = true;
+            registers = true;
+            cache = true;
+            memory = true;
+            pipeline = true;
+        }
+    }
+
+    struct SimulationState()
+    {
+        public const string SEIS_SIM_BIN_PATH = "seis-sim";
+
+        public Process? backend_process = null;
+        public bool binary = false;
+        public uint page_id = 0;
+        public Data.Page loaded_page = new();
+        public ViewUpdateFlags update_flags = new();
+        public Configuration running_config = new();
+
+        public delegate void OnLineRead(string line);
+        public OnLineRead listeners;
+
+        public void Start(string binary_file, Configuration config, OnLineRead listener)
+        {
+            listeners = listener;
+
+            running_config = config;
+            File.WriteAllText("config.toml", Toml.FromModel(config.IntoToml()));
+            string[] args = ["config.toml", binary_file, "-b"];
+            backend_process = Process.Start(new ProcessStartInfo(SEIS_SIM_BIN_PATH, args)
+            {
+                RedirectStandardError = true,
+                RedirectStandardInput = true,
+                RedirectStandardOutput = true,
+                CreateNoWindow = true,
+            });
+        }
+
+        public void Stop()
+        {
+            backend_process?.Kill();
+            backend_process = null;
+        }
+
+        public void Command(string command)
+        {
+            if (backend_process == null)
+                throw new InvalidOperationException("Backend process is not running");
+
+            backend_process.StandardInput.WriteLine(command);
+            listeners($"> {command}");
+        }
+
+        public string GetLine()
+        {
+            if (backend_process == null)
+                throw new InvalidOperationException("Backend process is not running");
+
+            string line = backend_process.StandardOutput.ReadLine() ?? throw new IOException("Pipe closed");
+
+            listeners($"< {line}");
+
+            return line;
+        }
     }
 
     /// <summary>
@@ -86,14 +154,9 @@ namespace gui
     /// </summary>
     public partial class MainWindow : Window
     {
-        const string SEIS_SIM_BIN_PATH = "seis-sim";
-
         string binary_file = "";
-        Process? backend_process;
-        bool binary = false;
-        uint page_id;
-        Data.Page loaded_page;
-        ViewUpdateFlags update_flags;
+        SimulationState state = new();
+        Queue<string> output_lines = new();
 
         public MainWindow()
         {
@@ -111,11 +174,11 @@ namespace gui
             Clock.IsEnabled = false;
             Run.IsEnabled = false;
 
-            if (!System.IO.File.Exists("config.toml"))
+            if (!File.Exists("config.toml"))
                 try
                 {
                     string[] args = ["-e", "config.toml"];
-                    Process proc = Process.Start(SEIS_SIM_BIN_PATH, args);
+                    Process proc = Process.Start(SimulationState.SEIS_SIM_BIN_PATH, args);
                     proc.WaitForExit();
                 }
                 catch { }
@@ -124,7 +187,7 @@ namespace gui
 
         private void Window_Closed(object sender, EventArgs e)
         {
-            backend_process?.Kill();
+            state.backend_process?.Kill();
             if (ValidateConfiguration())
                 try
                 {
@@ -143,8 +206,8 @@ namespace gui
 
         private void MemoryView_BinaryView_Checked(object sender, RoutedEventArgs e)
         {
-            binary = MemoryView_Binary.IsChecked.HasValue ? MemoryView_Binary.IsChecked.Value : false;
-            MemoryView.UpdateData(loaded_page, page_id, binary);
+            state.binary = MemoryView_BinaryView.IsChecked ?? false;
+            MemoryView_Grid.UpdateData(state.loaded_page, state.page_id, state.binary);
         }
 
         private bool ValidateCacheMissPenalty()
@@ -332,15 +395,8 @@ namespace gui
 
             try
             {
-                File.WriteAllText("config.toml", Toml.FromModel(GetConfiguration().IntoToml()));
-                string[] args = ["config.toml", binary_file, "-b"];
-                backend_process = Process.Start(new ProcessStartInfo(SEIS_SIM_BIN_PATH, args)
-                {
-                    RedirectStandardError = true,
-                    RedirectStandardInput = true,
-                    RedirectStandardOutput = true,
-                    CreateNoWindow = true,
-                });
+                state = new();
+                state.Start(binary_file, GetConfiguration(), OnLineRead);
             }
             catch (Exception ex)
             {
@@ -378,22 +434,16 @@ namespace gui
             OpenBinary.IsEnabled = true;
             OpenConfiguration.IsEnabled = true;
 
-            backend_process?.Kill();
+            state.Stop();
         }
 
         private void ResetSim_Click(object sender, RoutedEventArgs e)
         {
-            backend_process?.Kill();
             try
             {
-                string[] args = ["config.toml", binary_file, "-b"];
-                backend_process = Process.Start(new ProcessStartInfo(SEIS_SIM_BIN_PATH, args)
-                {
-                    RedirectStandardError = true,
-                    RedirectStandardInput = true,
-                    RedirectStandardOutput = true,
-                    CreateNoWindow = true,
-                });
+                state.Stop();
+                state = new();
+                state.Start(binary_file, GetConfiguration(), OnLineRead);
             }
             catch (Exception ex)
             {
@@ -404,27 +454,55 @@ namespace gui
         void UpdateOverview()
         {
             // TODO: update view
-            update_flags.overview = false;
+            state.update_flags.overview = false;
         }
         void UpdateRegistersView()
         {
-            // TODO: update view
-            update_flags.registers = false;
+            state.Command("regs");
+            string regs = state.GetLine();
+            Registers registers = JsonConvert.DeserializeObject<Registers>(regs);
+
+            RegisterView_Table.UpdateData(registers);
+
+            state.update_flags.registers = false;
         }
         void UpdateCacheView()
         {
             // TODO: update view
-            update_flags.cache = false;
+            state.update_flags.cache = false;
         }
         void UpdateMemoryView()
         {
-            // TODO: update view
-            update_flags.memory = false;
+            state.Command($"page {state.page_id}");
+            string page_data = state.GetLine();
+
+            Data.Page page = JsonConvert.DeserializeObject<Data.Page>(page_data);
+
+            MemoryView_Grid.UpdateData(page, state.page_id, state.binary);
+            MemoryView_PageID.Text = state.page_id.ToString();
+            state.loaded_page = page;
+
+            state.update_flags.memory = false;
         }
         void UpdatePipelineView()
         {
             // TODO: update view
-            update_flags.pipeline = false;
+            state.update_flags.pipeline = false;
+        }
+
+        void OnLineRead(string line)
+        {
+            if (line.Length <= 256)
+                output_lines.Enqueue(line);
+            else
+                output_lines.Enqueue($"{line.Substring(0, 253)}...");
+            if (output_lines.Count > 1024)
+                output_lines.Dequeue();
+
+            Output_TextBlock.Text = "";
+
+            foreach (string l in output_lines)
+                Output_TextBlock.Text += $"{l}\n";
         }
 
         void UpdateAllViews()
@@ -436,24 +514,89 @@ namespace gui
             UpdatePipelineView();
         }
 
+        void UpdateView()
+        {
+            switch (Tabs.SelectedIndex)
+            {
+                case 1:
+                    if (state.update_flags.overview)
+                        UpdateOverview();
+                    break;
+
+                case 2:
+                    if (state.update_flags.registers)
+                        UpdateRegistersView();
+                    break;
+
+                case 3:
+                    if (state.update_flags.cache)
+                        UpdateCacheView();
+                    break;
+
+                case 4:
+                    if (state.update_flags.memory)
+                        UpdateMemoryView();
+                    break;
+
+                case 5:
+                    if (state.update_flags.pipeline)
+                        UpdatePipelineView();
+                    break;
+
+                default: break;
+            }
+        }
+
         private void Clock_Click(object sender, RoutedEventArgs e)
         {
-            if (backend_process == null)
-                throw new InvalidOperationException("Backend process has not started!");
+            if (state.backend_process == null)
+                throw new InvalidOperationException("Backend process is not running");
 
-            backend_process.StandardInput.WriteLine("clock 1");
+            state.backend_process.StandardInput.WriteLine("clock 1");
+
+            state.update_flags.NeedUpdate();
+
+            UpdateView();
         }
 
         private void Run_Click(object sender, RoutedEventArgs e)
         {
-            if (backend_process == null)
-                throw new InvalidOperationException("Backend process has not started!");
+            if (state.backend_process == null)
+                throw new InvalidOperationException("Backend process is not running");
 
-            // TODO: Figure out how to have this process await the "done" message
-
-            backend_process.StandardInput.WriteLine("run");
+            state.backend_process.StandardInput.WriteLine("run");
             // Await the ending of the simulation before refreshing
-            backend_process.StandardOutput.ReadLine();
+            state.backend_process.StandardOutput.ReadLine();
+
+            state.update_flags.NeedUpdate();
+            UpdateView();
+        }
+
+        private void Tabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            UpdateView();
+        }
+
+        private void MemoryView_Previous_Click(object sender, RoutedEventArgs e)
+        {
+            if (state.backend_process == null)
+                throw new InvalidOperationException("Backend process is not running");
+            if (state.page_id > 0)
+            {
+                state.page_id -= 1;
+                UpdateMemoryView();
+            }
+        }
+
+        private void MemoryView_Next_Click(object sender, RoutedEventArgs e)
+        {
+            if (state.backend_process == null)
+                throw new InvalidOperationException("Backend process is not running");
+            if (state.page_id < ushort.MaxValue)
+            {
+                state.page_id += 1;
+                UpdateMemoryView();
+            }
         }
     }
 }

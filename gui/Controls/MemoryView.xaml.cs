@@ -22,12 +22,12 @@ namespace gui.Controls
 
         public MemoryViewRow(uint address, byte[] bytes, bool binary = false)
         {
-            Address = address.ToString("0x{X8}");
+            Address = $"0x{address:X8}";
             Byte = new string[bytes.Length];
 
             for (int i = 0; i < bytes.Length; ++i)
             {
-                Byte[i] = bytes[i].ToString(binary ? "{b8}" : "{X2}");
+                Byte[i] = binary ? $"{bytes[i]:b8}" : $"{bytes[i]:X2}";
             }
         }
     }
@@ -50,14 +50,17 @@ namespace gui.Controls
             else
             {
                 Data.IsEnabled = true;
-                for (uint i = 0; i <= page.data.Length; i += 16)
+                for (uint i = 0; i < page.data.Length; i += 16)
                 {
                     byte[] bytes = new byte[16];
-                    for (uint j = i; j <= i + 16; j++)
-                        bytes[j] = page.data[j];
+                    for (uint j = 0; j < 16; j++)
+                        bytes[j] = page.data[i + j];
 
                     Data.Items.Add(new MemoryViewRow((page_id << 16) | i, bytes, binary));
                 }
+
+                foreach (var column in Data.Columns)
+                    column.Width = DataGridLength.SizeToCells;
             }
         }
     }
