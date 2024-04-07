@@ -74,8 +74,13 @@
                 <controls:RegisterView x:Name="RegisterView_Table"/>
             </TabItem>
             <TabItem Header="Cache">
-                <Grid>
-                </Grid>
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Height="30">
+                        <Label Content="Cache" VerticalAlignment="Center"/>
+                        <ComboBox Name="CacheView_Selector" MinWidth="100" Margin="0,5,0,5" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <controls:CacheView x:Name="CacheView"/>
+                </StackPanel>
             </TabItem>
             <TabItem Header="Memory">
                 <Grid>
