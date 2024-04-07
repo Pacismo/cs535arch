@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace seisgui.Data
+namespace gui.Data
 {
-    struct Page
+    public struct Page
     {
         public byte[] data;
 
@@ -23,7 +23,7 @@ namespace seisgui.Data
             }
         }
 
-        internal struct Memory
+        public struct Memory
         {
             public Page[] pages;
 

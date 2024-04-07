@@ -5,23 +5,22 @@ using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 
-namespace seisgui
+namespace gui.Data
 {
-    struct Line
+    public readonly struct Line
     {
-        public uint base_address;
-        public bool dirty;
-        public byte[] data;
+        public readonly uint base_address;
+        public readonly bool dirty;
+        public readonly byte[] data;
 
         public byte this[int i] { get { return data[i]; } }
     }
 
-    internal readonly struct Cache
+    public readonly struct Cache
     {
-        readonly string name;
-        readonly Line[] lines;
+        public readonly string name;
+        public readonly Line[] lines;
 
-        public string Name { get { return name; } }
         public Line this[int i] { get { return lines[i]; } }
     }
 }
