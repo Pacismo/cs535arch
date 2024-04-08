@@ -14,8 +14,8 @@ loop:
     cmp v0, 0
     jgt loop
 
-    mul v2, 4, v4
-    slr v1, v3[v4]
+    mul v2, 2, v4
+    ssr v1, v3[v4]
 
     add v2, 1, v2
     load 8, v0
