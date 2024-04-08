@@ -1,18 +1,6 @@
 ﻿using gui.Data;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 
 namespace gui.Controls
 {
@@ -29,12 +17,21 @@ namespace gui.Controls
     /// </summary>
     public partial class RegisterView : UserControl
     {
+        Registers registers;
+
         public RegisterView()
         {
             InitializeComponent();
         }
 
         public void UpdateData(Registers registers)
+        {
+            this.registers = registers;
+
+            Refresh();
+        }
+
+        public void Refresh()
         {
             Data.Items.Clear();
             Data.Items.Add(new RegisterViewRow("V0", registers.v0));
@@ -64,36 +61,10 @@ namespace gui.Controls
             Data.Items.Add(new RegisterViewRow("INF", registers.inf));
         }
 
-        private void DataGrid_Loaded(object sender, RoutedEventArgs e)
+        private void OnLoad(object sender, RoutedEventArgs e)
         {
-            UpdateData(new Registers
-            {
-                v0 = 0,
-                v1 = 0,
-                v2 = 0,
-                v3 = 0,
-                v4 = 0,
-                v5 = 0,
-                v6 = 0,
-                v7 = 0,
-                v8 = 0,
-                v9 = 0,
-                va = 0,
-                vb = 0,
-                vc = 0,
-                vd = 0,
-                ve = 0,
-                vf = 0,
-                sp = 0,
-                bp = 0,
-                lp = 0,
-                pc = 0,
-                zf = 0,
-                of = 0,
-                eps = 0,
-                nan = 0,
-                inf = 0,
-            });
+            if (Data.Items.Count > 0) return;
+            Refresh();
         }
     }
 }

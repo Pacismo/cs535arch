@@ -7,20 +7,20 @@ using Newtonsoft.Json;
 
 namespace gui.Data
 {
-    public readonly struct Line
+    public struct Line
     {
-        public readonly uint base_address;
-        public readonly bool dirty;
-        public readonly byte[] data;
+        public uint base_address;
+        public bool dirty;
+        public byte[] data;
 
         public byte this[int i] { get { return data[i]; } }
     }
 
-    public readonly struct Cache
+    public struct Cache
     {
-        public readonly string name;
-        public readonly Line[] lines;
+        public string name;
+        public Line?[] lines;
 
-        public Line this[int i] { get { return lines[i]; } }
+        public Line? this[int i] { get { return lines[i]; } }
     }
 }

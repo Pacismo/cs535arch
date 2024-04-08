@@ -4,9 +4,9 @@
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
       xmlns:local="clr-namespace:gui.Controls"
-      mc:Ignorable="d" d:DesignHeight="225">
+      mc:Ignorable="d" d:DesignHeight="225"
+      Loaded="OnLoad">
     <DataGrid Name="Data" 
-              Loaded="DataGrid_Loaded" 
               AlternationCount="2" 
               RowBackground="WhiteSmoke" 
               AlternatingRowBackground="LightGray"
@@ -18,9 +18,9 @@
               FontFamily="Consolas" FontSize="12">
         <DataGrid.Columns>
             <DataGridTextColumn Header="Register" Binding="{Binding Register}"/>
-            <DataGridTextColumn Header="Binary" Binding="{Binding Binary}"/>
             <DataGridTextColumn Header="Decimal" Binding="{Binding Decimal}"/>
             <DataGridTextColumn Header="Hexadecimal" Binding="{Binding Hexdecimal}"/>
+            <DataGridTextColumn Header="Binary" Binding="{Binding Binary}"/>
         </DataGrid.Columns>
     </DataGrid>
 </UserControl>

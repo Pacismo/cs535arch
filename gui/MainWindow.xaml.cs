@@ -1,24 +1,13 @@
-﻿using System.Text;
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
-using System.Runtime;
 using System.Diagnostics;
 using gui.Data;
 using Microsoft.Win32;
-using Microsoft.VisualBasic;
 using System.IO;
-using System.Windows.Controls.Primitives;
 using gui.Controls;
 using Tomlyn;
 using Tomlyn.Model;
-using System.Security.Cryptography.X509Certificates;
 using Newtonsoft.Json;
 
 namespace gui
@@ -410,6 +399,12 @@ namespace gui
 
             OpenBinary.IsEnabled = false;
             OpenConfiguration.IsEnabled = false;
+
+            CacheView_Grid.SetConfiguration(new()
+            {
+                { "data", state.running_config.data_cache },
+                { "instruction", state.running_config.instruction_cache }
+            });
         }
 
         private void StopSim_Click(object sender, RoutedEventArgs e)
@@ -462,7 +457,11 @@ namespace gui
         }
         void UpdateCacheView()
         {
-            // TODO: update view
+            state.Command("cache");
+            string cache = state.GetLine();
+
+            CacheView_Grid.UpdateData(JsonConvert.DeserializeObject<Cache[]>(cache));
+
             state.update_flags.cache = false;
         }
         void UpdateMemoryView()
@@ -499,16 +498,7 @@ namespace gui
                 Output_TextBlock.Text += $"{l}\n";
         }
 
-        void UpdateAllViews()
-        {
-            UpdateOverview();
-            UpdateRegistersView();
-            UpdateCacheView();
-            UpdateMemoryView();
-            UpdatePipelineView();
-        }
-
-        void UpdateView()
+        void UpdateRootView()
         {
             switch (Tabs.SelectedIndex)
             {
@@ -541,6 +531,12 @@ namespace gui
             }
         }
 
+        void InvalidateView()
+        {
+            state.update_flags.NeedUpdate();
+            UpdateRootView();
+        }
+
         private void Clock_Click(object sender, RoutedEventArgs e)
         {
             if (state.backend_process == null)
@@ -550,7 +546,7 @@ namespace gui
 
             state.update_flags.NeedUpdate();
 
-            UpdateView();
+            UpdateRootView();
         }
 
         private void Run_Click(object sender, RoutedEventArgs e)
@@ -562,13 +558,12 @@ namespace gui
             // Await the ending of the simulation before refreshing
             state.backend_process.StandardOutput.ReadLine();
 
-            state.update_flags.NeedUpdate();
-            UpdateView();
+            InvalidateView();
         }
 
         private void Tabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            UpdateView();
+            UpdateRootView();
         }
 
         private void MemoryView_Previous_Click(object sender, RoutedEventArgs e)
