@@ -2,7 +2,7 @@ use super::execute::ExecuteResult;
 use crate::{Clock, Locks, PipelineStage, Registers, Status};
 use libmem::module::{MemoryModule, Status as MemStatus};
 use libseis::{
-    registers::{RegisterFlags, BP, EPS, INF, LP, NAN, OF, PC, SP, ZF},
+    registers::{get_name, RegisterFlags, BP, EPS, INF, LP, NAN, OF, PC, SP, ZF},
     types::{Byte, Register, Short, Word},
 };
 use serde::Serialize;
@@ -467,9 +467,10 @@ impl State {
                 MemoryResult::WriteReg1 { destination, .. } => {
                     [destination, ZF, OF, EPS, NAN, INF].into()
                 }
-                MemoryResult::WriteReg2 { register, .. } => {
-                    [register, SP, ZF, OF, EPS, NAN, INF].into()
-                }
+                MemoryResult::WriteReg2 {
+                    destination: register,
+                    ..
+                } => [register, SP, ZF, OF, EPS, NAN, INF].into(),
                 MemoryResult::JumpSubroutine { .. } => [PC, SP, BP, LP].into(),
                 MemoryResult::Jump { .. } => [PC].into(),
                 MemoryResult::Return { .. } => [SP, BP, PC].into(),
@@ -483,7 +484,7 @@ impl State {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy)]
 pub enum MemoryResult {
     /// Nothing
     Nop,
@@ -509,7 +510,7 @@ pub enum MemoryResult {
     },
     /// Write data back to a register, but also update the stack pointer
     WriteReg2 {
-        register: Register,
+        destination: Register,
         value: Word,
         sp: Word,
 
@@ -551,10 +552,130 @@ pub enum MemoryResult {
     },
 }
 
-#[derive(Debug, Serialize, Default)]
+impl Serialize for MemoryResult {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+        match self {
+            MemoryResult::Nop => serializer.collect_map([("job", "Nop")]),
+            MemoryResult::Squashed { wregs } => {
+                let mut map = serializer.serialize_map(Some(2))?;
+                map.serialize_entry("job", "squashed")?;
+                map.serialize_entry("wregs", wregs)?;
+                map.end()
+            }
+            MemoryResult::WriteRegNoStatus { destination, value } => serializer.collect_map([
+                ("job", "write register without status"),
+                ("destination", get_name(*destination).unwrap_or("<?>")),
+                ("value", value.to_string().as_str()),
+            ]),
+            MemoryResult::WriteReg1 {
+                destination,
+                value,
+                zf,
+                of,
+                eps,
+                nan,
+                inf,
+            } => serializer.collect_map([
+                ("job", "write register"),
+                ("destination", get_name(*destination).unwrap_or("<?>")),
+                ("value", value.to_string().as_str()),
+                ("zf", zf.to_string().as_str()),
+                ("of", of.to_string().as_str()),
+                ("eps", eps.to_string().as_str()),
+                ("nan", nan.to_string().as_str()),
+                ("inf", inf.to_string().as_str()),
+            ]),
+            MemoryResult::WriteReg2 {
+                destination,
+                value,
+                sp,
+                zf,
+                of,
+                eps,
+                nan,
+                inf,
+            } => serializer.collect_map([
+                ("job", "write register and stack pointer"),
+                ("destination", get_name(*destination).unwrap_or("<?>")),
+                ("sp", sp.to_string().as_str()),
+                ("value", value.to_string().as_str()),
+                ("zf", zf.to_string().as_str()),
+                ("of", of.to_string().as_str()),
+                ("eps", eps.to_string().as_str()),
+                ("nan", nan.to_string().as_str()),
+                ("inf", inf.to_string().as_str()),
+            ]),
+            MemoryResult::JumpSubroutine {
+                address,
+                link,
+                sp,
+                bp,
+            } => {
+                let mut map = serializer.serialize_map(Some(5))?;
+                map.serialize_entry("job", "jump to a subroutine")?;
+                map.serialize_entry("address", &format!("{address:#010X}"))?;
+                map.serialize_entry("link", link)?;
+                map.serialize_entry("sp", sp)?;
+                map.serialize_entry("bp", bp)?;
+                map.end()
+            }
+            MemoryResult::Jump { address } => {
+                serializer.collect_map([("job", "jump"), ("address", &format!("{address:#010X}"))])
+            }
+            MemoryResult::Return {
+                address,
+                bp,
+                sp,
+                lp,
+            } => serializer.collect_map([
+                ("job", "return"),
+                ("address", &format!("{address:#010X}")),
+                ("bp", bp.to_string().as_str()),
+                ("sp", sp.to_string().as_str()),
+                ("lp", lp.to_string().as_str()),
+            ]),
+            MemoryResult::Halt => serializer.collect_map([("job", "halt")]),
+            MemoryResult::Ignore { wregs } => {
+                let mut map = serializer.serialize_map(Some(2))?;
+                map.serialize_entry("job", "ignore")?;
+                map.serialize_entry("wregs", wregs)?;
+                map.end()
+            }
+            MemoryResult::WriteStatus {
+                zf,
+                of,
+                eps,
+                nan,
+                inf,
+            } => serializer.collect_map([
+                ("job", "write status registers"),
+                ("zf", zf.to_string().as_str()),
+                ("of", of.to_string().as_str()),
+                ("eps", eps.to_string().as_str()),
+                ("nan", nan.to_string().as_str()),
+                ("inf", inf.to_string().as_str()),
+            ]),
+        }
+    }
+}
+
+#[derive(Debug, Default)]
 pub struct Memory {
     state: State,
     forward: Option<MemoryResult>,
+}
+
+impl Serialize for Memory {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.state.serialize(serializer)
+    }
 }
 
 impl PipelineStage for Memory {
@@ -680,7 +801,7 @@ impl PipelineStage for Memory {
                             if clock.is_ready() {
                                 self.state = Idle;
                                 self.forward = Some(MemoryResult::WriteReg2 {
-                                    register: destination,
+                                    destination,
                                     value,
                                     sp,
                                     zf: value == 0,
@@ -693,7 +814,7 @@ impl PipelineStage for Memory {
                             } else {
                                 self.state = Ready {
                                     result: MemoryResult::WriteReg2 {
-                                        register: destination,
+                                        destination,
                                         value,
                                         sp,
                                         zf: value == 0,

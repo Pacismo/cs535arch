@@ -5,9 +5,17 @@ use libseis::registers::{BP, EPS, INF, LP, NAN, OF, PC, SP, ZF};
 use serde::Serialize;
 use std::mem::take;
 
-#[derive(Debug, Clone, Serialize, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct Writeback {
     job: Option<MemoryResult>,
+}
+
+impl Serialize for Writeback {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer {
+        self.job.serialize(serializer)
+    }
 }
 
 pub type WritebackResult = ();
@@ -79,7 +87,7 @@ impl PipelineStage for Writeback {
                     locks[INF] -= 1;
                 }
                 MemoryResult::WriteReg2 {
-                    register,
+                    destination: register,
                     value,
                     sp,
                     zf,
