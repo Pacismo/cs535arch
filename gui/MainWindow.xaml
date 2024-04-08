@@ -103,11 +103,6 @@
             <TabItem Header="Pipeline">
                 <controls:PipelineView x:Name="PipelineView"/>
             </TabItem>
-            <TabItem Header="Output">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <TextBlock Name="Output_TextBlock" FontFamily="Consolas" Background="Black" Foreground="White"/>
-                </ScrollViewer>
-            </TabItem>
         </TabControl>
         <controls:Overview x:Name="Overview" Height="30" VerticalAlignment="Bottom" HorizontalAlignment="Center"/>
     </Grid>

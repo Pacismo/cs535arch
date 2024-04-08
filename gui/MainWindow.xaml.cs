@@ -55,8 +55,8 @@ namespace gui
                 data_cache = CacheConfig.FromToml(caches["data"] as TomlTable),
                 instruction_cache = CacheConfig.FromToml(caches["instruction"] as TomlTable),
 
-                miss_penalty = (uint)(table["miss_penalty"] as long? ?? throw new InvalidDataException("Type mismatch for field \"miss_penalty\" (expected an integer)")),
-                volatile_penalty = (uint)(table["volatile_penalty"] as long? ?? throw new InvalidDataException("Type mismatch for field \"volatile_penalty_penalty\" (expected an integer)")),
+                miss_penalty = (uint) (table["miss_penalty"] as long? ?? throw new InvalidDataException("Type mismatch for field \"miss_penalty\" (expected an integer)")),
+                volatile_penalty = (uint) (table["volatile_penalty"] as long? ?? throw new InvalidDataException("Type mismatch for field \"volatile_penalty_penalty\" (expected an integer)")),
                 pipelining = (table["pipelining"] as bool? ?? throw new InvalidDataException("Type mismatch for field \"pipelining\" (expected a boolean)")) == true,
                 writethrough = (table["writethrough"] as bool? ?? throw new InvalidDataException("Type mismatch for field \"writethrough\" (expected a boolean)")) == true
             };
@@ -93,8 +93,6 @@ namespace gui
         public ViewUpdateFlags update_flags = new();
         public Configuration running_config = new();
 
-        public Queue<string> output_lines = new();
-
         public void Start(string binary_file, Configuration config)
         {
             running_config = config;
@@ -122,8 +120,8 @@ namespace gui
             if (backend_process == null)
                 throw new InvalidOperationException("Backend process is not running");
 
-            backend_process.StandardInput.WriteLine(command);
-            output_lines.Enqueue($"> {command}");
+            lock (backend_process)
+                backend_process.StandardInput.WriteLine(command);
         }
 
         public string GetLine()
@@ -135,9 +133,21 @@ namespace gui
             lock (backend_process)
                 line = backend_process.StandardOutput.ReadLine() ?? throw new IOException("Pipe closed");
 
-            output_lines.Enqueue($"< {line}");
-
             return line;
+        }
+
+        public T? DeserializeResult<T>(string command)
+        {
+            if (backend_process == null)
+                throw new InvalidOperationException("Backend process is not running");
+
+            string line;
+            lock (backend_process)
+            {
+                backend_process.StandardInput.WriteLine(command);
+                line = backend_process.StandardOutput.ReadLine() ?? throw new IOException("Pipe closed");
+            }
+            return JsonConvert.DeserializeObject<T>(line);
         }
     }
 
@@ -463,9 +473,7 @@ namespace gui
 
         void UpdateOverview()
         {
-            state.Command("stats");
-
-            OverviewContent content = JsonConvert.DeserializeObject<OverviewContent?>(state.GetLine()) ?? throw new NullReferenceException();
+            OverviewContent content = state.DeserializeResult<OverviewContent>("stats");
 
             Application.Current.Dispatcher.Invoke(() => Overview.UpdateData(content));
 
@@ -474,9 +482,7 @@ namespace gui
 
         void UpdateRegistersView()
         {
-            state.Command("regs");
-            string regs = state.GetLine();
-            Registers registers = JsonConvert.DeserializeObject<Registers>(regs);
+            Registers registers = state.DeserializeResult<Registers>("regs");
 
             Application.Current.Dispatcher.Invoke(() => RegisterView_Table.UpdateData(registers));
 
@@ -484,9 +490,7 @@ namespace gui
         }
         void UpdateCacheView()
         {
-            state.Command("cache");
-
-            Cache[]? caches = JsonConvert.DeserializeObject<Cache[]>(state.GetLine());
+            Cache[]? caches = state.DeserializeResult<Cache[]>("cache");
 
             Application.Current.Dispatcher.Invoke(() => CacheView_Grid.UpdateData(caches));
 
@@ -494,10 +498,7 @@ namespace gui
         }
         void UpdateMemoryView()
         {
-            state.Command($"page {state.page_id}");
-            string page_data = state.GetLine();
-
-            Data.Page page = JsonConvert.DeserializeObject<Data.Page>(page_data);
+            Data.Page page = state.DeserializeResult<Data.Page>($"page {state.page_id}");
 
             Application.Current.Dispatcher.Invoke(() =>
             {
@@ -510,10 +511,7 @@ namespace gui
         }
         void UpdateDisassemblyView()
         {
-            state.Command($"disasm {state.page_id}");
-            string page_data = state.GetLine();
-
-            DisassemblyViewRow[]? rows = JsonConvert.DeserializeObject<DisassemblyViewRow[]?>(page_data);
+            DisassemblyViewRow[]? rows = state.DeserializeResult<DisassemblyViewRow[]?>($"disasm {state.page_id}");
             Application.Current.Dispatcher.Invoke(() =>
             {
                 DisassemblyView_Grid.UpdateData(rows);
@@ -524,9 +522,8 @@ namespace gui
         }
         void UpdatePipelineView()
         {
-            state.Command("pipe");
             Dictionary<string, Dictionary<string, object>> pipe_stages =
-                JsonConvert.DeserializeObject<Dictionary<string, Dictionary<string, object>>>(state.GetLine())
+                state.DeserializeResult<Dictionary<string, Dictionary<string, object>>>("pipe")
                 ?? throw new NullReferenceException();
 
             Application.Current.Dispatcher.Invoke(() =>
@@ -541,56 +538,44 @@ namespace gui
             state.update_flags.pipeline = false;
         }
 
-        void UpdateOutputView()
-        {
-            while (state.output_lines.Count > 128)
-                state.output_lines.Dequeue();
-
-            Output_TextBlock.Text = "";
-
-            foreach (string l in state.output_lines)
-                Output_TextBlock.Text += $"{l}\n";
-        }
-
         void UpdateRootView()
         {
             if (!state.IsRunning())
                 return;
 
             if (state.update_flags.overview)
-                ThreadPool.QueueUserWorkItem(o => UpdateOverview());
+                ThreadPool.QueueUserWorkItem(_ => UpdateOverview());
 
             switch (Tabs.SelectedIndex)
             {
                 case 1:
                     if (state.update_flags.registers)
-                        ThreadPool.QueueUserWorkItem(o => UpdateRegistersView());
+                        ThreadPool.QueueUserWorkItem(_ => UpdateRegistersView());
                     break;
 
                 case 2:
                     if (state.update_flags.cache)
-                        ThreadPool.QueueUserWorkItem(o => UpdateCacheView());
+                        ThreadPool.QueueUserWorkItem(_ => UpdateCacheView());
                     break;
 
                 case 3:
                     if (state.update_flags.memory)
-                        ThreadPool.QueueUserWorkItem(o => UpdateMemoryView());
+                        ThreadPool.QueueUserWorkItem(_ => UpdateMemoryView());
                     break;
 
                 case 4:
                     if (state.update_flags.disassembly)
-                        ThreadPool.QueueUserWorkItem(o => UpdateDisassemblyView());
+                        ThreadPool.QueueUserWorkItem(_ => UpdateDisassemblyView());
                     break;
 
                 case 5:
                     if (state.update_flags.pipeline)
-                        ThreadPool.QueueUserWorkItem(o => UpdatePipelineView());
+                        ThreadPool.QueueUserWorkItem(_ => UpdatePipelineView());
                     break;
 
-                default: break;
+                default:
+                    break;
             }
-
-            UpdateOutputView();
         }
 
         void InvalidateView()

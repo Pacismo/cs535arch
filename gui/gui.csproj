@@ -15,7 +15,7 @@
   </ItemGroup>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="cp ../target/debug/seis-sim.exe ./bin/Debug/net8.0-windows" />
+    <Exec Command="cp ../target/debug/seis-sim.exe ./bin/Debug/net8.0-windows&#xD;&#xA;cp ../target/release/seis-sim.exe ./bin/Release/net8.0-windows" />
   </Target>
 
 </Project>
