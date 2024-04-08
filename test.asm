@@ -1,5 +1,5 @@
 .array_base = 0x00030000
-.loops = 4
+.loops = 8
 
 #[location = 0]
 main:
