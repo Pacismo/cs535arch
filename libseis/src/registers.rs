@@ -173,7 +173,7 @@ impl Serialize for RegisterFlags {
     where
         S: serde::Serializer,
     {
-        serializer.collect_seq(self.registers())
+        serializer.collect_seq(self.registers().map(|r| get_name(r).unwrap_or("<?>")))
     }
 }
 
