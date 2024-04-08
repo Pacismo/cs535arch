@@ -29,6 +29,10 @@ namespace gui.Controls
         public MemoryView()
         {
             InitializeComponent();
+            Data.Columns.Clear();
+            Data.Columns.Add(new DataGridTextColumn() { Binding = new Binding("Address"), Header = "Address", Width = DataGridLength.Auto });
+            for (uint i = 0; i < COLUMNS; ++i)
+                Data.Columns.Add(new DataGridTextColumn() { Binding = new Binding($"Byte[{i}]"), Header = $"{i:X2}", Width = DataGridLength.Auto });
         }
 
         public void UpdateData(Data.Page page, uint page_id)
@@ -48,14 +52,6 @@ namespace gui.Controls
                     Data.Items.Add(new MemoryViewRow((page_id << 16) | i, bytes));
                 }
             }
-        }
-
-        private void Data_Loaded(object sender, RoutedEventArgs e)
-        {
-            Data.Columns.Clear();
-            Data.Columns.Add(new DataGridTextColumn() { Binding = new Binding("Address"), Header = "Address", Width = DataGridLength.Auto });
-            for (uint i = 0; i < COLUMNS; ++i)
-                Data.Columns.Add(new DataGridTextColumn() { Binding = new Binding($"Byte[{i}]"), Header = $"{i:X2}", Width = DataGridLength.Auto });
         }
     }
 }

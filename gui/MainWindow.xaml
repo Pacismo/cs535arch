@@ -9,6 +9,13 @@
         Title="SEIS Simulation Frontend" Height="500" Width="900"
         Loaded="Window_Loaded"
         Closed="Window_Closed">
+    <Window.InputBindings>
+        <KeyBinding Key="C" Command="{x:Static local:MainWindow.ClockCommand}" Modifiers="Alt"/>
+    </Window.InputBindings>
+    <Window.CommandBindings>
+        <CommandBinding Command="{x:Static local:MainWindow.ClockCommand}" 
+                        Executed="ClockCommandHandler"/>
+    </Window.CommandBindings>
     <Grid>
         <Menu VerticalAlignment="Top" Height="20">
             <MenuItem Header="File">
@@ -24,15 +31,15 @@
                 <MenuItem Name="StopSim" Header="Stop" Click="StopSim_Click"/>
                 <MenuItem Name="ResetSim" Header="Reset" Click="ResetSim_Click"/>
                 <Separator/>
-                <MenuItem Name="Clock" Header="Clock" StaysOpenOnClick="True" Click="Clock_Click"/>
-                <MenuItem Name="Run" Header="Run" Click="Run_Click"/>
+                <MenuItem Name="Clock" Header="_Clock" StaysOpenOnClick="True" Command="{x:Static local:MainWindow.ClockCommand}"/>
+                <MenuItem Name="Run" Header="_Run" Click="Run_Click"/>
             </MenuItem>
             <MenuItem Header="Help">
                 <MenuItem Name="About" Header="About"/>
             </MenuItem>
         </Menu>
 
-        <TabControl Name="Tabs" Margin="0,20,0,0" SelectionChanged="Tabs_SelectionChanged">
+        <TabControl Name="Tabs" Margin="0,20,0,30" SelectionChanged="Tabs_SelectionChanged">
             <TabItem Name="Tabs_Config" Header="Configuration">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Name="Tabs_Config_Content">
@@ -67,9 +74,6 @@
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
-            <TabItem Header="Overview">
-
-            </TabItem>
             <TabItem Header="Registers">
                 <controls:RegisterView x:Name="RegisterView_Table"/>
             </TabItem>
@@ -79,38 +83,25 @@
             <TabItem Header="Memory">
                 <Grid>
                     <Menu Height="25" HorizontalAlignment="Center" Background="{x:Null}" VerticalAlignment="Bottom">
-                        <Button x:Name="MemoryView_Previous" Content="◀️" Width="20" Click="MemoryView_Previous_Click"/>
+                        <Button Content="◀️" Width="20" Click="MemoryView_Previous_Click"/>
                         <TextBlock Name="MemoryView_PageID" Text="0" TextAlignment="Center" VerticalAlignment="Center" Width="20"/>
-                        <Button x:Name="MemoryView_Next" Content="▶️" Width="20" Click="MemoryView_Next_Click"/>
+                        <Button Content="▶️" Width="20" Click="MemoryView_Next_Click"/>
                     </Menu>
                     <controls:MemoryView x:Name="MemoryView_Grid" Margin="0,0,0,30"/>
                 </Grid>
             </TabItem>
             <TabItem Header="Disassembly">
-                
+                <Grid>
+                    <Menu Height="25" HorizontalAlignment="Center" Background="{x:Null}" VerticalAlignment="Bottom">
+                        <Button Content="◀️" Width="20" Click="MemoryView_Previous_Click"/>
+                        <TextBlock Name="DisassemblyView_PageID" Text="0" TextAlignment="Center" VerticalAlignment="Center" Width="20"/>
+                        <Button Content="▶️" Width="20" Click="MemoryView_Next_Click"/>
+                    </Menu>
+                    <controls:DisassemblyView x:Name="DisassemblyView_Grid" Margin="0,0,0,30"/>
+                </Grid>
             </TabItem>
             <TabItem Header="Pipeline">
-                <Grid>
-                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-                        <StackPanel Orientation="Horizontal">
-                            <GroupBox Header="Fetch" HorizontalAlignment="Left" Width="250">
-                                <ListBox Name="fetch_list" BorderThickness="0,0,0,0"/>
-                            </GroupBox>
-                            <GroupBox Header="Decode" HorizontalAlignment="Left" Width="250">
-                                <ListBox Name="decode_list" BorderThickness="0,0,0,0"/>
-                            </GroupBox>
-                            <GroupBox Header="Execute" HorizontalAlignment="Left" Width="250">
-                                <ListBox Name="execute_list" BorderThickness="0,0,0,0"/>
-                            </GroupBox>
-                            <GroupBox Header="Memory" HorizontalAlignment="Left" Width="250">
-                                <ListBox Name="memory_list" BorderThickness="0,0,0,0"/>
-                            </GroupBox>
-                            <GroupBox Header="Writeback" HorizontalAlignment="Left" Width="250">
-                                <ListBox Name="writeback_list" BorderThickness="0,0,0,0"/>
-                            </GroupBox>
-                        </StackPanel>
-                    </ScrollViewer>
-                </Grid>
+                <controls:PipelineView x:Name="PipelineView"/>
             </TabItem>
             <TabItem Header="Output">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -118,5 +109,6 @@
                 </ScrollViewer>
             </TabItem>
         </TabControl>
+        <controls:Overview x:Name="Overview" Height="30" VerticalAlignment="Bottom" HorizontalAlignment="Center"/>
     </Grid>
 </Window>

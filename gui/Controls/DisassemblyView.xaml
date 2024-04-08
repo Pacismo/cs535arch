@@ -1,0 +1,29 @@
+﻿<UserControl x:Class="gui.Controls.DisassemblyView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:gui.Controls"
+             mc:Ignorable="d">
+    <DataGrid Name="Data" 
+          AlternationCount="2" 
+          RowBackground="WhiteSmoke" 
+          AlternatingRowBackground="LightGray"
+          IsReadOnly="True"
+          CanUserAddRows="False" CanUserDeleteRows="False" 
+          CanUserResizeRows="False" CanUserReorderColumns="False" 
+          CanUserResizeColumns="False" CanUserSortColumns="False"
+          SelectionMode="Single" SelectionUnit="Cell"
+          ColumnWidth="Auto"
+          FontFamily="Consolas" FontSize="12" 
+          FrozenColumnCount="1">
+        <DataGrid.Columns>
+            <DataGridTextColumn Header="Address" Binding="{Binding Address}"/>
+            <DataGridTextColumn Header="0" Binding="{Binding Bytes[0]}"/>
+            <DataGridTextColumn Header="1" Binding="{Binding Bytes[1]}"/>
+            <DataGridTextColumn Header="2" Binding="{Binding Bytes[2]}"/>
+            <DataGridTextColumn Header="3" Binding="{Binding Bytes[3]}"/>
+            <DataGridTextColumn Header="Instruction" Binding="{Binding Instruction}"/>
+        </DataGrid.Columns>
+    </DataGrid>
+</UserControl>

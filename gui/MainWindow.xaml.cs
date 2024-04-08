@@ -9,6 +9,7 @@ using gui.Controls;
 using Tomlyn;
 using Tomlyn.Model;
 using Newtonsoft.Json;
+using System.Windows.Input;
 
 namespace gui
 {
@@ -68,6 +69,7 @@ namespace gui
         public bool registers = true;
         public bool cache = true;
         public bool memory = true;
+        public bool disassembly = true;
         public bool pipeline = true;
 
         public void NeedUpdate()
@@ -76,6 +78,7 @@ namespace gui
             registers = true;
             cache = true;
             memory = true;
+            disassembly = true;
             pipeline = true;
         }
     }
@@ -85,7 +88,6 @@ namespace gui
         public const string SEIS_SIM_BIN_PATH = "seis-sim";
 
         public Process? backend_process = null;
-        public bool binary = false;
         public uint page_id = 0;
         public Data.Page loaded_page = new();
         public ViewUpdateFlags update_flags = new();
@@ -93,6 +95,8 @@ namespace gui
 
         public delegate void OnLineRead(string line);
         public OnLineRead listeners;
+
+        public Queue<string> output_lines = new();
 
         public void Start(string binary_file, Configuration config, OnLineRead listener)
         {
@@ -109,6 +113,8 @@ namespace gui
                 CreateNoWindow = true,
             });
         }
+
+        public readonly bool IsRunning() => backend_process != null;
 
         public void Stop()
         {
@@ -143,25 +149,39 @@ namespace gui
     /// </summary>
     public partial class MainWindow : Window
     {
+        public static RoutedCommand ClockCommand = new();
+
         string binary_file = "";
         SimulationState state = new();
-        Queue<string> output_lines = new();
+
+        private void ClockCommandHandler(object s, ExecutedRoutedEventArgs e)
+        {
+            if (!state.IsRunning())
+                return;
+
+            state.Command("clock 1");
+            InvalidateView();
+        }
 
         public MainWindow()
         {
             InitializeComponent();
+            DataContext = this;
         }
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            foreach (TabItem tab in Tabs.Items) tab.IsEnabled = false;
-            Tabs_Config.IsEnabled = true;
+            foreach (TabItem tab in Tabs.Items)
+                tab.Visibility = Visibility.Hidden;
+            Tabs_Config.Visibility = Visibility.Visible;
+
             Tabs.SelectedIndex = 0;
 
             StopSim.IsEnabled = false;
             ResetSim.IsEnabled = false;
             Clock.IsEnabled = false;
             Run.IsEnabled = false;
+            Overview.Visibility = Visibility.Hidden;
 
             if (!File.Exists("config.toml"))
                 try
@@ -387,7 +407,7 @@ namespace gui
                 return;
             }
 
-            foreach (TabItem tab in Tabs.Items) tab.IsEnabled = true;
+            foreach (TabItem tab in Tabs.Items) tab.Visibility = Visibility.Visible;
             Tabs_Config_Content.IsEnabled = false;
             Tabs.SelectedIndex = 1;
 
@@ -396,6 +416,7 @@ namespace gui
             ResetSim.IsEnabled = true;
             Clock.IsEnabled = true;
             Run.IsEnabled = true;
+            Overview.Visibility = Visibility.Visible;
 
             OpenBinary.IsEnabled = false;
             OpenConfiguration.IsEnabled = false;
@@ -409,8 +430,8 @@ namespace gui
 
         private void StopSim_Click(object sender, RoutedEventArgs e)
         {
-            foreach (TabItem tab in Tabs.Items) tab.IsEnabled = false;
-            Tabs_Config.IsEnabled = true;
+            foreach (TabItem tab in Tabs.Items) tab.Visibility = Visibility.Hidden;
+            Tabs_Config.Visibility = Visibility.Visible;
             Tabs_Config_Content.IsEnabled = true;
             Tabs.SelectedIndex = 0;
 
@@ -419,6 +440,7 @@ namespace gui
             ResetSim.IsEnabled = false;
             Clock.IsEnabled = false;
             Run.IsEnabled = false;
+            Overview.Visibility = Visibility.Hidden;
 
             OpenBinary.IsEnabled = true;
             OpenConfiguration.IsEnabled = true;
@@ -438,13 +460,19 @@ namespace gui
             {
                 new OkDialog("Failed to Reset Process", $"There was an issue while restarting the simulation.\n{ex}").ShowDialog();
             }
+
+            InvalidateView();
         }
 
         void UpdateOverview()
         {
-            // TODO: update view
+            state.Command("stats");
+
+            Overview.UpdateData(JsonConvert.DeserializeObject<OverviewContent?>(state.GetLine()) ?? throw new NullReferenceException());
+
             state.update_flags.overview = false;
         }
+
         void UpdateRegistersView()
         {
             state.Command("regs");
@@ -477,49 +505,74 @@ namespace gui
 
             state.update_flags.memory = false;
         }
+        void UpdateDisassemblyView()
+        {
+            state.Command($"disasm {state.page_id}");
+            string page_data = state.GetLine();
+
+            DisassemblyViewRow[]? rows = JsonConvert.DeserializeObject<DisassemblyViewRow[]?>(page_data);
+            DisassemblyView_Grid.UpdateData(rows);
+            DisassemblyView_PageID.Text = state.page_id.ToString();
+
+            state.update_flags.disassembly = false;
+        }
         void UpdatePipelineView()
         {
-            // TODO: update view
+            state.Command("pipe");
+            Dictionary<string, Dictionary<string, object>> pipe_stages = JsonConvert.DeserializeObject<Dictionary<string, Dictionary<string, object>>>(state.GetLine()) ?? throw new NullReferenceException();
+
+            PipelineView.Fetch.UpdateData(pipe_stages["fetch"]);
+            PipelineView.Decode.UpdateData(pipe_stages["decode"]);
+            PipelineView.Execute.UpdateData(pipe_stages["execute"]);
+            PipelineView.Memory.UpdateData(pipe_stages["memory"]);
+            PipelineView.Writeback.UpdateData(pipe_stages["writeback"]);
+
             state.update_flags.pipeline = false;
         }
 
         void OnLineRead(string line)
         {
             if (line.Length <= 256)
-                output_lines.Enqueue(line);
+                state.output_lines.Enqueue(line);
             else
-                output_lines.Enqueue($"{line.Substring(0, 253)}...");
-            if (output_lines.Count > 1024)
-                output_lines.Dequeue();
+                state.output_lines.Enqueue($"{line.Substring(0, 253)}...");
+            if (state.output_lines.Count > 128)
+                state.output_lines.Dequeue();
 
             Output_TextBlock.Text = "";
 
-            foreach (string l in output_lines)
+            foreach (string l in state.output_lines)
                 Output_TextBlock.Text += $"{l}\n";
         }
 
         void UpdateRootView()
         {
+            if (!state.IsRunning())
+                return;
+
+            if (state.update_flags.overview)
+                UpdateOverview();
+
             switch (Tabs.SelectedIndex)
             {
                 case 1:
-                    if (state.update_flags.overview)
-                        UpdateOverview();
-                    break;
-
-                case 2:
                     if (state.update_flags.registers)
                         UpdateRegistersView();
                     break;
 
-                case 3:
+                case 2:
                     if (state.update_flags.cache)
                         UpdateCacheView();
                     break;
 
-                case 4:
+                case 3:
                     if (state.update_flags.memory)
                         UpdateMemoryView();
+                    break;
+
+                case 4:
+                    if (state.update_flags.disassembly)
+                        UpdateDisassemblyView();
                     break;
 
                 case 5:
@@ -539,24 +592,22 @@ namespace gui
 
         private void Clock_Click(object sender, RoutedEventArgs e)
         {
-            if (state.backend_process == null)
+            if (!state.IsRunning())
                 throw new InvalidOperationException("Backend process is not running");
 
-            state.backend_process.StandardInput.WriteLine("clock 1");
+            state.Command("clock 1");
 
-            state.update_flags.NeedUpdate();
-
-            UpdateRootView();
+            InvalidateView();
         }
 
         private void Run_Click(object sender, RoutedEventArgs e)
         {
-            if (state.backend_process == null)
+            if (!state.IsRunning())
                 throw new InvalidOperationException("Backend process is not running");
 
-            state.backend_process.StandardInput.WriteLine("run");
+            state.Command("run");
             // Await the ending of the simulation before refreshing
-            state.backend_process.StandardOutput.ReadLine();
+            state.GetLine();
 
             InvalidateView();
         }
@@ -568,23 +619,27 @@ namespace gui
 
         private void MemoryView_Previous_Click(object sender, RoutedEventArgs e)
         {
-            if (state.backend_process == null)
+            if (!state.IsRunning())
                 throw new InvalidOperationException("Backend process is not running");
             if (state.page_id > 0)
             {
                 state.page_id -= 1;
-                UpdateMemoryView();
+                state.update_flags.memory = true;
+                state.update_flags.disassembly = true;
+                UpdateRootView();
             }
         }
 
         private void MemoryView_Next_Click(object sender, RoutedEventArgs e)
         {
-            if (state.backend_process == null)
+            if (!state.IsRunning())
                 throw new InvalidOperationException("Backend process is not running");
             if (state.page_id < ushort.MaxValue)
             {
                 state.page_id += 1;
-                UpdateMemoryView();
+                state.update_flags.memory = true;
+                state.update_flags.disassembly = true;
+                UpdateRootView();
             }
         }
     }

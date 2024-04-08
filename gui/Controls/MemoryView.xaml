@@ -16,7 +16,6 @@
               SelectionMode="Single" SelectionUnit="Cell"
               ColumnWidth="Auto"
               FontFamily="Consolas" FontSize="12" 
-              FrozenColumnCount="1"
-              Loaded="Data_Loaded">
+              FrozenColumnCount="1">
     </DataGrid>
 </UserControl>
