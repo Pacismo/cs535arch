@@ -147,7 +147,7 @@ impl Memory {
 
                 if let Some(page) = &self.pages[page] {
                     let mut bytes = [0; 4];
-                    bytes.copy_from_slice(&page[byte..]);
+                    bytes.copy_from_slice(&page[byte..byte + 4]);
                     Word::from_be_bytes(bytes)
                 } else {
                     0
