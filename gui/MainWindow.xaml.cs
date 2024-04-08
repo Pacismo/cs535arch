@@ -204,12 +204,6 @@ namespace gui
             Close();
         }
 
-        private void MemoryView_BinaryView_Checked(object sender, RoutedEventArgs e)
-        {
-            state.binary = MemoryView_BinaryView.IsChecked ?? false;
-            MemoryView_Grid.UpdateData(state.loaded_page, state.page_id, state.binary);
-        }
-
         private bool ValidateCacheMissPenalty()
         {
             try
@@ -478,7 +472,7 @@ namespace gui
 
             Data.Page page = JsonConvert.DeserializeObject<Data.Page>(page_data);
 
-            MemoryView_Grid.UpdateData(page, state.page_id, state.binary);
+            MemoryView_Grid.UpdateData(page, state.page_id);
             MemoryView_PageID.Text = state.page_id.ToString();
             state.loaded_page = page;
 

@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:gui"
         xmlns:controls="clr-namespace:gui.Controls"
         mc:Ignorable="d"
-        Title="SEIS Simulation Frontend" Height="450" Width="800"
+        Title="SEIS Simulation Frontend" Height="500" Width="900"
         Loaded="Window_Loaded"
         Closed="Window_Closed">
     <Grid>
@@ -79,14 +79,12 @@
             </TabItem>
             <TabItem Header="Memory">
                 <Grid>
-                    <ToolBar Height="30" VerticalAlignment="Top">
-                        <ToggleButton Name="MemoryView_BinaryView" Content="Binary View" Click="MemoryView_BinaryView_Checked"/>
-                        <Separator/>
+                    <Menu Height="25" HorizontalAlignment="Center" Background="{x:Null}" VerticalAlignment="Bottom">
                         <Button x:Name="MemoryView_Previous" Content="◀️" Width="20" Click="MemoryView_Previous_Click"/>
                         <TextBlock Name="MemoryView_PageID" Text="0" TextAlignment="Center" VerticalAlignment="Center" Width="20"/>
                         <Button x:Name="MemoryView_Next" Content="▶️" Width="20" Click="MemoryView_Next_Click"/>
-                    </ToolBar>
-                    <controls:MemoryView x:Name="MemoryView_Grid" Margin="0,30,0,0"/>
+                    </Menu>
+                    <controls:MemoryView x:Name="MemoryView_Grid" Margin="0,0,0,30"/>
                 </Grid>
             </TabItem>
             <TabItem Header="Pipeline">
@@ -113,8 +111,8 @@
                 </Grid>
             </TabItem>
             <TabItem Header="Output">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
-                    <TextBlock Name="Output_TextBlock" Margin="1" FontFamily="Consolas" Background="Black" Foreground="White"/>
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <TextBlock Name="Output_TextBlock" FontFamily="Consolas" Background="Black" Foreground="White"/>
                 </ScrollViewer>
             </TabItem>
         </TabControl>
