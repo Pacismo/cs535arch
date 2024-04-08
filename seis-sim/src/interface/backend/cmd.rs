@@ -30,6 +30,10 @@ pub enum Command {
     ReadPage {
         page: usize,
     },
+    #[command(aliases = ["disasm"])]
+    DisassemblePage {
+        page: usize,
+    },
     Clock {
         count: usize,
     },

@@ -1,4 +1,5 @@
 mod cmd;
+mod disassembly;
 mod input;
 
 use self::{
@@ -6,12 +7,15 @@ use self::{
     input::InputHandler,
 };
 use super::Interface;
-use crate::{config::SimulationConfiguration, PAGES};
+use crate::{
+    config::SimulationConfiguration, interface::backend::disassembly::DisassemblyRow, PAGES,
+};
 use clap::Parser;
 use libpipe::{ClockResult, Pipeline};
 use libseis::{
     instruction_set::{Decode, Instruction},
     pages::PAGE_SIZE,
+    types::Word,
 };
 use serde_json as json;
 use std::{
@@ -90,6 +94,10 @@ impl BackendState {
         use Command::*;
 
         match Command::try_parse_from(self.input_handler.get_next().split_whitespace())? {
+            DisassemblePage { page } => {
+                self.show_disassembled_page(page)?;
+                Ok(true)
+            }
             Clock { mut count } => {
                 while count > 0 && !self.finished {
                     let min = self.clocks_required.min(count);
@@ -247,6 +255,40 @@ impl BackendState {
         );
 
         println!("{}", json::to_string(&map)?);
+
+        Ok(())
+    }
+
+    fn show_disassembled_page(&self, page: usize) -> Result<(), Box<dyn Error>> {
+        let array = json::to_string(
+            &self
+                .pipeline
+                .memory_module()
+                .memory()
+                .get_page(page)
+                .map(|p| {
+                    p.chunks(4)
+                        .enumerate()
+                        .map(|(i, b)| DisassemblyRow {
+                            address: format!("{:#010X}", i * 4),
+                            bytes: [
+                                format!("{:02X}", b[0]),
+                                format!("{:02X}", b[1]),
+                                format!("{:02X}", b[2]),
+                                format!("{:02X}", b[3]),
+                            ],
+                            instruction: Instruction::decode(Word::from_be_bytes([
+                                b[0], b[1], b[2], b[3],
+                            ]))
+                            .unwrap_or_default()
+                            .to_string(),
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default(),
+        )?;
+
+        println!("{}", &array);
 
         Ok(())
     }
