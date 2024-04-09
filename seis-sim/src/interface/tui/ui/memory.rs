@@ -53,7 +53,7 @@ impl<'a> Runtime<'a> {
         {
             if self.memory_view.disassembly {
                 let bytes: usize = 4;
-                let pc = self.pipeline.registers().pc.wrapping_sub(4);
+                let pc = self.pipeline.registers().pc;
 
                 let mut headers = vec!["Address".to_string()];
                 headers.extend((0..bytes).into_iter().map(|i| format!("{i:02X}")));

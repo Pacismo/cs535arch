@@ -525,17 +525,23 @@ impl<'a> Runtime<'a> {
 
     fn draw_pipe_writeback_view(&self, stages: &PipelineStages, chunk: Rect, buf: &mut Buffer) {
         match stages.writeback.get_state() {
-            Some(_) => List::new(
-                [Line::from(vec!["State: ".into(), "Busy".red().bold()])]
-                    .into_iter()
-                    .map(ListItem::new),
-            ),
+            Some(op) => {
+                let op_str = format!("{op:#?}");
+                let op = op_str.lines().map(Line::from).collect::<Vec<_>>();
+                List::new(
+                    [Line::from(vec!["State: ".into(), "Busy".red().bold()])]
+                        .into_iter()
+                        .chain(op)
+                        .map(ListItem::new),
+                )
+                .render(chunk, buf)
+            }
             None => List::new(
                 [Line::from(vec!["State: ".into(), "Idle".red().bold()])]
                     .into_iter()
                     .map(ListItem::new),
-            ),
+            )
+            .render(chunk, buf),
         }
-        .render(chunk, buf);
     }
 }
