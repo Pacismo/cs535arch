@@ -45,7 +45,7 @@ impl Page {
         if addr >= self.len {
             self.len = addr + 1;
         }
-        self.data[byte as usize] = value;
+        self.data[addr as usize] = value;
     }
 
     pub fn data(&self) -> &[u8] {
