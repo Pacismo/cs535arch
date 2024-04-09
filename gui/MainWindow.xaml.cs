@@ -98,7 +98,7 @@ namespace gui
 
     struct SimulationState()
     {
-        public const string SEIS_SIM_BIN_PATH = "seis-sim";
+        public const string SEIS_SIM_BIN_PATH = "./bin/seis-sim";
 
         public Process? backend_process = null;
         public uint page_id = 0;
@@ -661,7 +661,9 @@ namespace gui
             {
                 state.page_id -= 1;
                 state.update.memory = true;
+                state.update.memory_hash = null;
                 state.update.disassembly = true;
+                state.update.disassembly_hash = null;
                 UpdateRootView();
             }
         }
@@ -674,9 +676,16 @@ namespace gui
             {
                 state.page_id += 1;
                 state.update.memory = true;
+                state.update.memory_hash = null;
                 state.update.disassembly = true;
+                state.update.disassembly_hash = null;
                 UpdateRootView();
             }
+        }
+
+        private void About_Click(object sender, RoutedEventArgs e)
+        {
+            new About().ShowDialog();
         }
     }
 }

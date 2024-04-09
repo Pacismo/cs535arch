@@ -9,7 +9,8 @@
         Title="SEIS Simulation Frontend" Height="500" Width="900"
         Loaded="Window_Loaded"
         Closed="Window_Closed"
-        SnapsToDevicePixels="True">
+        SnapsToDevicePixels="True"
+        Icon="pack://application:,,,/Resources/AppIcon.ico">
     <Window.InputBindings>
         <KeyBinding Key="C" Command="{x:Static local:MainWindow.ClockCommand}" Modifiers="Alt"/>
     </Window.InputBindings>
@@ -36,7 +37,7 @@
                 <MenuItem Name="Run" Header="_Run" Click="Run_Click"/>
             </MenuItem>
             <MenuItem Header="Help">
-                <MenuItem Name="About" Header="About"/>
+                <MenuItem Name="About" Header="About" Click="About_Click"/>
             </MenuItem>
         </Menu>
 

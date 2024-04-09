@@ -7,15 +7,22 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>False</UseWindowsForms>
+    <ApplicationIcon>Resources\AppIcon.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="Resources\AppIcon.ico">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="Tomlyn" Version="0.17.0" />
   </ItemGroup>
 
-  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="cp ../target/debug/seis-sim.exe ./bin/Debug/net8.0-windows&#xD;&#xA;cp ../target/release/seis-sim.exe ./bin/Release/net8.0-windows" />
+  <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
+    <Exec Command="cargo install --path ../seis-sim --root ./$(OutDir)&#xD;&#xA;cargo install --path ../seis-asm --root ./$(OutDir)&#xD;&#xA;cargo install --path ../seis-disasm --root ./$(OutDir)" />
   </Target>
 
 </Project>
