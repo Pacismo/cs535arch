@@ -157,9 +157,9 @@
                 }
             },
             "args": [
-                "test.asm",
+                "benchmarks/matrix.asm",
                 "-o",
-                "test.bin"
+                "benchmarks/matrix.bin"
             ],
             "cwd": "${workspaceFolder}"
         },
@@ -198,8 +198,8 @@
                 }
             },
             "args": [
-                "./sim-pipelined.toml",
-                "./test.bin"
+                "./benchmarks/matrix.toml",
+                "./benchmarks/matrix.bin"
             ],
             "cwd": "${workspaceFolder}"
         },
