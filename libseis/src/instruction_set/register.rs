@@ -225,12 +225,13 @@ impl WriteOp {
     const OFFSET_MASK: Word = 0b0000_0000_0000_1111_1111_1111_0000_0000;
     const OFFSET_SHIFT: Word = 8;
 
-    const VOLATILE_BIT: Word = 0b100;
     const INDIRECT_MODE: Word = 0b000;
     const OFFSET_MODE: Word = 0b001;
     const INDEXED_MODE: Word = 0b010;
     const STACK_OFFSET_MODE: Word = 0b011;
-
+    const VOLATILE_INDIRECT_MODE: Word = 0b100;
+    const VOLATILE_OFFSET_MODE: Word = 0b101;
+    const VOLATILE_INDEXED_MODE: Word = 0b110;
     const ZERO_PAGE_MODE: Word = 0b111;
 }
 
@@ -242,24 +243,41 @@ impl Decode for WriteOp {
 
         match addr_mode {
             Self::INDIRECT_MODE => Ok(Indirect {
-                volatile: (word & Self::VOLATILE_BIT) != 0,
+                volatile: false,
                 address: ((word & Self::ADDRESS_REG_MASK) >> Self::ADDRESS_REG_SHIFT) as Register,
                 source,
             }),
             Self::OFFSET_MODE => Ok(OffsetIndirect {
-                volatile: (word & Self::VOLATILE_BIT) != 0,
+                volatile: false,
                 address: ((word & Self::ADDRESS_REG_MASK) >> Self::ADDRESS_REG_SHIFT) as Register,
                 offset: ((word & Self::OFFSET_MASK) >> Self::OFFSET_SHIFT) as Short,
                 source,
             }),
             Self::INDEXED_MODE => Ok(IndexedIndirect {
-                volatile: (word & Self::VOLATILE_BIT) != 0,
+                volatile: false,
                 address: ((word & Self::ADDRESS_REG_MASK) >> Self::ADDRESS_REG_SHIFT) as Register,
                 index: ((word & Self::INDEX_REG_MASK) >> Self::INDEX_REG_SHIFT) as Register,
                 source,
             }),
             Self::STACK_OFFSET_MODE => Ok(StackOffset {
                 offset: ((word & Self::OFFSET_MASK) >> Self::OFFSET_SHIFT) as Short,
+                source,
+            }),
+            Self::VOLATILE_INDIRECT_MODE => Ok(Indirect {
+                volatile: true,
+                address: ((word & Self::ADDRESS_REG_MASK) >> Self::ADDRESS_REG_SHIFT) as Register,
+                source,
+            }),
+            Self::VOLATILE_OFFSET_MODE => Ok(OffsetIndirect {
+                volatile: true,
+                address: ((word & Self::ADDRESS_REG_MASK) >> Self::ADDRESS_REG_SHIFT) as Register,
+                offset: ((word & Self::OFFSET_MASK) >> Self::OFFSET_SHIFT) as Short,
+                source,
+            }),
+            Self::VOLATILE_INDEXED_MODE => Ok(IndexedIndirect {
+                volatile: true,
+                address: ((word & Self::ADDRESS_REG_MASK) >> Self::ADDRESS_REG_SHIFT) as Register,
+                index: ((word & Self::INDEX_REG_MASK) >> Self::INDEX_REG_SHIFT) as Register,
                 source,
             }),
             Self::ZERO_PAGE_MODE => Ok(ZeroPage {
@@ -276,55 +294,77 @@ impl Encode for WriteOp {
         use WriteOp::*;
 
         match self {
-            ZeroPage {
-                address,
-                source: destination,
-            } => {
+            StackOffset { offset, source } => {
+                (Self::STACK_OFFSET_MODE << Self::ADDR_MODE_SHIFT)
+                    | ((offset as Word) << Self::OFFSET_SHIFT)
+                    | (source as Word)
+            }
+            ZeroPage { address, source } => {
                 (Self::ZERO_PAGE_MODE << Self::ADDR_MODE_SHIFT)
                     | ((address as Word) << Self::ZPG_ADDR_SHIFT)
-                    | (destination as Word)
+                    | (source as Word)
             }
             Indirect {
-                volatile,
+                volatile: false,
                 address,
-                source: destination,
+                source,
             } => {
                 (Self::INDIRECT_MODE << Self::ADDR_MODE_SHIFT)
-                    | if volatile { Self::VOLATILE_BIT } else { 0 }
                     | ((address as Word) << Self::ADDRESS_REG_SHIFT)
-                    | (destination as Word)
+                    | (source as Word)
             }
             OffsetIndirect {
-                volatile,
+                volatile: false,
                 address,
                 offset,
-                source: destination,
+                source,
             } => {
                 (Self::OFFSET_MODE << Self::ADDR_MODE_SHIFT)
-                    | if volatile { Self::VOLATILE_BIT } else { 0 }
                     | ((address as Word) << Self::ADDRESS_REG_SHIFT)
                     | ((offset as Word) << Self::OFFSET_SHIFT)
-                    | (destination as Word)
+                    | (source as Word)
             }
             IndexedIndirect {
-                volatile,
+                volatile: false,
                 address,
                 index,
                 source,
             } => {
                 (Self::INDEXED_MODE << Self::ADDR_MODE_SHIFT)
-                    | if volatile { Self::VOLATILE_BIT } else { 0 }
                     | ((address as Word) << Self::ADDRESS_REG_SHIFT)
                     | ((index as Word) << Self::INDEX_REG_SHIFT)
                     | (source as Word)
             }
-            StackOffset {
-                offset,
-                source: destination,
+            Indirect {
+                volatile: true,
+                address,
+                source,
             } => {
-                (Self::STACK_OFFSET_MODE << Self::ADDR_MODE_SHIFT)
+                (Self::VOLATILE_INDIRECT_MODE << Self::ADDR_MODE_SHIFT)
+                    | ((address as Word) << Self::ADDRESS_REG_SHIFT)
+                    | (source as Word)
+            }
+            OffsetIndirect {
+                volatile: true,
+                address,
+                offset,
+                source,
+            } => {
+                (Self::VOLATILE_OFFSET_MODE << Self::ADDR_MODE_SHIFT)
+                    | ((address as Word) << Self::ADDRESS_REG_SHIFT)
                     | ((offset as Word) << Self::OFFSET_SHIFT)
-                    | (destination as Word)
+                    | (source as Word)
+            }
+            IndexedIndirect {
+                volatile: true,
+                address,
+                index,
+                source,
+            } => {
+                (Self::VOLATILE_INDEXED_MODE << Self::ADDR_MODE_SHIFT)
+                    | ((address as Word) << Self::ADDRESS_REG_SHIFT)
+                    | ((index as Word) << Self::INDEX_REG_SHIFT)
+                    | (source as Word)
             }
         }
     }
@@ -422,12 +462,13 @@ impl ReadOp {
     const OFFSET_MASK: Word = 0b0000_0000_0000_1111_1111_1111_0000_0000;
     const OFFSET_SHIFT: Word = 8;
 
-    const VOLATILE_BIT: Word = 0b100;
     const INDIRECT_MODE: Word = 0b000;
     const OFFSET_MODE: Word = 0b001;
     const INDEXED_MODE: Word = 0b010;
     const STACK_OFFSET_MODE: Word = 0b011;
-
+    const VOLATILE_INDIRECT_MODE: Word = 0b100;
+    const VOLATILE_OFFSET_MODE: Word = 0b101;
+    const VOLATILE_INDEXED_MODE: Word = 0b110;
     const ZERO_PAGE_MODE: Word = 0b111;
 }
 
@@ -439,24 +480,41 @@ impl Decode for ReadOp {
 
         match addr_mode {
             Self::INDIRECT_MODE => Ok(Indirect {
-                volatile: (word & Self::VOLATILE_BIT) != 0,
+                volatile: false,
                 address: ((word & Self::ADDRESS_REG_MASK) >> Self::ADDRESS_REG_SHIFT) as Register,
                 destination,
             }),
             Self::OFFSET_MODE => Ok(OffsetIndirect {
-                volatile: (word & Self::VOLATILE_BIT) != 0,
+                volatile: false,
                 address: ((word & Self::ADDRESS_REG_MASK) >> Self::ADDRESS_REG_SHIFT) as Register,
                 offset: ((word & Self::OFFSET_MASK) >> Self::OFFSET_SHIFT) as Short,
                 destination,
             }),
             Self::INDEXED_MODE => Ok(IndexedIndirect {
-                volatile: (word & Self::VOLATILE_BIT) != 0,
+                volatile: false,
                 address: ((word & Self::ADDRESS_REG_MASK) >> Self::ADDRESS_REG_SHIFT) as Register,
                 index: ((word & Self::INDEX_REG_MASK) >> Self::INDEX_REG_SHIFT) as Register,
                 destination,
             }),
             Self::STACK_OFFSET_MODE => Ok(StackOffset {
                 offset: ((word & Self::OFFSET_MASK) >> Self::OFFSET_SHIFT) as Short,
+                destination,
+            }),
+            Self::VOLATILE_INDIRECT_MODE => Ok(Indirect {
+                volatile: true,
+                address: ((word & Self::ADDRESS_REG_MASK) >> Self::ADDRESS_REG_SHIFT) as Register,
+                destination,
+            }),
+            Self::VOLATILE_OFFSET_MODE => Ok(OffsetIndirect {
+                volatile: true,
+                address: ((word & Self::ADDRESS_REG_MASK) >> Self::ADDRESS_REG_SHIFT) as Register,
+                offset: ((word & Self::OFFSET_MASK) >> Self::OFFSET_SHIFT) as Short,
+                destination,
+            }),
+            Self::VOLATILE_INDEXED_MODE => Ok(IndexedIndirect {
+                volatile: true,
+                address: ((word & Self::ADDRESS_REG_MASK) >> Self::ADDRESS_REG_SHIFT) as Register,
+                index: ((word & Self::INDEX_REG_MASK) >> Self::INDEX_REG_SHIFT) as Register,
                 destination,
             }),
             Self::ZERO_PAGE_MODE => Ok(ZeroPage {
@@ -473,6 +531,14 @@ impl Encode for ReadOp {
         use ReadOp::*;
 
         match self {
+            StackOffset {
+                offset,
+                destination,
+            } => {
+                (Self::STACK_OFFSET_MODE << Self::ADDR_MODE_SHIFT)
+                    | ((offset as Word) << Self::OFFSET_SHIFT)
+                    | (destination as Word)
+            }
             ZeroPage {
                 address,
                 destination,
@@ -482,45 +548,65 @@ impl Encode for ReadOp {
                     | (destination as Word)
             }
             Indirect {
-                volatile,
+                volatile: false,
                 address,
                 destination,
             } => {
                 (Self::INDIRECT_MODE << Self::ADDR_MODE_SHIFT)
-                    | if volatile { Self::VOLATILE_BIT } else { 0 }
                     | ((address as Word) << Self::ADDRESS_REG_SHIFT)
                     | (destination as Word)
             }
             OffsetIndirect {
-                volatile,
+                volatile: false,
                 address,
                 offset,
                 destination,
             } => {
                 (Self::OFFSET_MODE << Self::ADDR_MODE_SHIFT)
-                    | if volatile { Self::VOLATILE_BIT } else { 0 }
                     | ((address as Word) << Self::ADDRESS_REG_SHIFT)
                     | ((offset as Word) << Self::OFFSET_SHIFT)
                     | (destination as Word)
             }
             IndexedIndirect {
-                volatile,
+                volatile: false,
                 address,
                 index,
                 destination,
             } => {
                 (Self::INDEXED_MODE << Self::ADDR_MODE_SHIFT)
-                    | if volatile { Self::VOLATILE_BIT } else { 0 }
                     | ((address as Word) << Self::ADDRESS_REG_SHIFT)
                     | ((index as Word) << Self::INDEX_REG_SHIFT)
                     | (destination as Word)
             }
-            StackOffset {
+            Indirect {
+                volatile: true,
+                address,
+                destination,
+            } => {
+                (Self::VOLATILE_INDIRECT_MODE << Self::ADDR_MODE_SHIFT)
+                    | ((address as Word) << Self::ADDRESS_REG_SHIFT)
+                    | (destination as Word)
+            }
+            OffsetIndirect {
+                volatile: true,
+                address,
                 offset,
                 destination,
             } => {
-                (Self::STACK_OFFSET_MODE << Self::ADDR_MODE_SHIFT)
+                (Self::VOLATILE_OFFSET_MODE << Self::ADDR_MODE_SHIFT)
+                    | ((address as Word) << Self::ADDRESS_REG_SHIFT)
                     | ((offset as Word) << Self::OFFSET_SHIFT)
+                    | (destination as Word)
+            }
+            IndexedIndirect {
+                volatile: true,
+                address,
+                index,
+                destination,
+            } => {
+                (Self::VOLATILE_INDEXED_MODE << Self::ADDR_MODE_SHIFT)
+                    | ((address as Word) << Self::ADDRESS_REG_SHIFT)
+                    | ((index as Word) << Self::INDEX_REG_SHIFT)
                     | (destination as Word)
             }
         }

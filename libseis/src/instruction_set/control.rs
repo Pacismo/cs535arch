@@ -273,7 +273,7 @@ impl Info for ControlOp {
         use ControlOp::*;
 
         match self {
-            Ret => [PC, SP, BP].into(),
+            Ret => [PC, LP, SP, BP].into(),
             Jmp(_) | Jeq(_) | Jne(_) | Jgt(_) | Jlt(_) | Jge(_) | Jle(_) => [PC].into(),
             Jsr(_) => [PC, LP, SP, BP].into(),
 
