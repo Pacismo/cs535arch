@@ -18,6 +18,7 @@
           FontFamily="Consolas" FontSize="12" 
           FrozenColumnCount="1">
         <DataGrid.Columns>
+            <DataGridCheckBoxColumn Binding="{Binding Current}"/>
             <DataGridTextColumn Header="Address" Binding="{Binding Address}"/>
             <DataGridTextColumn Header="0" Binding="{Binding Bytes[0]}"/>
             <DataGridTextColumn Header="1" Binding="{Binding Bytes[1]}"/>

@@ -8,7 +8,9 @@ use self::{
 };
 use super::Interface;
 use crate::{
-    config::SimulationConfiguration, interface::backend::disassembly::DisassemblyRow, PAGES,
+    config::SimulationConfiguration,
+    interface::backend::disassembly::{DisassemblyData, DisassemblyRow},
+    PAGES,
 };
 use clap::Parser;
 use libpipe::{ClockResult, Pipeline};
@@ -218,7 +220,7 @@ impl BackendState {
             }
             Terminate {} => Ok(false),
             Decode { value } => {
-                let map: json::Map<String, json::Value> = [(
+                let data: json::Map<String, json::Value> = [(
                     "decoded".to_string(),
                     Instruction::decode(value)
                         .map(|i| i.to_string())
@@ -228,7 +230,7 @@ impl BackendState {
                 .into_iter()
                 .collect();
 
-                println!("{}", json::to_string(&map)?);
+                println!("{}", json::to_string(&data)?);
 
                 Ok(true)
             }
@@ -260,8 +262,9 @@ impl BackendState {
     }
 
     fn show_disassembled_page(&self, page: usize) -> Result<(), Box<dyn Error>> {
-        let array = json::to_string(
-            &self
+        let data = DisassemblyData {
+            pc: self.pipeline.registers().pc,
+            rows: self
                 .pipeline
                 .memory_module()
                 .memory()
@@ -286,9 +289,9 @@ impl BackendState {
                         .collect::<Vec<_>>()
                 })
                 .unwrap_or_default(),
-        )?;
+        };
 
-        println!("{}", &array);
+        println!("{}", json::to_string(&data)?);
 
         Ok(())
     }

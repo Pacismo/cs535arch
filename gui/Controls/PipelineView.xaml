@@ -8,11 +8,26 @@
              d:DesignHeight="450" d:DesignWidth="800">
     <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Hidden">
         <StackPanel Orientation="Horizontal">
-            <local:PipelineStageView x:Name="Fetch" Header="Fetch" HorizontalAlignment="Left" Width="250"/>
-            <local:PipelineStageView x:Name="Decode" Header="Decode" HorizontalAlignment="Left" Width="250"/>
-            <local:PipelineStageView x:Name="Execute" Header="Execute" HorizontalAlignment="Left" Width="250"/>
-            <local:PipelineStageView x:Name="Memory" Header="Memory" HorizontalAlignment="Left" Width="250"/>
-            <local:PipelineStageView x:Name="Writeback" Header="Writeback" HorizontalAlignment="Left" Width="250"/>
+            <local:PipelineStageView x:Name="Fetch" 
+                                     Header="Fetch" 
+                                     HorizontalAlignment="Left" 
+                                     MinWidth="250"/>
+            <local:PipelineStageView x:Name="Decode" 
+                                     Header="Decode" 
+                                     HorizontalAlignment="Left" 
+                                     MinWidth="250"/>
+            <local:PipelineStageView x:Name="Execute" 
+                                     Header="Execute" 
+                                     HorizontalAlignment="Left" 
+                                     MinWidth="250"/>
+            <local:PipelineStageView x:Name="Memory" 
+                                     Header="Memory" 
+                                     HorizontalAlignment="Left" 
+                                     MinWidth="250"/>
+            <local:PipelineStageView x:Name="Writeback" 
+                                     Header="Writeback" 
+                                     HorizontalAlignment="Left" 
+                                     MinWidth="250"/>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

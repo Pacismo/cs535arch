@@ -8,7 +8,8 @@
         mc:Ignorable="d"
         Title="SEIS Simulation Frontend" Height="500" Width="900"
         Loaded="Window_Loaded"
-        Closed="Window_Closed">
+        Closed="Window_Closed"
+        SnapsToDevicePixels="True">
     <Window.InputBindings>
         <KeyBinding Key="C" Command="{x:Static local:MainWindow.ClockCommand}" Modifiers="Alt"/>
     </Window.InputBindings>

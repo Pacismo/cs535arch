@@ -55,8 +55,8 @@ namespace gui
                 data_cache = CacheConfig.FromToml(caches["data"] as TomlTable),
                 instruction_cache = CacheConfig.FromToml(caches["instruction"] as TomlTable),
 
-                miss_penalty = (uint) (table["miss_penalty"] as long? ?? throw new InvalidDataException("Type mismatch for field \"miss_penalty\" (expected an integer)")),
-                volatile_penalty = (uint) (table["volatile_penalty"] as long? ?? throw new InvalidDataException("Type mismatch for field \"volatile_penalty_penalty\" (expected an integer)")),
+                miss_penalty = (uint)(table["miss_penalty"] as long? ?? throw new InvalidDataException("Type mismatch for field \"miss_penalty\" (expected an integer)")),
+                volatile_penalty = (uint)(table["volatile_penalty"] as long? ?? throw new InvalidDataException("Type mismatch for field \"volatile_penalty_penalty\" (expected an integer)")),
                 pipelining = (table["pipelining"] as bool? ?? throw new InvalidDataException("Type mismatch for field \"pipelining\" (expected a boolean)")) == true,
                 writethrough = (table["writethrough"] as bool? ?? throw new InvalidDataException("Type mismatch for field \"writethrough\" (expected a boolean)")) == true
             };
@@ -72,6 +72,13 @@ namespace gui
         public bool disassembly = true;
         public bool pipeline = true;
 
+        public int? overview_hash = null;
+        public int? registers_hash = null;
+        public int? cache_hash = null;
+        public int? memory_hash = null;
+        public int? disassembly_hash = null;
+        public int? pipeline_hash = null;
+
         public void NeedUpdate()
         {
             overview = true;
@@ -83,14 +90,19 @@ namespace gui
         }
     }
 
+    struct PotentialUpdate<T>(T? result, int hash)
+    {
+        public T? result = result;
+        public int hash = hash;
+    }
+
     struct SimulationState()
     {
         public const string SEIS_SIM_BIN_PATH = "seis-sim";
 
         public Process? backend_process = null;
         public uint page_id = 0;
-        public Data.Page loaded_page = new();
-        public ViewUpdateFlags update_flags = new();
+        public ViewUpdateFlags update = new();
         public Configuration running_config = new();
 
         public void Start(string binary_file, Configuration config)
@@ -136,7 +148,7 @@ namespace gui
             return line;
         }
 
-        public T? DeserializeResult<T>(string command)
+        public PotentialUpdate<T>? DeserializeResult<T>(string command, int? previous)
         {
             if (backend_process == null)
                 throw new InvalidOperationException("Backend process is not running");
@@ -147,7 +159,11 @@ namespace gui
                 backend_process.StandardInput.WriteLine(command);
                 line = backend_process.StandardOutput.ReadLine() ?? throw new IOException("Pipe closed");
             }
-            return JsonConvert.DeserializeObject<T>(line);
+            int hash = line.GetHashCode();
+            if (previous == null || hash != previous)
+                return new(JsonConvert.DeserializeObject<T>(line), hash);
+            else
+                return null;
         }
     }
 
@@ -473,69 +489,95 @@ namespace gui
 
         void UpdateOverview()
         {
-            OverviewContent content = state.DeserializeResult<OverviewContent>("stats");
+            var content = state.DeserializeResult<OverviewContent>("stats", state.update.overview_hash);
 
-            Application.Current.Dispatcher.Invoke(() => Overview.UpdateData(content));
+            if (content.HasValue)
+            {
+                state.update.overview_hash = content.Value.hash;
+                Application.Current.Dispatcher.Invoke(() => Overview.UpdateData(content.Value.result));
+            }
 
-            state.update_flags.overview = false;
+            state.update.overview = false;
         }
 
         void UpdateRegistersView()
         {
-            Registers registers = state.DeserializeResult<Registers>("regs");
+            var registers = state.DeserializeResult<Registers>("regs", state.update.registers_hash);
 
-            Application.Current.Dispatcher.Invoke(() => RegisterView_Table.UpdateData(registers));
+            if (registers.HasValue)
+            {
+                state.update.registers_hash = registers.Value.hash;
+                Application.Current.Dispatcher.Invoke(() => RegisterView_Table.UpdateData(registers.Value.result));
+            }
 
-            state.update_flags.registers = false;
+            state.update.registers = false;
         }
         void UpdateCacheView()
         {
-            Cache[]? caches = state.DeserializeResult<Cache[]>("cache");
+            var caches = state.DeserializeResult<Cache[]>("cache", state.update.cache_hash);
 
-            Application.Current.Dispatcher.Invoke(() => CacheView_Grid.UpdateData(caches));
-
-            state.update_flags.cache = false;
+            if (caches.HasValue)
+            {
+                state.update.cache_hash = caches.Value.hash;
+                Application.Current.Dispatcher.Invoke(() => CacheView_Grid.UpdateData(caches.Value.result));
+            }
+            state.update.cache = false;
         }
         void UpdateMemoryView()
         {
-            Data.Page page = state.DeserializeResult<Data.Page>($"page {state.page_id}");
+            var page = state.DeserializeResult<Data.Page>($"page {state.page_id}", state.update.memory_hash);
 
-            Application.Current.Dispatcher.Invoke(() =>
+            if (page.HasValue)
             {
-                MemoryView_Grid.UpdateData(page, state.page_id);
-                MemoryView_PageID.Text = state.page_id.ToString();
-            });
-            state.loaded_page = page;
+                state.update.memory_hash = page.Value.hash;
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    MemoryView_Grid.UpdateData(page.Value.result, state.page_id);
+                    MemoryView_PageID.Text = state.page_id.ToString();
+                });
+            }
 
-            state.update_flags.memory = false;
+            state.update.memory = false;
         }
         void UpdateDisassemblyView()
         {
-            DisassemblyViewRow[]? rows = state.DeserializeResult<DisassemblyViewRow[]?>($"disasm {state.page_id}");
-            Application.Current.Dispatcher.Invoke(() =>
-            {
-                DisassemblyView_Grid.UpdateData(rows);
-                DisassemblyView_PageID.Text = state.page_id.ToString();
-            });
+            var rows = state.DeserializeResult<DisassemblyViewData>($"disasm {state.page_id}", state.update.disassembly_hash);
 
-            state.update_flags.disassembly = false;
+            if (rows.HasValue)
+            {
+                state.update.disassembly_hash = rows.Value.hash;
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    DisassemblyView_Grid.UpdateData(state.page_id, rows.Value.result);
+                    DisassemblyView_PageID.Text = state.page_id.ToString();
+                });
+            }
+
+            state.update.disassembly = false;
         }
         void UpdatePipelineView()
         {
-            Dictionary<string, Dictionary<string, object>> pipe_stages =
-                state.DeserializeResult<Dictionary<string, Dictionary<string, object>>>("pipe")
-                ?? throw new NullReferenceException();
+            var pipe_stages =
+                state.DeserializeResult<Dictionary<string, Dictionary<string, object>>>("pipe", state.update.pipeline_hash);
 
-            Application.Current.Dispatcher.Invoke(() =>
+            if (pipe_stages.HasValue)
             {
-                PipelineView.Fetch.UpdateData(pipe_stages["fetch"]);
-                PipelineView.Decode.UpdateData(pipe_stages["decode"]);
-                PipelineView.Execute.UpdateData(pipe_stages["execute"]);
-                PipelineView.Memory.UpdateData(pipe_stages["memory"]);
-                PipelineView.Writeback.UpdateData(pipe_stages["writeback"]);
-            });
+                if (pipe_stages.Value.result == null)
+                    throw new NullReferenceException();
 
-            state.update_flags.pipeline = false;
+                state.update.pipeline_hash = pipe_stages.Value.hash;
+
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    PipelineView.Fetch.UpdateData(pipe_stages.Value.result["fetch"]);
+                    PipelineView.Decode.UpdateData(pipe_stages.Value.result["decode"]);
+                    PipelineView.Execute.UpdateData(pipe_stages.Value.result["execute"]);
+                    PipelineView.Memory.UpdateData(pipe_stages.Value.result["memory"]);
+                    PipelineView.Writeback.UpdateData(pipe_stages.Value.result["writeback"]);
+                });
+            }
+
+            state.update.pipeline = false;
         }
 
         void UpdateRootView()
@@ -543,33 +585,33 @@ namespace gui
             if (!state.IsRunning())
                 return;
 
-            if (state.update_flags.overview)
+            if (state.update.overview)
                 ThreadPool.QueueUserWorkItem(_ => UpdateOverview());
 
             switch (Tabs.SelectedIndex)
             {
                 case 1:
-                    if (state.update_flags.registers)
+                    if (state.update.registers)
                         ThreadPool.QueueUserWorkItem(_ => UpdateRegistersView());
                     break;
 
                 case 2:
-                    if (state.update_flags.cache)
+                    if (state.update.cache)
                         ThreadPool.QueueUserWorkItem(_ => UpdateCacheView());
                     break;
 
                 case 3:
-                    if (state.update_flags.memory)
+                    if (state.update.memory)
                         ThreadPool.QueueUserWorkItem(_ => UpdateMemoryView());
                     break;
 
                 case 4:
-                    if (state.update_flags.disassembly)
+                    if (state.update.disassembly)
                         ThreadPool.QueueUserWorkItem(_ => UpdateDisassemblyView());
                     break;
 
                 case 5:
-                    if (state.update_flags.pipeline)
+                    if (state.update.pipeline)
                         ThreadPool.QueueUserWorkItem(_ => UpdatePipelineView());
                     break;
 
@@ -580,7 +622,7 @@ namespace gui
 
         void InvalidateView()
         {
-            state.update_flags.NeedUpdate();
+            state.update.NeedUpdate();
             UpdateRootView();
         }
 
@@ -618,8 +660,8 @@ namespace gui
             if (state.page_id > 0)
             {
                 state.page_id -= 1;
-                state.update_flags.memory = true;
-                state.update_flags.disassembly = true;
+                state.update.memory = true;
+                state.update.disassembly = true;
                 UpdateRootView();
             }
         }
@@ -631,8 +673,8 @@ namespace gui
             if (state.page_id < ushort.MaxValue)
             {
                 state.page_id += 1;
-                state.update_flags.memory = true;
-                state.update_flags.disassembly = true;
+                state.update.memory = true;
+                state.update.disassembly = true;
                 UpdateRootView();
             }
         }
