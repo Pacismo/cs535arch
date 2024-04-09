@@ -10,6 +10,7 @@ using Tomlyn;
 using Tomlyn.Model;
 using Newtonsoft.Json;
 using System.Windows.Input;
+using System.Security.Cryptography.X509Certificates;
 
 namespace gui
 {
@@ -55,8 +56,8 @@ namespace gui
                 data_cache = CacheConfig.FromToml(caches["data"] as TomlTable),
                 instruction_cache = CacheConfig.FromToml(caches["instruction"] as TomlTable),
 
-                miss_penalty = (uint)(table["miss_penalty"] as long? ?? throw new InvalidDataException("Type mismatch for field \"miss_penalty\" (expected an integer)")),
-                volatile_penalty = (uint)(table["volatile_penalty"] as long? ?? throw new InvalidDataException("Type mismatch for field \"volatile_penalty_penalty\" (expected an integer)")),
+                miss_penalty = (uint) (table["miss_penalty"] as long? ?? throw new InvalidDataException("Type mismatch for field \"miss_penalty\" (expected an integer)")),
+                volatile_penalty = (uint) (table["volatile_penalty"] as long? ?? throw new InvalidDataException("Type mismatch for field \"volatile_penalty_penalty\" (expected an integer)")),
                 pipelining = (table["pipelining"] as bool? ?? throw new InvalidDataException("Type mismatch for field \"pipelining\" (expected a boolean)")) == true,
                 writethrough = (table["writethrough"] as bool? ?? throw new InvalidDataException("Type mismatch for field \"writethrough\" (expected a boolean)")) == true
             };
@@ -192,6 +193,15 @@ namespace gui
             DataContext = this;
         }
 
+        void SetBinary(string binary)
+        {
+            if (!File.Exists(binary))
+                throw new FileNotFoundException($"File \"{binary}\" does not exist in the filesystem");
+
+            binary_file = binary;
+            Title = $"SEIS Simulation Frontend ({binary_file})";
+        }
+
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
             foreach (TabItem tab in Tabs.Items)
@@ -301,10 +311,7 @@ namespace gui
                 DefaultDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
             };
             if (openFileDialog.ShowDialog() == true)
-            {
-                binary_file = openFileDialog.FileName;
-                Title = $"SEIS Simulation Frontend ({binary_file})";
-            }
+                SetBinary(openFileDialog.FileName);
         }
 
         private void OpenConfiguration_Click(object sender, RoutedEventArgs e)
@@ -331,7 +338,26 @@ namespace gui
         {
             try
             {
-                SetConfiguration(Configuration.FromToml(Toml.ToModel(File.ReadAllText(path))));
+                TomlTable table = Toml.ToModel(File.ReadAllText(path));
+
+                if (table.ContainsKey("simulation"))
+                {
+                    TomlTable simulation = table["simulation"] as TomlTable
+                        ?? throw new InvalidDataException("Key \"simulation\" must be a table");
+
+                    if (simulation.ContainsKey("binary"))
+                    {
+                        string binary = simulation["binary"] as string
+                            ?? throw new InvalidDataException("Key \"simulation.binary\" must be a string");
+
+                        if (!Path.IsPathFullyQualified(binary))
+                            binary = Path.Join(Path.GetDirectoryName(path), binary);
+
+                        SetBinary(binary);
+                    }
+                }
+
+                SetConfiguration(Configuration.FromToml(table));
                 return true;
             }
             catch (IOException ex)
