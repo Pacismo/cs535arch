@@ -7,26 +7,26 @@ main:
     load left_matrix, va
     load right_matrix, vb
     load result_matrix, ve
-    load 0, vc
+    load 0, v0
 
 main_i_loop:
-    load 0, vd
+    load 0, v1
 main_j_loop:
     jsr mat_mul
 
-    mul vd, .O, v0
-    add v0, vc, v0
-    mul v0, 4, v0
+    mul v1, .O, v2
+    add v2, v0, v2
+    mul v2, 4, v2
 
-    slr vf, ve[v0]
+    slr vf, ve[v2]
 
-    add vd, 1, vd
-    cmp vd, .O
+    add v1, 1, v1
+    cmp v1, .O
     jlt main_j_loop
 
-    add vc, 1, vc
+    add v0, 1, v0
 
-    cmp vc, .M
+    cmp v0, .M
     jlt main_i_loop
 
     halt
@@ -35,31 +35,31 @@ mat_mul: ; mat_mul(mat1: @va, mat2: @vb, i: @vc, j: @vd) -> @vf
          ; REQUIREMENTS:
          ;  - 0 <= i < .M
          ;  - 0 <= j < .O
-    push { v0, v1, v2, v3, v4 }
+    push { v0, v1, v2, v3 }
 
-    load 0, v4
-    load 0, vf
+    load 0, v3 ; index
+    load 0, vf ; result
 
 mat_mul_loop:
-    mul v4, .M, v0 ; Compute index in mat1
+    mul v3, .M, v0 ; Compute index in mat1
     add vc, v0, v0
     mul v0, 4, v0
 
-    mul v4, .O, v1 ; Compute index in mat2
+    mul v3, .O, v1 ; Compute index in mat2
     add vd, v1, v1
     mul v1, 4, v1
 
-    llr va[v0], v0
+    llr va[v0], v0 ; Read values
     llr vb[v1], v1
 
-    add v0, v1, v2
-    add v2, v3, vf
+    mul v0, v1, v2 ; Multiply values
+    add v2, vf, vf ; Add to sum
 
-    add v4, 1, v4
+    add v3, 1, v3
     cmp v4, .N
     jlt mat_mul_loop
 
-    pop { v0, v1, v2, v3, v4 }
+    pop { v0, v1, v2, v3 }
     ret
 
 #[location = 0x00030000]
