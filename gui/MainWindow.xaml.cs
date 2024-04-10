@@ -10,7 +10,6 @@ using Tomlyn;
 using Tomlyn.Model;
 using Newtonsoft.Json;
 using System.Windows.Input;
-using System.Security.Cryptography.X509Certificates;
 
 namespace gui
 {
@@ -49,17 +48,22 @@ namespace gui
 
         public static Configuration FromToml(TomlTable table)
         {
-            TomlTable caches = table["cache"] as TomlTable ?? throw new InvalidDataException("Expected dictionary \"cache\"");
+            TomlTable caches = table["cache"] as TomlTable
+                ?? throw new InvalidDataException("Expected dictionary \"cache\"");
 
             return new()
             {
                 data_cache = CacheConfig.FromToml(caches["data"] as TomlTable),
                 instruction_cache = CacheConfig.FromToml(caches["instruction"] as TomlTable),
 
-                miss_penalty = (uint) (table["miss_penalty"] as long? ?? throw new InvalidDataException("Type mismatch for field \"miss_penalty\" (expected an integer)")),
-                volatile_penalty = (uint) (table["volatile_penalty"] as long? ?? throw new InvalidDataException("Type mismatch for field \"volatile_penalty_penalty\" (expected an integer)")),
-                pipelining = (table["pipelining"] as bool? ?? throw new InvalidDataException("Type mismatch for field \"pipelining\" (expected a boolean)")) == true,
-                writethrough = (table["writethrough"] as bool? ?? throw new InvalidDataException("Type mismatch for field \"writethrough\" (expected a boolean)")) == true
+                miss_penalty = (uint) (table["miss_penalty"] as long?
+                    ?? throw new InvalidDataException("Type mismatch for field \"miss_penalty\" (expected an integer)")),
+                volatile_penalty = (uint) (table["volatile_penalty"] as long?
+                    ?? throw new InvalidDataException("Type mismatch for field \"volatile_penalty_penalty\" (expected an integer)")),
+                pipelining = (table["pipelining"] as bool?
+                    ?? throw new InvalidDataException("Type mismatch for field \"pipelining\" (expected a boolean)")) == true,
+                writethrough = (table["writethrough"] as bool?
+                    ?? throw new InvalidDataException("Type mismatch for field \"writethrough\" (expected a boolean)")) == true
             };
         }
     }
@@ -149,7 +153,7 @@ namespace gui
             return line;
         }
 
-        public PotentialUpdate<T>? DeserializeResult<T>(string command, int? previous)
+        public PotentialUpdate<T>? DeserializeResult<T>(string command, int? previous = null)
         {
             if (backend_process == null)
                 throw new InvalidOperationException("Backend process is not running");
@@ -567,7 +571,9 @@ namespace gui
         }
         void UpdateDisassemblyView()
         {
-            var rows = state.DeserializeResult<DisassemblyViewData>($"disasm {state.page_id}", state.update.disassembly_hash);
+            var rows = state.DeserializeResult<DisassembledWord[]>($"disasm {state.page_id}", state.update.disassembly_hash);
+            var pc = state.DeserializeResult<PcOnlyRegisterStruct>("regs")?.result.pc
+                ?? throw new NullReferenceException();
 
             if (rows.HasValue)
             {
@@ -577,7 +583,8 @@ namespace gui
                     DisassemblyView_Grid.UpdateData(state.page_id, rows.Value.result);
                     DisassemblyView_PageID.Text = state.page_id.ToString();
                 });
-            }
+            } else
+                Application.Current.Dispatcher.Invoke(() => DisassemblyView_Grid.PC = pc);
 
             state.update.disassembly = false;
         }

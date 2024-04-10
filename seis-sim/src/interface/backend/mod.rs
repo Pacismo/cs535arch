@@ -3,14 +3,12 @@ mod disassembly;
 mod input;
 
 use self::{
-    cmd::{Command, Info},
+    cmd::{Command, Info, Register},
     input::InputHandler,
 };
 use super::Interface;
 use crate::{
-    config::SimulationConfiguration,
-    interface::backend::disassembly::{DisassemblyData, DisassemblyRow},
-    PAGES,
+    config::SimulationConfiguration, interface::backend::disassembly::DisassemblyRow, PAGES,
 };
 use clap::Parser;
 use libpipe::{ClockResult, Pipeline};
@@ -198,8 +196,8 @@ impl BackendState {
                 self.show_page(page)?;
                 Ok(true)
             }
-            ShowRegs {} => {
-                self.show_registers()?;
+            ShowRegs { regs } => {
+                self.show_registers(regs)?;
                 Ok(true)
             }
             ShowCache {} => {
@@ -262,69 +260,72 @@ impl BackendState {
     }
 
     fn show_disassembled_page(&self, page: usize) -> Result<(), Box<dyn Error>> {
-        let data = DisassemblyData {
-            pc: self.pipeline.registers().pc,
-            rows: self
-                .pipeline
-                .memory_module()
-                .memory()
-                .get_page(page)
-                .map(|p| {
-                    p.chunks(4)
-                        .enumerate()
-                        .map(|(i, b)| DisassemblyRow {
-                            address: format!("{:#010X}", i * 4),
-                            bytes: [
-                                format!("{:02X}", b[0]),
-                                format!("{:02X}", b[1]),
-                                format!("{:02X}", b[2]),
-                                format!("{:02X}", b[3]),
-                            ],
-                            instruction: Instruction::decode(Word::from_be_bytes([
-                                b[0], b[1], b[2], b[3],
-                            ]))
-                            .unwrap_or_default()
-                            .to_string(),
-                        })
-                        .collect::<Vec<_>>()
-                })
-                .unwrap_or_default(),
-        };
+        let data = self
+            .pipeline
+            .memory_module()
+            .memory()
+            .get_page(page)
+            .map(|p| {
+                p.chunks(4)
+                    .enumerate()
+                    .map(|(i, b)| DisassemblyRow {
+                        address: format!("{:#010X}", i * 4),
+                        bytes: [
+                            format!("{:02X}", b[0]),
+                            format!("{:02X}", b[1]),
+                            format!("{:02X}", b[2]),
+                            format!("{:02X}", b[3]),
+                        ],
+                        instruction: Instruction::decode(Word::from_be_bytes([
+                            b[0], b[1], b[2], b[3],
+                        ]))
+                        .unwrap_or_default()
+                        .to_string(),
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
 
         println!("{}", json::to_string(&data)?);
 
         Ok(())
     }
 
-    fn show_registers(&self) -> Result<(), Box<dyn Error>> {
+    fn show_registers(&self, regs: Option<Vec<Register>>) -> Result<(), Box<dyn Error>> {
         let mut map = json::Map::new();
-        let regs = self.pipeline.registers();
+        let registers = self.pipeline.registers();
 
-        map.insert("v0".to_string(), regs.v[0].into());
-        map.insert("v1".to_string(), regs.v[1].into());
-        map.insert("v2".to_string(), regs.v[2].into());
-        map.insert("v3".to_string(), regs.v[3].into());
-        map.insert("v4".to_string(), regs.v[4].into());
-        map.insert("v5".to_string(), regs.v[5].into());
-        map.insert("v6".to_string(), regs.v[6].into());
-        map.insert("v7".to_string(), regs.v[7].into());
-        map.insert("v8".to_string(), regs.v[8].into());
-        map.insert("v9".to_string(), regs.v[9].into());
-        map.insert("va".to_string(), regs.v[10].into());
-        map.insert("vb".to_string(), regs.v[11].into());
-        map.insert("vc".to_string(), regs.v[12].into());
-        map.insert("vd".to_string(), regs.v[13].into());
-        map.insert("ve".to_string(), regs.v[14].into());
-        map.insert("vf".to_string(), regs.v[15].into());
-        map.insert("sp".to_string(), regs.sp.into());
-        map.insert("bp".to_string(), regs.bp.into());
-        map.insert("lp".to_string(), regs.lp.into());
-        map.insert("pc".to_string(), regs.pc.into());
-        map.insert("zf".to_string(), regs.zf.into());
-        map.insert("of".to_string(), regs.of.into());
-        map.insert("eps".to_string(), regs.eps.into());
-        map.insert("nan".to_string(), regs.nan.into());
-        map.insert("inf".to_string(), regs.inf.into());
+        if let Some(regs) = regs {
+            for reg in regs.into_iter() {
+                map.insert(reg.to_string(), registers[reg.into()].into());
+            }
+        } else {
+            map.insert("v0".to_string(), registers.v[0].into());
+            map.insert("v1".to_string(), registers.v[1].into());
+            map.insert("v2".to_string(), registers.v[2].into());
+            map.insert("v3".to_string(), registers.v[3].into());
+            map.insert("v4".to_string(), registers.v[4].into());
+            map.insert("v5".to_string(), registers.v[5].into());
+            map.insert("v6".to_string(), registers.v[6].into());
+            map.insert("v7".to_string(), registers.v[7].into());
+            map.insert("v8".to_string(), registers.v[8].into());
+            map.insert("v9".to_string(), registers.v[9].into());
+            map.insert("va".to_string(), registers.v[10].into());
+            map.insert("vb".to_string(), registers.v[11].into());
+            map.insert("vc".to_string(), registers.v[12].into());
+            map.insert("vd".to_string(), registers.v[13].into());
+            map.insert("ve".to_string(), registers.v[14].into());
+            map.insert("vf".to_string(), registers.v[15].into());
+            map.insert("sp".to_string(), registers.sp.into());
+            map.insert("bp".to_string(), registers.bp.into());
+            map.insert("lp".to_string(), registers.lp.into());
+            map.insert("pc".to_string(), registers.pc.into());
+            map.insert("zf".to_string(), registers.zf.into());
+            map.insert("of".to_string(), registers.of.into());
+            map.insert("eps".to_string(), registers.eps.into());
+            map.insert("nan".to_string(), registers.nan.into());
+            map.insert("inf".to_string(), registers.inf.into());
+        }
 
         println!("{}", json::to_string(&map)?);
 
