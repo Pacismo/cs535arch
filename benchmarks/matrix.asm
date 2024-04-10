@@ -8,12 +8,11 @@ main:
     load right_matrix, vb
     load result_matrix, ve
     load 0, vc
+
+main_i_loop:
     load 0, vd
-
-main_loop:
+main_j_loop:
     jsr mat_mul
-
-    load 0, v0
 
     mul vd, .O, v0
     add v0, vc, v0
@@ -21,14 +20,14 @@ main_loop:
 
     slr vf, ve[v0]
 
-    add vc, 1, vc
-    cmp vc, .M
-    jle main_loop
-
-    load 0, vc
     add vd, 1, vd
     cmp vd, .O
-    jle main_loop
+    jle main_j_loop
+
+    add vc, 1, vc
+
+    cmp vc, .M
+    jle main_i_loop
 
     halt
 
