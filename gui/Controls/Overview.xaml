@@ -8,21 +8,21 @@
              d:Background="WhiteSmoke">
     <StackPanel Orientation="Horizontal">
         <Label HorizontalContentAlignment="Right" Content="Memory Accesses" VerticalAlignment="Center" HorizontalAlignment="Left"/>
-        <Label Name="Accesses" Width="50" Content="0" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+        <Label Name="Accesses" MinWidth="50" Content="0" VerticalAlignment="Center" HorizontalAlignment="Left"/>
         
         <Label HorizontalContentAlignment="Right" Content="Cache Hits" VerticalAlignment="Center" HorizontalAlignment="Left"/>
-        <Label Name="Hits" Width="50" Content="0" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+        <Label Name="Hits" MinWidth="50" Content="0" VerticalAlignment="Center" HorizontalAlignment="Left"/>
         
         <Label HorizontalContentAlignment="Right" Content="Cache Misses" VerticalAlignment="Center" HorizontalAlignment="Left"/>
-        <Label Name="Misses" Width="50" Content="0" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+        <Label Name="Misses" MinWidth="50" Content="0" VerticalAlignment="Center" HorizontalAlignment="Left"/>
         
         <Label HorizontalContentAlignment="Right" Content="Cold Misses" VerticalAlignment="Center" HorizontalAlignment="Left"/>
-        <Label Name="Cold" Width="50" Content="0" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+        <Label Name="Cold" MinWidth="50" Content="0" VerticalAlignment="Center" HorizontalAlignment="Left"/>
         
         <Label HorizontalContentAlignment="Right" Content="Conflict Misses" VerticalAlignment="Center" HorizontalAlignment="Left"/>
-        <Label Name="Conflict" Width="50" Content="0" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+        <Label Name="Conflict" MinWidth="50" Content="0" VerticalAlignment="Center" HorizontalAlignment="Left"/>
         
         <Label HorizontalContentAlignment="Right" Content="Clocks" VerticalAlignment="Center" HorizontalAlignment="Left"/>
-        <Label Name="Clocks" Width="50" Content="0" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+        <Label Name="Clocks" MinWidth="50" Content="0" VerticalAlignment="Center" HorizontalAlignment="Left"/>
     </StackPanel>
 </UserControl>
