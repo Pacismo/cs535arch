@@ -1,7 +1,7 @@
 use super::{memory::MemoryResult, PipelineStage};
 use crate::{Clock, Locks, Registers, Status};
 use libmem::module::MemoryModule;
-use libseis::registers::{BP, EPS, INF, LP, NAN, OF, PC, SP, ZF};
+use libseis::{pages::PAGE_SIZE, registers::{BP, EPS, INF, LP, NAN, OF, PC, SP, ZF}, types::Word};
 use serde::Serialize;
 use std::mem::take;
 
@@ -152,6 +152,11 @@ impl PipelineStage for Writeback {
                 }
             }
         }
+
+        registers[SP] %= PAGE_SIZE as Word;
+        registers[BP] %= PAGE_SIZE as Word;
+        registers[PC] &= 0xFFFF_FFFC;
+        registers[LP] &= 0xFFFF_FFFC;
 
         clock.to_ready()
     }
