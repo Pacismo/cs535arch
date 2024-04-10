@@ -105,6 +105,7 @@ namespace gui
     {
         public const string SEIS_SIM_BIN_PATH = "./bin/seis-sim";
 
+        public Mutex proc_mtx = new();
         public Process? backend_process = null;
         Task? run_task;
         public uint page_id = 0;
@@ -139,7 +140,7 @@ namespace gui
             if (backend_process == null)
                 throw new InvalidOperationException("Backend process is not running");
 
-            lock (backend_process)
+            lock (proc_mtx)
                 backend_process.StandardInput.WriteLine(command);
         }
 
@@ -149,7 +150,7 @@ namespace gui
                 throw new InvalidOperationException("Backend process is not running");
 
             string line;
-            lock (backend_process)
+            lock (proc_mtx)
                 line = backend_process.StandardOutput.ReadLine() ?? throw new IOException("Pipe closed");
 
             return line;
@@ -161,7 +162,7 @@ namespace gui
                 throw new InvalidOperationException("Backend process is not running");
 
             string line;
-            lock (backend_process)
+            lock (proc_mtx)
             {
                 backend_process.StandardInput.WriteLine(command);
                 line = backend_process.StandardOutput.ReadLine() ?? throw new IOException("Pipe closed");
@@ -175,18 +176,10 @@ namespace gui
 
        void run_proc()
         {
-            lock (backend_process!)
+            lock (proc_mtx!)
             {
-                backend_process.StandardInput.WriteLine("run");
-                Task<string> read = backend_process.StandardOutput.ReadLineAsync()!;
-
-                while (!read.IsCompleted)
-                    if (run_task == null)
-                    {
-                        backend_process.StandardInput.WriteLine("stop");
-                        read.Wait();
-                        break;
-                    }
+                backend_process!.StandardInput.WriteLine("run");
+                backend_process.StandardOutput.ReadLine();
             }
             run_task = null;
         }
@@ -202,7 +195,12 @@ namespace gui
             run_task = Task.Run(run_proc);
         }
 
-        public void Break() => run_task = null;
+        public void Break()
+        {
+            if (run_task != null)
+                backend_process!.StandardInput.WriteLine("stop");
+            run_task = null;
+        }
     }
 
     /// <summary>
