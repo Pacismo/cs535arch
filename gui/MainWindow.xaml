@@ -33,8 +33,9 @@
                 <MenuItem Name="StopSim" Header="Stop" Click="StopSim_Click"/>
                 <MenuItem Name="ResetSim" Header="Reset" Click="ResetSim_Click"/>
                 <Separator/>
-                <MenuItem Name="Clock" Header="_Clock" StaysOpenOnClick="True" Command="{x:Static local:MainWindow.ClockCommand}"/>
+                <MenuItem Name="Clock" Header="_Clock (Alt+C)" StaysOpenOnClick="True" Command="{x:Static local:MainWindow.ClockCommand}"/>
                 <MenuItem Name="Run" Header="_Run" Click="Run_Click"/>
+                <MenuItem Name="Break" Header="_Break" Click="Break_Click"/>
             </MenuItem>
             <MenuItem Header="Help">
                 <MenuItem Name="About" Header="About" Click="About_Click"/>

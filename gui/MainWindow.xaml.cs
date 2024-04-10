@@ -101,11 +101,12 @@ namespace gui
         public int hash = hash;
     }
 
-    struct SimulationState()
+    class SimulationState()
     {
         public const string SEIS_SIM_BIN_PATH = "./bin/seis-sim";
 
         public Process? backend_process = null;
+        Task? run_task;
         public uint page_id = 0;
         public ViewUpdateFlags update = new();
         public Configuration running_config = new();
@@ -124,10 +125,11 @@ namespace gui
             });
         }
 
-        public readonly bool IsRunning() => backend_process != null;
+        public bool IsRunning() => backend_process != null;
 
         public void Stop()
         {
+            run_task = null;
             backend_process?.Kill();
             backend_process = null;
         }
@@ -171,17 +173,36 @@ namespace gui
                 return null;
         }
 
+       void run_proc()
+        {
+            lock (backend_process!)
+            {
+                backend_process.StandardInput.WriteLine("run");
+                Task<string> read = backend_process.StandardOutput.ReadLineAsync()!;
+
+                while (!read.IsCompleted)
+                    if (run_task == null)
+                    {
+                        backend_process.StandardInput.WriteLine("stop");
+                        read.Wait();
+                        break;
+                    }
+            }
+            run_task = null;
+        }
+
         public void Run()
         {
             if (backend_process == null)
                 throw new InvalidOperationException("Backend process is not running");
+            if (run_task != null)
+                return;
 
-            lock (backend_process)
-            {
-                backend_process.StandardInput.WriteLine("run");
-                backend_process.StandardOutput.ReadLine();
-            }
+            var self = this;
+            run_task = Task.Run(run_proc);
         }
+
+        public void Break() => run_task = null;
     }
 
     /// <summary>
@@ -691,8 +712,12 @@ namespace gui
             Task.Run(() =>
             {
                 state.Run();
-                InvalidateView();
+                Application.Current.Dispatcher.Invoke(InvalidateView);
             });
+        }
+        private void Break_Click(object sender, RoutedEventArgs e)
+        {
+            state.Break();
         }
 
         private void Tabs_SelectionChanged(object sender, SelectionChangedEventArgs e)

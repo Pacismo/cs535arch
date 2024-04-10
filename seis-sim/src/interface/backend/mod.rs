@@ -143,12 +143,14 @@ impl BackendState {
                     }
 
                     if let Some(command) =
-                        self.input_handler.get_next_timeout(Duration::from_nanos(1))
+                        self.input_handler.get_next_timeout(Duration::from_nanos(0))
                     {
                         let command = Command::try_parse_from(command.split_whitespace());
                         if matches!(command, Ok(Command::Stop {})) {
+                            println!("break");
                             return Ok(true);
                         } else if matches!(command, Ok(Command::Terminate {})) {
+                            println!("terminated");
                             return Ok(false);
                         }
                     }
@@ -177,7 +179,11 @@ impl BackendState {
                         self.input_handler.get_next_timeout(Duration::from_nanos(0))
                     {
                         let command = Command::try_parse_from(command.split_whitespace());
-                        if matches!(command, Ok(Command::Terminate {})) {
+                        if matches!(command, Ok(Command::Stop {})) {
+                            println!("break");
+                            return Ok(true);
+                        } else if matches!(command, Ok(Command::Terminate {})) {
+                            println!("terminated");
                             return Ok(false);
                         }
                     }

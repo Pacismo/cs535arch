@@ -22,12 +22,12 @@ main_j_loop:
 
     add vd, 1, vd
     cmp vd, .O
-    jle main_j_loop
+    jlt main_j_loop
 
     add vc, 1, vc
 
     cmp vc, .M
-    jle main_i_loop
+    jlt main_i_loop
 
     halt
 
