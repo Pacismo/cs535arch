@@ -237,7 +237,7 @@ impl Resolver for RegisterOp {
                     }
                 } else {
                     ExecuteResult::PopStack {
-                        sp: regvals[SP].wrapping_sub(4),
+                        sp: regvals[SP],
                     }
                 }
             }
