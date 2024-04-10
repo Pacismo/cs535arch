@@ -14,7 +14,7 @@ impl<'a> Runtime<'a> {
         if event::poll(if self.running.slow_mode {
             Duration::from_millis(100)
         } else {
-            Duration::from_nanos(10)
+            Duration::from_nanos(0)
         })? {
             if matches!(
                 event::read()?,
