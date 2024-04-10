@@ -170,6 +170,18 @@ namespace gui
             else
                 return null;
         }
+
+        public void Run()
+        {
+            if (backend_process == null)
+                throw new InvalidOperationException("Backend process is not running");
+
+            lock (backend_process)
+            {
+                backend_process.StandardInput.WriteLine("run");
+                backend_process.StandardOutput.ReadLine();
+            }
+        }
     }
 
     /// <summary>
@@ -524,7 +536,7 @@ namespace gui
             if (content.HasValue)
             {
                 state.update.overview_hash = content.Value.hash;
-                Application.Current.Dispatcher.Invoke(() => Overview.UpdateData(content.Value.result));
+                Application.Current.Dispatcher.InvokeAsync(() => Overview.UpdateData(content.Value.result));
             }
 
             state.update.overview = false;
@@ -532,45 +544,48 @@ namespace gui
 
         void UpdateRegistersView()
         {
+            state.update.registers = false;
+
             var registers = state.DeserializeResult<Registers>("regs", state.update.registers_hash);
 
             if (registers.HasValue)
             {
                 state.update.registers_hash = registers.Value.hash;
-                Application.Current.Dispatcher.Invoke(() => RegisterView_Table.UpdateData(registers.Value.result));
+                Application.Current.Dispatcher.InvokeAsync(() => RegisterView_Table.UpdateData(registers.Value.result));
             }
-
-            state.update.registers = false;
         }
         void UpdateCacheView()
         {
+            state.update.cache = false;
+
             var caches = state.DeserializeResult<Cache[]>("cache", state.update.cache_hash);
 
             if (caches.HasValue)
             {
                 state.update.cache_hash = caches.Value.hash;
-                Application.Current.Dispatcher.Invoke(() => CacheView_Grid.UpdateData(caches.Value.result));
+                Application.Current.Dispatcher.InvokeAsync(() => CacheView_Grid.UpdateData(caches.Value.result));
             }
-            state.update.cache = false;
         }
         void UpdateMemoryView()
         {
+            state.update.memory = false;
+
             var page = state.DeserializeResult<Data.Page>($"page {state.page_id}", state.update.memory_hash);
 
             if (page.HasValue)
             {
                 state.update.memory_hash = page.Value.hash;
-                Application.Current.Dispatcher.Invoke(() =>
+                Application.Current.Dispatcher.InvokeAsync(() =>
                 {
                     MemoryView_Grid.UpdateData(page.Value.result, state.page_id);
                     MemoryView_PageID.Text = state.page_id.ToString();
                 });
             }
-
-            state.update.memory = false;
         }
         void UpdateDisassemblyView()
         {
+            state.update.disassembly = false;
+
             var rows = state.DeserializeResult<DisassembledWord[]>($"disasm {state.page_id}", state.update.disassembly_hash);
             var pc = state.DeserializeResult<PcOnlyRegisterStruct>("regs")?.result.pc
                 ?? throw new NullReferenceException();
@@ -578,18 +593,19 @@ namespace gui
             if (rows.HasValue)
             {
                 state.update.disassembly_hash = rows.Value.hash;
-                Application.Current.Dispatcher.Invoke(() =>
+                Application.Current.Dispatcher.InvokeAsync(() =>
                 {
-                    DisassemblyView_Grid.UpdateData(state.page_id, rows.Value.result);
+                    DisassemblyView_Grid.UpdateData(state.page_id, rows.Value.result, pc);
                     DisassemblyView_PageID.Text = state.page_id.ToString();
                 });
-            } else
+            }
+            else
                 Application.Current.Dispatcher.Invoke(() => DisassemblyView_Grid.PC = pc);
-
-            state.update.disassembly = false;
         }
         void UpdatePipelineView()
         {
+            state.update.pipeline = false;
+
             var pipe_stages =
                 state.DeserializeResult<Dictionary<string, Dictionary<string, object>>>("pipe", state.update.pipeline_hash);
 
@@ -600,7 +616,7 @@ namespace gui
 
                 state.update.pipeline_hash = pipe_stages.Value.hash;
 
-                Application.Current.Dispatcher.Invoke(() =>
+                Application.Current.Dispatcher.InvokeAsync(() =>
                 {
                     PipelineView.Fetch.UpdateData(pipe_stages.Value.result["fetch"]);
                     PipelineView.Decode.UpdateData(pipe_stages.Value.result["decode"]);
@@ -609,8 +625,6 @@ namespace gui
                     PipelineView.Writeback.UpdateData(pipe_stages.Value.result["writeback"]);
                 });
             }
-
-            state.update.pipeline = false;
         }
 
         void UpdateRootView()
@@ -619,33 +633,33 @@ namespace gui
                 return;
 
             if (state.update.overview)
-                ThreadPool.QueueUserWorkItem(_ => UpdateOverview());
+                Task.Run(UpdateOverview);
 
             switch (Tabs.SelectedIndex)
             {
                 case 1:
                     if (state.update.registers)
-                        ThreadPool.QueueUserWorkItem(_ => UpdateRegistersView());
+                        Task.Run(UpdateRegistersView);
                     break;
 
                 case 2:
                     if (state.update.cache)
-                        ThreadPool.QueueUserWorkItem(_ => UpdateCacheView());
+                        Task.Run(UpdateCacheView);
                     break;
 
                 case 3:
                     if (state.update.memory)
-                        ThreadPool.QueueUserWorkItem(_ => UpdateMemoryView());
+                        Task.Run(UpdateMemoryView);
                     break;
 
                 case 4:
                     if (state.update.disassembly)
-                        ThreadPool.QueueUserWorkItem(_ => UpdateDisassemblyView());
+                        Task.Run(UpdateDisassemblyView);
                     break;
 
                 case 5:
                     if (state.update.pipeline)
-                        ThreadPool.QueueUserWorkItem(_ => UpdatePipelineView());
+                        Task.Run(UpdatePipelineView);
                     break;
 
                 default:
@@ -674,11 +688,11 @@ namespace gui
             if (!state.IsRunning())
                 throw new InvalidOperationException("Backend process is not running");
 
-            state.Command("run");
-            // Await the ending of the simulation before refreshing
-            state.GetLine();
-
-            InvalidateView();
+            Task.Run(() =>
+            {
+                state.Run();
+                InvalidateView();
+            });
         }
 
         private void Tabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
