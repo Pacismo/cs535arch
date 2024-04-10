@@ -678,6 +678,18 @@ impl Serialize for Memory {
     }
 }
 
+macro_rules! stack_address {
+    ($a:ident + $o:literal) => {
+        libseis::pages::STACK_PAGE | ($a.wrapping_add($o) & 0xFFFF)
+    };
+    ($a:ident - $o:literal) => {
+        libseis::pages::STACK_PAGE | ($a.wrapping_sub($o) & 0xFFFF)
+    };
+    ($a:ident) => {
+        libseis::pages::STACK_PAGE | ($a & 0xFFFF)
+    };
+}
+
 impl PipelineStage for Memory {
     type Prev = ExecuteResult;
     type Next = MemoryResult;
@@ -761,7 +773,8 @@ impl PipelineStage for Memory {
                             }
                         }
                     },
-                    Pushing { value, sp, .. } => match memory.write_word(sp, value) {
+                    Pushing { value, sp, .. } => match memory.write_word(stack_address!(sp), value)
+                    {
                         MemStatus::Busy(clocks) => {
                             self.state = Pushing { value, sp, clocks };
                             clock.to_block()
@@ -787,7 +800,7 @@ impl PipelineStage for Memory {
                     },
                     Popping {
                         destination, sp, ..
-                    } => match memory.read_word(sp) {
+                    } => match memory.read_word(stack_address!(sp - 4)) {
                         Err(MemStatus::Busy(clocks)) => {
                             self.state = Popping {
                                 destination,
@@ -803,7 +816,7 @@ impl PipelineStage for Memory {
                                 self.forward = Some(MemoryResult::WriteReg2 {
                                     destination,
                                     value,
-                                    sp,
+                                    sp: sp.wrapping_sub(4),
                                     zf: value == 0,
                                     of: false,
                                     eps: false,
@@ -816,7 +829,7 @@ impl PipelineStage for Memory {
                                     result: MemoryResult::WriteReg2 {
                                         destination,
                                         value,
-                                        sp,
+                                        sp: sp.wrapping_sub(4),
                                         zf: value == 0,
                                         of: false,
                                         eps: false,
@@ -828,7 +841,7 @@ impl PipelineStage for Memory {
                             }
                         }
                     },
-                    DummyPop { sp, .. } => match memory.read_word(sp) {
+                    DummyPop { sp, .. } => match memory.read_word(stack_address!(sp - 4)) {
                         Ok(_) => {
                             if clock.is_ready() {
                                 self.state = Idle;
@@ -862,7 +875,7 @@ impl PipelineStage for Memory {
                         state,
                         ..
                     } => match state {
-                        WritingLp => match memory.write_word(sp, link) {
+                        WritingLp => match memory.write_word(stack_address!(sp), link) {
                             MemStatus::Idle => {
                                 self.state = JsrPrep {
                                     address,
@@ -888,14 +901,14 @@ impl PipelineStage for Memory {
                                 clock.to_block()
                             }
                         },
-                        WritingBp => match memory.write_word(sp, bp) {
+                        WritingBp => match memory.write_word(stack_address!(sp + 4), bp) {
                             MemStatus::Idle => {
                                 if clock.is_ready() {
                                     self.state = Idle;
                                     self.forward = Some(MemoryResult::JumpSubroutine {
                                         address,
                                         link,
-                                        sp,
+                                        sp: sp.wrapping_add(8),
                                         bp,
                                     });
                                     clock.to_ready()
@@ -904,7 +917,7 @@ impl PipelineStage for Memory {
                                         result: MemoryResult::JumpSubroutine {
                                             address,
                                             link,
-                                            sp,
+                                            sp: sp.wrapping_add(8),
                                             bp,
                                         },
                                     };
@@ -928,7 +941,7 @@ impl PipelineStage for Memory {
                     RetPrep {
                         link, bp, state, ..
                     } => match state {
-                        ReadingBp => match memory.read_word(bp.wrapping_sub(4)) {
+                        ReadingBp => match memory.read_word(stack_address!(bp - 4)) {
                             Ok(value) => {
                                 self.state = RetPrep {
                                     link,
@@ -949,7 +962,7 @@ impl PipelineStage for Memory {
                             }
                             Err(MemStatus::Idle) => unreachable!(),
                         },
-                        ReadingLp(bpval) => match memory.read_word(bp.wrapping_sub(8)) {
+                        ReadingLp(bpval) => match memory.read_word(stack_address!(bp - 8)) {
                             Ok(value) => {
                                 if clock.is_ready() {
                                     self.state = Idle;
