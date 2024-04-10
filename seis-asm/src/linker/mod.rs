@@ -18,12 +18,6 @@ use std::{
     mem::transmute,
 };
 
-macro_rules! byte_len {
-    ($container:ident) => {
-        ($container.len() * std::mem::size_of_val($container.first().unwrap()))
-    };
-}
-
 #[derive(Debug)]
 pub struct Page {
     data: [u8; PAGE_SIZE],
@@ -166,7 +160,7 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
                                         value: right,
                                         destination,
                                         location: 0,
-                                        zero: false,
+                                        zero: true,
                                     }),
                                     ip,
                                     span.clone(),
@@ -178,7 +172,7 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
                                             value: left,
                                             destination,
                                             location: 1,
-                                            zero: true,
+                                            zero: false,
                                         }),
                                         ip,
                                         span,
@@ -195,7 +189,7 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
                                         value: right,
                                         destination,
                                         location: 0,
-                                        zero: false,
+                                        zero: true,
                                     }),
                                     ip,
                                     span.clone(),
@@ -208,7 +202,7 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
                                             value: left,
                                             destination,
                                             location: 1,
-                                            zero: true,
+                                            zero: false,
                                         }),
                                         ip,
                                         span,
@@ -231,7 +225,7 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
                                             value: right,
                                             destination,
                                             location: 0,
-                                            zero: false,
+                                            zero: true,
                                         }),
                                         ip,
                                         span.clone(),
@@ -243,7 +237,7 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
                                                 value: left,
                                                 destination,
                                                 location: 1,
-                                                zero: true,
+                                                zero: false,
                                             }),
                                             ip,
                                             span,
@@ -271,7 +265,7 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
                     }
 
                     Instruction::Pop(StackOp::Registers(regs)) => {
-                        for reg in regs {
+                        for reg in regs.into_iter().rev() {
                             expanded.push_back((
                                 Instruction::Pop(StackOp::Register(reg)),
                                 ip,
@@ -321,47 +315,24 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
 
                 match content {
                     D::Byte(bytes) => {
-                        let len = byte_len!(bytes) as Word;
+                        ip += bytes.len() as Word;
                         data.push_back((bytes, ip, span));
-                        ip += len;
                     }
                     D::Short(shorts) => {
-                        let len = byte_len!(shorts) as Word;
-                        let bytes = shorts.into_iter().map(Short::to_be_bytes).fold(
-                            vec![],
-                            |mut acc, e| {
-                                acc.extend_from_slice(&e);
-                                acc
-                            },
-                        );
+                        let bytes: Vec<_> =
+                            shorts.into_iter().flat_map(Short::to_be_bytes).collect();
+                        ip += bytes.len() as Word;
                         data.push_back((bytes, ip, span));
-                        ip += len;
                     }
                     D::Word(words) => {
-                        let len = byte_len!(words) as Word;
-                        let bytes =
-                            words
-                                .into_iter()
-                                .map(Word::to_be_bytes)
-                                .fold(vec![], |mut acc, e| {
-                                    acc.extend_from_slice(&e);
-                                    acc
-                                });
+                        let bytes: Vec<_> = words.into_iter().flat_map(Word::to_be_bytes).collect();
+                        ip += bytes.len() as Word;
                         data.push_back((bytes, ip, span));
-                        ip += len;
                     }
                     D::Float(floats) => {
-                        let len = byte_len!(floats) as Word;
-                        let bytes =
-                            floats
-                                .into_iter()
-                                .map(f32::to_be_bytes)
-                                .fold(vec![], |mut acc, e| {
-                                    acc.extend_from_slice(&e);
-                                    acc
-                                });
+                        let bytes: Vec<_> = floats.into_iter().flat_map(f32::to_be_bytes).collect();
+                        ip += bytes.len() as Word;
                         data.push_back((bytes, ip, span));
-                        ip += len;
                     }
                     D::String(strings) => {
                         let mut bytes = vec![];
