@@ -61,6 +61,7 @@ impl PipelineStage for Writeback {
                 }
                 MemoryResult::WriteRegNoStatus { destination, value } => {
                     registers[destination] = value;
+                    locks[destination] -= 1;
                 }
                 MemoryResult::WriteReg1 {
                     destination: register,
