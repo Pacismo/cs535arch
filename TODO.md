@@ -9,5 +9,5 @@
   - [x] Implement the seis-sim crate
 - [x] Finish the graphical frontend
 - [ ] Write the benchmarks
-  - [ ] Matrix multiply
+  - [x] Matrix multiply
   - [ ] Exchange (insertion/bubble) sort

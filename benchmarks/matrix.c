@@ -44,7 +44,7 @@ int main()
         while (j < O) {
             //           [x,      y]
             //     result[i,      j] = dot_product(mat1, mat2, i, j)
-            RESULT_MATRIX[i + j * M] = dot_product(MATRIX_1, MATRIX_2, i, j);
+            RESULT_MATRIX[j + i * O] = dot_product(MATRIX_1, MATRIX_2, i, j);
 
             j = j + 1;
         }
