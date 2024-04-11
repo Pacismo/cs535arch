@@ -109,8 +109,11 @@ namespace gui
         public Process? backend_process = null;
         Task? run_task;
         public uint page_id = 0;
+        uint max_page = 65535;
         public ViewUpdateFlags update = new();
         public Configuration running_config = new();
+
+        public uint MaxPage { get { return max_page; } }
 
         public void Start(string binary_file, Configuration config)
         {
@@ -119,11 +122,17 @@ namespace gui
             string[] args = ["config.toml", binary_file, "-b"];
             backend_process = Process.Start(new ProcessStartInfo(SEIS_SIM_BIN_PATH, args)
             {
-                RedirectStandardError = true,
                 RedirectStandardInput = true,
                 RedirectStandardOutput = true,
                 CreateNoWindow = true,
+                ErrorDialog = true,
             });
+            
+            lock(proc_mtx)
+            {
+                Dictionary<string, uint> dict = DeserializeResult<Dictionary<string, uint>>("info pages")?.result!;
+                max_page = dict["page_count"];
+            }
         }
 
         public bool IsRunning() => backend_process != null;
@@ -611,7 +620,7 @@ namespace gui
                 Application.Current.Dispatcher.InvokeAsync(() =>
                 {
                     MemoryView_Grid.UpdateData(page.Value.result, state.page_id);
-                    MemoryView_PageID.Text = state.page_id.ToString();
+                    MemoryView_PageID.Content = state.page_id.ToString();
                 });
             }
         }
@@ -629,7 +638,7 @@ namespace gui
                 Application.Current.Dispatcher.InvokeAsync(() =>
                 {
                     DisassemblyView_Grid.UpdateData(state.page_id, rows.Value.result, pc);
-                    DisassemblyView_PageID.Text = state.page_id.ToString();
+                    DisassemblyView_PageID.Content = state.page_id.ToString();
                 });
             }
             else
@@ -756,7 +765,7 @@ namespace gui
         {
             if (!state.IsRunning())
                 throw new InvalidOperationException("Backend process is not running");
-            if (state.page_id < ushort.MaxValue)
+            if (state.page_id < state.MaxPage - 1)
             {
                 state.page_id += 1;
                 state.update.memory = true;
@@ -770,6 +779,23 @@ namespace gui
         private void About_Click(object sender, RoutedEventArgs e)
         {
             new About().ShowDialog();
+        }
+
+        private void MemoryView_PageID_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            PageSelector selector = new(state.page_id, state.MaxPage);
+            selector.ShowDialog();
+
+            uint? pid = selector.GetPageID();
+            if (pid.HasValue && pid.Value != state.page_id)
+            {
+                state.page_id = pid.Value;
+                state.update.memory = true;
+                state.update.memory_hash = null;
+                state.update.disassembly = false;
+                state.update.disassembly_hash = null;
+                UpdateRootView();
+            }
         }
     }
 }

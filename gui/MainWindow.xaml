@@ -12,7 +12,8 @@
         SnapsToDevicePixels="True"
         Icon="pack://application:,,,/Resources/AppIcon.ico">
     <Window.InputBindings>
-        <KeyBinding Key="C" Command="{x:Static local:MainWindow.ClockCommand}" Modifiers="Alt"/>
+        <KeyBinding Key="Space" 
+                    Command="{x:Static local:MainWindow.ClockCommand}" />
     </Window.InputBindings>
     <Window.CommandBindings>
         <CommandBinding Command="{x:Static local:MainWindow.ClockCommand}" 
@@ -87,7 +88,13 @@
                 <Grid>
                     <Menu Height="25" HorizontalAlignment="Center" Background="{x:Null}" VerticalAlignment="Bottom">
                         <Button Content="◀️" Width="20" Click="MemoryView_Previous_Click"/>
-                        <TextBlock Name="MemoryView_PageID" Text="0" TextAlignment="Center" VerticalAlignment="Center" Width="20"/>
+                        <Label Name="MemoryView_PageID" 
+                               Content="0" 
+                               VerticalContentAlignment="Center" 
+                               HorizontalContentAlignment="Center" 
+                               VerticalAlignment="Center" 
+                               MinWidth="20" Height="30"
+                               MouseDoubleClick="MemoryView_PageID_MouseDoubleClick" />
                         <Button Content="▶️" Width="20" Click="MemoryView_Next_Click"/>
                     </Menu>
                     <controls:MemoryView x:Name="MemoryView_Grid" Margin="0,0,0,30"/>
@@ -97,7 +104,13 @@
                 <Grid>
                     <Menu Height="25" HorizontalAlignment="Center" Background="{x:Null}" VerticalAlignment="Bottom">
                         <Button Content="◀️" Width="20" Click="MemoryView_Previous_Click"/>
-                        <TextBlock Name="DisassemblyView_PageID" Text="0" TextAlignment="Center" VerticalAlignment="Center" Width="20"/>
+                        <Label Name="DisassemblyView_PageID" 
+                               Content="0" 
+                               VerticalContentAlignment="Center" 
+                               HorizontalContentAlignment="Center" 
+                               VerticalAlignment="Center" 
+                               MinWidth="20" Height="30"
+                               MouseDoubleClick="MemoryView_PageID_MouseDoubleClick" />
                         <Button Content="▶️" Width="20" Click="MemoryView_Next_Click"/>
                     </Menu>
                     <controls:DisassemblyView x:Name="DisassemblyView_Grid" Margin="0,0,0,30"/>
