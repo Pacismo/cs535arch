@@ -28,7 +28,7 @@ macro_rules! parse_integer {
 /// The value passed must be any one of [`Rule::oct`], [`Rule::dec`], or [`Rule::hex`].
 ///
 /// Converts the integer into a base-10 representation.
-fn convert_base(pair: Pair<'_, Rule>) -> Result<String, ErrorSource> {
+fn convert_base(pair: Pair<Rule>) -> Result<String, ErrorSource> {
     let str = pair.as_str();
     let sign = if str.starts_with('-') {
         Some(true)
@@ -61,7 +61,7 @@ fn convert_base(pair: Pair<'_, Rule>) -> Result<String, ErrorSource> {
     }
 }
 
-fn tokenize_data_block(mut pair: Pairs<'_, Rule>) -> Result<Data, ErrorSource> {
+fn tokenize_data_block(mut pair: Pairs<Rule>) -> Result<Data, ErrorSource> {
     match pair.next().unwrap().as_str().to_lowercase().as_str() {
         "byte" => pair
             .map(|b| match b.as_rule() {
@@ -133,7 +133,7 @@ fn tokenize_data_block(mut pair: Pairs<'_, Rule>) -> Result<Data, ErrorSource> {
     }
 }
 
-fn tokenize_constant(mut pair: Pairs<'_, Rule>) -> Result<Constant, ErrorSource> {
+fn tokenize_constant(mut pair: Pairs<Rule>) -> Result<Constant, ErrorSource> {
     use lines::ConstantValue::*;
 
     let name = pair.next().unwrap().into_inner().next().unwrap().as_str();
@@ -152,7 +152,7 @@ fn tokenize_constant(mut pair: Pairs<'_, Rule>) -> Result<Constant, ErrorSource>
     })
 }
 
-fn tokenize_directive(mut pair: Pairs<'_, Rule>) -> Result<Directive, ErrorSource> {
+fn tokenize_directive(mut pair: Pairs<Rule>) -> Result<Directive, ErrorSource> {
     let ident = pair.next().unwrap();
     let value = pair.next();
 
@@ -183,7 +183,7 @@ fn tokenize_directive(mut pair: Pairs<'_, Rule>) -> Result<Directive, ErrorSourc
     }
 }
 
-fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorSource> {
+fn tokenize_instruction(mut pair: Pairs<Rule>) -> Result<Instruction, ErrorSource> {
     let instruction = pair.next().unwrap();
 
     match instruction.as_rule() {
@@ -784,6 +784,47 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
     }
 }
 
+fn tokenize_randomized_data_block(mut pair: Pairs<Rule>) -> Result<RandomData, ErrorSource> {
+    let r#type = pair.next().unwrap();
+    let lower = pair.next().unwrap();
+    let upper = pair.next().unwrap();
+    let count = pair.next().unwrap();
+    let seed = if let Some(pair) = pair.next() {
+        Some(parse_integer!(pair))
+    } else {
+        None
+    };
+
+    match r#type.as_str().to_lowercase().as_str() {
+        "byte" => Ok(RandomData::Byte(
+            parse_integer!(lower),
+            parse_integer!(upper),
+            parse_integer!(count),
+            seed,
+        )),
+        "short" => Ok(RandomData::Short(
+            parse_integer!(lower),
+            parse_integer!(upper),
+            parse_integer!(count),
+            seed,
+        )),
+        "word" => Ok(RandomData::Word(
+            parse_integer!(lower),
+            parse_integer!(upper),
+            parse_integer!(count),
+            seed,
+        )),
+        "float" => Ok(RandomData::Float(
+            lower.as_str().parse().unwrap(),
+            upper.as_str().parse().unwrap(),
+            parse_integer!(count),
+            seed,
+        )),
+
+        _ => unreachable!(),
+    }
+}
+
 fn tokenize_line(line: Pair<'_, Rule>, span: Span) -> Result<Option<LineType>, ErrorSource> {
     use LineType::*;
 
@@ -796,6 +837,7 @@ fn tokenize_line(line: Pair<'_, Rule>, span: Span) -> Result<Option<LineType>, E
             span,
         )),
         Rule::datablock => Some(Data(tokenize_data_block(line.into_inner())?, span)),
+        Rule::randatablock => Some(RandomData(tokenize_randomized_data_block(line.into_inner())?, span)),
 
         Rule::EOI => None,
         _ => unreachable!("{line:#?}"),

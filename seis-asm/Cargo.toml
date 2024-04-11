@@ -17,3 +17,6 @@ version = "2.7.7"
 
 [dependencies.pest_derive]
 version = "2.7.7"
+
+[dependencies.rand]
+version = "0.8.5"

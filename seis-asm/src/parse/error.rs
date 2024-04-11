@@ -174,6 +174,7 @@ impl Display for ErrorSource {
                     AsmRule::part => "short index".into(),
                     AsmRule::assign => "arrow (=> or ->) or comma".into(),
                     AsmRule::volassign => "super arrow (=>> or ->>)".into(),
+                    AsmRule::randatablock => "randomized data block".into(),
                 });
 
                 write!(f, "{renamed}")

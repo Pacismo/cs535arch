@@ -369,6 +369,63 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
                 }
             }
 
+            T::RandomData(content, span) => {
+                use crate::parse::RandomData as D;
+                use rand::distributions::{Distribution, Uniform};
+                use rand::{random, rngs::StdRng, SeedableRng};
+
+                match content {
+                    D::Byte(low, high, count, seed) => {
+                        let rng = StdRng::seed_from_u64(seed.unwrap_or_else(random));
+                        let dist = Uniform::new_inclusive(low, high);
+
+                        let bytes = dist.sample_iter(rng).take(count).collect::<Vec<u8>>();
+
+                        let len = bytes.len() as Word;
+                        data.push_back((bytes, ip, span));
+                        ip += len;
+                    }
+                    D::Short(low, high, count, seed) => {
+                        let rng = StdRng::seed_from_u64(seed.unwrap_or_else(random));
+                        let dist = Uniform::new_inclusive(low, high);
+
+                        let bytes: Vec<_> = dist
+                            .sample_iter(rng)
+                            .take(count)
+                            .flat_map(Short::to_be_bytes)
+                            .collect();
+                        let len = bytes.len() as Word;
+                        data.push_back((bytes, ip, span));
+                        ip += len;
+                    }
+                    D::Word(low, high, count, seed) => {
+                        let rng = StdRng::seed_from_u64(seed.unwrap_or_else(random));
+                        let dist = Uniform::new_inclusive(low, high);
+
+                        let bytes: Vec<_> = dist
+                            .sample_iter(rng)
+                            .take(count)
+                            .flat_map(Word::to_be_bytes)
+                            .collect();
+                        let len = bytes.len() as Word;
+                        data.push_back((bytes, ip, span));
+                        ip += len;
+                    }
+                    D::Float(low, high, count, seed) => {
+                        let rng = StdRng::seed_from_u64(seed.unwrap_or_else(random));
+                        let dist = Uniform::new_inclusive(low, high);
+
+                        let bytes: Vec<_> = dist
+                            .sample_iter(rng)
+                            .take(count)
+                            .flat_map(f32::to_be_bytes)
+                            .collect();
+                        let len = bytes.len() as Word;
+                        data.push_back((bytes, ip, span));
+                        ip += len;
+                    }
+                }
+            }
             _ => unreachable!("constants are all removed from the list"),
         }
     }

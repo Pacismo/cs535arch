@@ -4,10 +4,14 @@ comment = _{ ("//" | ";") ~ (!NEWLINE ~ ANY)* }
 
 program = _{ SOI ~ (line? ~ comment?) ~ (NEWLINE ~ line? ~ comment?)* ~ EOI }
 
-line = _{ constant | instruction | directive | label | datablock }
+line = _{ constant | instruction | directive | label | datablock | randatablock }
 
 datablock = @{
     "#" ~ datatype ~ "!" ~ WHITESPACE* ~ "{" ~ NEWLINE* ~ WHITESPACE* ~ (float | integer | string) ~ (NEWLINE* ~ WHITESPACE* ~ "," ~ NEWLINE* ~ WHITESPACE* ~ (float | integer | string))* ~ NEWLINE* ~ WHITESPACE* ~ ","? ~ WHITESPACE* ~ NEWLINE* ~ "}"
+}
+
+randatablock = @{
+    "#" ~ datatype ~ "?" ~ WHITE_SPACE* ~ "[" ~ (float | integer) ~ "," ~ WHITE_SPACE* ~ (float | integer) ~ ";" ~ WHITE_SPACE* ~ integer ~ (WHITE_SPACE* ~ "%" ~ integer)? ~ "]"
 }
 
 datatype = ${ ^"string" | type | ^"float" }

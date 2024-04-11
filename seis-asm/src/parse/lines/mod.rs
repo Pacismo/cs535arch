@@ -3,7 +3,7 @@ mod float;
 mod integer;
 mod register;
 
-pub use data::Data;
+pub use data::*;
 pub use float::*;
 pub use integer::*;
 use libseis::types::{Register, SWord, Word};
@@ -107,6 +107,7 @@ pub enum LineType {
     Directive(Directive, Span),
     Label(String, Span),
     Data(Data, Span),
+    RandomData(RandomData, Span),
 }
 
 #[derive(Debug)]
