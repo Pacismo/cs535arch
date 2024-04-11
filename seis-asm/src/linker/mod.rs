@@ -315,24 +315,28 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
 
                 match content {
                     D::Byte(bytes) => {
-                        ip += bytes.len() as Word;
+                        let len = bytes.len() as Word;
                         data.push_back((bytes, ip, span));
+                        ip += len;
                     }
                     D::Short(shorts) => {
                         let bytes: Vec<_> =
                             shorts.into_iter().flat_map(Short::to_be_bytes).collect();
-                        ip += bytes.len() as Word;
+                        let len = bytes.len() as Word;
                         data.push_back((bytes, ip, span));
+                        ip += len;
                     }
                     D::Word(words) => {
                         let bytes: Vec<_> = words.into_iter().flat_map(Word::to_be_bytes).collect();
-                        ip += bytes.len() as Word;
+                        let len = bytes.len() as Word;
                         data.push_back((bytes, ip, span));
+                        ip += len;
                     }
                     D::Float(floats) => {
                         let bytes: Vec<_> = floats.into_iter().flat_map(f32::to_be_bytes).collect();
-                        ip += bytes.len() as Word;
+                        let len = bytes.len() as Word;
                         data.push_back((bytes, ip, span));
+                        ip += len;
                     }
                     D::String(strings) => {
                         let mut bytes = vec![];
@@ -1128,7 +1132,7 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
     // MARK: transform into a page set
 
     for (data, address, span) in data {
-        if pages.page_of(address).len > address & 0x0000_FFFF {
+        if pages.page_of(address).len > (address & 0x0000_FFFF) {
             println!("At {span}:\nBy writing to address {address:#x}, you may potentially be overwriting code or data. It is recommended that you move the code or data elsewhere.")
         }
 
