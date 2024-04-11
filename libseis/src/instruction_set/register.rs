@@ -50,7 +50,7 @@ impl Decode for ImmOp {
         use ImmOp::*;
 
         if word & Self::ZPG_TRANSLATE == 0 {
-            let zero = (word & Self::ZERO_FLAG) == 0;
+            let zero = (word & Self::ZERO_FLAG) != 0;
             let destination = (word & Self::DEST_REG_MASK) as Register;
             let immediate = ((word & Self::IMM_MASK) >> Self::IMM_SHIFT) as Short;
             let shift = ((word & Self::IMM_BSHIFT_MASK) >> Self::IMM_BSHIFT_SHIFT) as Byte;
@@ -85,9 +85,9 @@ impl Encode for ImmOp {
                 destination,
             } => {
                 let zero = if zero { Self::ZERO_FLAG } else { 0 };
-                let destination = destination as Word;
-                let immediate = (immediate as Word) << Self::IMM_SHIFT;
-                let shift = (shift as Word) << Self::IMM_BSHIFT_SHIFT;
+                let destination = (destination as Word) & Self::DEST_REG_MASK;
+                let immediate = (immediate as Word) << Self::IMM_SHIFT & Self::IMM_MASK;
+                let shift = (shift as Word) << Self::IMM_BSHIFT_SHIFT & Self::IMM_BSHIFT_MASK;
 
                 zero | destination | immediate | shift
             }
@@ -96,7 +96,7 @@ impl Encode for ImmOp {
                 destination,
             } => {
                 let address = (address as Word) << Self::IMM_SHIFT;
-                let destination = destination as Word;
+                let destination = destination as Word & Self::DEST_REG_MASK;
 
                 address | destination
             }
@@ -458,7 +458,7 @@ impl ReadOp {
     const ADDRESS_REG_MASK: Word = 0b0000_0000_0000_0000_0000_0000_1111_0000;
     const ADDRESS_REG_SHIFT: Word = 4;
     const INDEX_REG_MASK: Word = 0b0000_0000_0000_0000_0000_1111_0000_0000;
-    const INDEX_REG_SHIFT: Word = 12;
+    const INDEX_REG_SHIFT: Word = 8;
     const OFFSET_MASK: Word = 0b0000_0000_0000_1111_1111_1111_0000_0000;
     const OFFSET_SHIFT: Word = 8;
 
