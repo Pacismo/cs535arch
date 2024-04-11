@@ -941,7 +941,7 @@ impl PipelineStage for Memory {
                     RetPrep {
                         link, bp, state, ..
                     } => match state {
-                        ReadingBp => match memory.read_word(stack_address!(bp - 4)) {
+                        ReadingBp => match memory.read_word(stack_address!(bp + 8)) {
                             Ok(value) => {
                                 self.state = RetPrep {
                                     link,
@@ -962,14 +962,14 @@ impl PipelineStage for Memory {
                             }
                             Err(MemStatus::Idle) => unreachable!(),
                         },
-                        ReadingLp(bpval) => match memory.read_word(stack_address!(bp - 8)) {
+                        ReadingLp(bpval) => match memory.read_word(stack_address!(bp + 4)) {
                             Ok(value) => {
                                 if clock.is_ready() {
                                     self.state = Idle;
                                     self.forward = Some(MemoryResult::Return {
                                         address: link,
                                         bp: bpval,
-                                        sp: bp.wrapping_sub(8),
+                                        sp: bp,
                                         lp: value,
                                     });
                                     clock.to_ready()
@@ -978,7 +978,7 @@ impl PipelineStage for Memory {
                                         result: MemoryResult::Return {
                                             address: link,
                                             bp: bpval,
-                                            sp: bp.wrapping_sub(8),
+                                            sp: bp,
                                             lp: value,
                                         },
                                     };
