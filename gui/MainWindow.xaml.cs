@@ -118,8 +118,8 @@ namespace gui
         public void Start(string binary_file, Configuration config)
         {
             running_config = config;
-            File.WriteAllText("config.toml", Toml.FromModel(config.IntoToml()));
-            string[] args = ["config.toml", binary_file, "-b"];
+            File.WriteAllText(MainWindow.CONFIG_FILE(), Toml.FromModel(config.IntoToml()));
+            string[] args = [MainWindow.CONFIG_FILE(), binary_file, "-b"];
             backend_process = Process.Start(new ProcessStartInfo(SEIS_SIM_BIN_PATH, args)
             {
                 RedirectStandardInput = true,
@@ -127,7 +127,7 @@ namespace gui
                 CreateNoWindow = true,
                 ErrorDialog = true,
             });
-            
+
             lock(proc_mtx)
             {
                 Dictionary<string, uint> dict = DeserializeResult<Dictionary<string, uint>>("info pages")?.result!;
@@ -217,6 +217,8 @@ namespace gui
     /// </summary>
     public partial class MainWindow : Window
     {
+        public static string CONFIG_FILE() => Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) + "/config.toml";
+
         public static RoutedCommand ClockCommand = new();
 
         string binary_file = "";
@@ -274,15 +276,15 @@ namespace gui
                         new OkDialog("Error Reading Configuration", $"There was a problem loading the configuration from {cli[1]}\n{x}").ShowDialog();
                     }
 
-            if (!File.Exists("config.toml"))
+            if (!File.Exists(CONFIG_FILE()))
                 try
                 {
-                    string[] args = ["-e", "config.toml"];
+                    string[] args = ["-e", CONFIG_FILE()];
                     Process proc = Process.Start(SimulationState.SEIS_SIM_BIN_PATH, args);
                     proc.WaitForExit();
                 }
                 catch { }
-            LoadConfigurationFrom("config.toml");
+            LoadConfigurationFrom(CONFIG_FILE());
         }
 
         private void Window_Closed(object sender, EventArgs e)
@@ -291,7 +293,7 @@ namespace gui
             if (ValidateConfiguration())
                 try
                 {
-                    File.WriteAllText("config.toml", Toml.FromModel(GetConfiguration().IntoToml()));
+                    File.WriteAllText(CONFIG_FILE(), Toml.FromModel(GetConfiguration().IntoToml()));
                 }
                 catch (Exception ex)
                 {
