@@ -17,7 +17,8 @@
                Margin="10,0,0,10"/>
         <TextBlock Margin="10,10,10,35" TextWrapping="Wrap">
             This is a graphical frontend for the SEIS simulation software providing details about the 
-            runtime in a user-friendly way.<LineBreak/>
+            runtime in a user-friendly way.<LineBreak /><LineBreak />
+            Pressing [Space] will clock the simulation.
         </TextBlock>
         <TextBlock Margin="35,0,0,12" VerticalAlignment="Bottom" HorizontalAlignment="Left">
             ©2024 Francisco Santana-Pardo
