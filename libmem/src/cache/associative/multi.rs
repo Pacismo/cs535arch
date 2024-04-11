@@ -468,6 +468,7 @@ impl Cache for MultiAssociative {
         let off_bits = self.off_bits;
 
         let (tag, set, _) = self.split_address(address);
+        let address = self.construct_address(tag, set as Word, 0);
         let line_len = self.line_len();
 
         let sets = self.set_mut(set);

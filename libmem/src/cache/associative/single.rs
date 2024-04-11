@@ -264,6 +264,7 @@ impl Cache for Associative {
         }
 
         let (tag, set, _) = self.split_address(address);
+        let address = self.construct_address(tag, set as Word, 0);
 
         // Flush a previously-existing line if it is dirty. Otherwise, purge its contents.
         if let Some(mut line) = take(&mut self.sets[set]) {
