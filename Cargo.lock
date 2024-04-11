@@ -655,6 +655,7 @@ dependencies = [
  "libseis",
  "pest",
  "pest_derive",
+ "rand",
 ]
 
 [[package]]
