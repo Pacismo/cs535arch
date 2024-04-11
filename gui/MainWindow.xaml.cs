@@ -217,7 +217,7 @@ namespace gui
     /// </summary>
     public partial class MainWindow : Window
     {
-        public static string CONFIG_FILE() => Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) + "/config.toml";
+        public static string CONFIG_FILE() => Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) + "/seis-sim-gui/config.toml";
 
         public static RoutedCommand ClockCommand = new();
 
