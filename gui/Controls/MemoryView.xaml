@@ -12,10 +12,9 @@
               IsReadOnly="True"
               CanUserAddRows="False" CanUserDeleteRows="False" 
               CanUserResizeRows="False" CanUserReorderColumns="False" 
-              CanUserResizeColumns="False" CanUserSortColumns="False"
-              SelectionMode="Single" SelectionUnit="Cell"
+              CanUserResizeColumns="False" CanUserSortColumns="False" 
+              SelectionUnit="Cell"
               ColumnWidth="Auto"
               FontFamily="Consolas" FontSize="12" 
-              FrozenColumnCount="1">
-    </DataGrid>
+              FrozenColumnCount="1"/>
 </UserControl>
