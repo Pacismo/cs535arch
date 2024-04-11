@@ -694,6 +694,7 @@ fn tokenize_instruction(mut pair: Pairs<'_, Rule>) -> Result<Instruction, ErrorS
 
             let mut inner = instruction.into_inner();
             let source = registers::get_id(inner.next().unwrap().as_str()).unwrap();
+            inner.next();
             let destination = registers::get_id(inner.next().unwrap().as_str()).unwrap();
 
             Ok(Tfr(source, destination))
