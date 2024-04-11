@@ -107,7 +107,7 @@ namespace gui.Controls
             Data.Columns.Add(new DataGridTextColumn() { Header = "Dirty", Binding = new Binding("Dirty") });
 
             for (int i = 0; i < line_width; ++i)
-                Data.Columns.Add(new DataGridTextColumn() { Binding = new Binding($"Data[{i}]") });
+                Data.Columns.Add(new DataGridTextColumn() { Header = $"{i:X2}", Binding = new Binding($"Data[{i}]") });
         }
 
         void ShowCache(string cache_name)
