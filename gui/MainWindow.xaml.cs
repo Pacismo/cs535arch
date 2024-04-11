@@ -103,7 +103,7 @@ namespace gui
 
     class SimulationState()
     {
-        public const string SEIS_SIM_BIN_PATH = "./bin/seis-sim";
+        public const string SEIS_SIM_BIN_PATH = "bin/seis-sim";
 
         public Mutex proc_mtx = new();
         public Process? backend_process = null;
@@ -174,7 +174,7 @@ namespace gui
                 return null;
         }
 
-       void run_proc()
+        void run_proc()
         {
             lock (proc_mtx!)
             {
@@ -250,6 +250,20 @@ namespace gui
             Clock.IsEnabled = false;
             Run.IsEnabled = false;
             Overview.Visibility = Visibility.Hidden;
+
+            var cli = Environment.GetCommandLineArgs();
+            if (cli?.Length > 1)
+                if (!File.Exists(cli[1]))
+                    new OkDialog("Error Reading Configuration", $"Configuration file {cli[1]} does not exist").ShowDialog();
+                else try
+                    {
+                        LoadConfigurationFrom(cli[1]);
+                        return;
+                    }
+                    catch (Exception x)
+                    {
+                        new OkDialog("Error Reading Configuration", $"There was a problem loading the configuration from {cli[1]}\n{x}").ShowDialog();
+                    }
 
             if (!File.Exists("config.toml"))
                 try
