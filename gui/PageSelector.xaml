@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:gui"
         mc:Ignorable="d"
-        Title="PageSelector" Height="110" Width="300"
+        Title="Page Selector" Height="110" Width="300"
         ResizeMode="NoResize"
         ShowInTaskbar="False">
     <Window.InputBindings>
