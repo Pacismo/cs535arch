@@ -244,17 +244,17 @@ impl MemoryModule for SingleLevel {
                 let mut penalty = self.read_miss_penalty;
                 if addr % 4 != 0 {
                     penalty += 1;
-                }
-                match self.data_cache.check_address(addr + 1) {
-                    cache::Status::Conflict => {
-                        self.conflict();
-                        penalty += self.read_miss_penalty;
+                    match self.data_cache.check_address(addr + 1) {
+                        cache::Status::Conflict => {
+                            self.conflict();
+                            penalty += self.read_miss_penalty;
+                        }
+                        cache::Status::Cold => {
+                            self.cold();
+                            penalty += self.read_miss_penalty;
+                        }
+                        _ => (),
                     }
-                    cache::Status::Cold => {
-                        self.cold();
-                        penalty += self.read_miss_penalty;
-                    }
-                    _ => (),
                 }
 
                 Err(self.set_if_idle(ReadShort(addr), penalty))
@@ -264,17 +264,17 @@ impl MemoryModule for SingleLevel {
                 let mut penalty = self.read_miss_penalty;
                 if addr % 4 != 0 {
                     penalty += 1;
-                }
-                match self.data_cache.check_address(addr + 1) {
-                    cache::Status::Conflict => {
-                        self.conflict();
-                        penalty += self.read_miss_penalty;
+                    match self.data_cache.check_address(addr + 1) {
+                        cache::Status::Conflict => {
+                            self.conflict();
+                            penalty += self.read_miss_penalty;
+                        }
+                        cache::Status::Cold => {
+                            self.cold();
+                            penalty += self.read_miss_penalty;
+                        }
+                        _ => (),
                     }
-                    cache::Status::Cold => {
-                        self.cold();
-                        penalty += self.read_miss_penalty;
-                    }
-                    _ => (),
                 }
 
                 Err(self.set_if_idle(ReadShort(addr), penalty))
@@ -312,17 +312,17 @@ impl MemoryModule for SingleLevel {
                 let mut penalty = self.read_miss_penalty;
                 if addr % 4 != 0 {
                     penalty += 1;
-                }
-                match self.data_cache.check_address(addr + 3) {
-                    cache::Status::Conflict => {
-                        self.conflict();
-                        penalty += self.read_miss_penalty;
+                    match self.data_cache.check_address(addr + 3) {
+                        cache::Status::Conflict => {
+                            self.conflict();
+                            penalty += self.read_miss_penalty;
+                        }
+                        cache::Status::Cold => {
+                            self.cold();
+                            penalty += self.read_miss_penalty;
+                        }
+                        _ => (),
                     }
-                    cache::Status::Cold => {
-                        self.cold();
-                        penalty += self.read_miss_penalty;
-                    }
-                    _ => (),
                 }
 
                 Err(self.set_if_idle(ReadWord(addr), penalty))
@@ -333,17 +333,17 @@ impl MemoryModule for SingleLevel {
                 let mut penalty = self.read_miss_penalty;
                 if addr % 4 != 0 {
                     penalty += 1;
-                }
-                match self.data_cache.check_address(addr + 3) {
-                    cache::Status::Conflict => {
-                        self.conflict();
-                        penalty += self.read_miss_penalty;
+                    match self.data_cache.check_address(addr + 3) {
+                        cache::Status::Conflict => {
+                            self.conflict();
+                            penalty += self.read_miss_penalty;
+                        }
+                        cache::Status::Cold => {
+                            self.cold();
+                            penalty += self.read_miss_penalty;
+                        }
+                        _ => (),
                     }
-                    cache::Status::Cold => {
-                        self.cold();
-                        penalty += self.read_miss_penalty;
-                    }
-                    _ => (),
                 }
 
                 Err(self.set_if_idle(ReadWord(addr), penalty))
@@ -500,17 +500,17 @@ impl MemoryModule for SingleLevel {
                     let mut penalty = self.write_miss_penalty;
                     if addr % 2 != 0 {
                         penalty += 1;
-                    }
-                    match self.data_cache.check_address(addr + 1) {
-                        cache::Status::Conflict => {
-                            self.conflict();
-                            penalty = self.write_miss_penalty;
+                        match self.data_cache.check_address(addr + 1) {
+                            cache::Status::Conflict => {
+                                self.conflict();
+                                penalty = self.write_miss_penalty;
+                            }
+                            cache::Status::Cold => {
+                                self.cold();
+                                penalty = self.write_miss_penalty;
+                            }
+                            _ => (),
                         }
-                        cache::Status::Cold => {
-                            self.cold();
-                            penalty = self.write_miss_penalty;
-                        }
-                        _ => (),
                     }
 
                     if !self.current_transaction.is_busy() {
@@ -525,17 +525,17 @@ impl MemoryModule for SingleLevel {
                     let mut penalty = self.write_miss_penalty;
                     if addr % 2 != 0 {
                         penalty += 1;
-                    }
-                    match self.data_cache.check_address(addr + 1) {
-                        cache::Status::Conflict => {
-                            self.conflict();
-                            penalty = self.write_miss_penalty;
+                        match self.data_cache.check_address(addr + 1) {
+                            cache::Status::Conflict => {
+                                self.conflict();
+                                penalty = self.write_miss_penalty;
+                            }
+                            cache::Status::Cold => {
+                                self.cold();
+                                penalty = self.write_miss_penalty;
+                            }
+                            _ => (),
                         }
-                        cache::Status::Cold => {
-                            self.cold();
-                            penalty = self.write_miss_penalty;
-                        }
-                        _ => (),
                     }
 
                     if !self.current_transaction.is_busy() {
@@ -580,17 +580,18 @@ impl MemoryModule for SingleLevel {
                     let mut penalty = self.write_miss_penalty;
                     if addr % 4 != 0 {
                         penalty += 1;
-                    }
-                    match self.data_cache.check_address(addr + 3) {
-                        cache::Status::Conflict => {
-                            self.conflict();
-                            penalty = self.write_miss_penalty;
+
+                        match self.data_cache.check_address(addr + 3) {
+                            cache::Status::Conflict => {
+                                self.conflict();
+                                penalty = self.write_miss_penalty;
+                            }
+                            cache::Status::Cold => {
+                                self.cold();
+                                penalty = self.write_miss_penalty;
+                            }
+                            _ => (),
                         }
-                        cache::Status::Cold => {
-                            self.cold();
-                            penalty = self.write_miss_penalty;
-                        }
-                        _ => (),
                     }
 
                     if !self.current_transaction.is_busy() {
@@ -605,17 +606,17 @@ impl MemoryModule for SingleLevel {
                     let mut penalty = self.write_miss_penalty;
                     if addr % 4 != 0 {
                         penalty += 1;
-                    }
-                    match self.data_cache.check_address(addr + 3) {
-                        cache::Status::Conflict => {
-                            self.conflict();
-                            penalty = self.write_miss_penalty;
+                        match self.data_cache.check_address(addr + 3) {
+                            cache::Status::Conflict => {
+                                self.conflict();
+                                penalty = self.write_miss_penalty;
+                            }
+                            cache::Status::Cold => {
+                                self.cold();
+                                penalty = self.write_miss_penalty;
+                            }
+                            _ => (),
                         }
-                        cache::Status::Cold => {
-                            self.cold();
-                            penalty = self.write_miss_penalty;
-                        }
-                        _ => (),
                     }
 
                     if !self.current_transaction.is_busy() {
