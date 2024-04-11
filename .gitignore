@@ -1,4 +1,6 @@
 /target
+/benchmarks/*.exe
+/benchmarks/*.bin
 
 *.bin
 
