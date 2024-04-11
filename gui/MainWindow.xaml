@@ -43,7 +43,7 @@
             </MenuItem>
         </Menu>
 
-        <TabControl Name="Tabs" Margin="0,20,0,30" SelectionChanged="Tabs_SelectionChanged">
+        <TabControl Name="Tabs" Margin="0,20,0,52" SelectionChanged="Tabs_SelectionChanged">
             <TabItem Name="Tabs_Config" Header="Configuration">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Name="Tabs_Config_Content">
@@ -120,6 +120,6 @@
                 <controls:PipelineView x:Name="PipelineView"/>
             </TabItem>
         </TabControl>
-        <controls:Overview x:Name="Overview" Height="30" VerticalAlignment="Bottom" HorizontalAlignment="Center"/>
+        <controls:Overview x:Name="Overview" VerticalAlignment="Bottom" HorizontalContentAlignment="Center"/>
     </Grid>
 </Window>
