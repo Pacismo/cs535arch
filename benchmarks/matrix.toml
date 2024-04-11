@@ -1,7 +1,7 @@
 miss_penalty = 1
 pipelining = false
 volatile_penalty = 1
-writethrough = false
+writethrough = true
 
 [cache.data]
 mode = "associative"

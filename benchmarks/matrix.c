@@ -1,3 +1,5 @@
+#include <stdio.h>
+
 const unsigned M = 10;
 const unsigned N = 10;
 const unsigned O = 10;
@@ -30,7 +32,7 @@ unsigned MATRIX_2[N * O] = {
 
 unsigned RESULT_MATRIX[M * O];
 
-unsigned mat_mul(unsigned[], unsigned[], unsigned, unsigned);
+unsigned dot_product(unsigned[], unsigned[], unsigned, unsigned);
 
 int main()
 {
@@ -40,21 +42,39 @@ int main()
     while (i < M) {
         j = 0;
         while (j < O) {
-            RESULT_MATRIX[i + j * O] = mat_mul(MATRIX_1, MATRIX_2, i, j);
+            //           [x,      y]
+            //     result[i,      j] = dot_product(mat1, mat2, i, j)
+            RESULT_MATRIX[i + j * M] = dot_product(MATRIX_1, MATRIX_2, i, j);
 
             j = j + 1;
         }
         i = i + 1;
     }
+
+    for (j = 0; j < O; ++j) {
+        for (i = 0; i < M; ++i)
+            printf("%8u ", RESULT_MATRIX[j * M + i]);
+        printf("\n");
+    }
+    printf("\n");
+    for (j = 0; j < O; ++j) {
+        for (i = 0; i < M; ++i)
+            printf("%8x ", RESULT_MATRIX[j * M + i]);
+        printf("\n");
+    }
 }
 
-unsigned mat_mul(unsigned mat1[], unsigned mat2[], unsigned i, unsigned j)
+unsigned dot_product(unsigned mat1[], unsigned mat2[], unsigned i, unsigned j)
 {
     unsigned sum = 0;
     unsigned idx = 0;
 
-    while (idx < N)
-        sum += mat1[idx + i * M] * mat2[idx + j * O];
+    while (idx < N) {
+        //         [  x,      y]       [x,        y]
+        //     mat1[idx,      i] * mat2[j,      idx]
+        sum += mat1[idx + i * M] * mat2[j + idx * O];
+        idx = idx + 1;
+    }
 
     return sum;
 }

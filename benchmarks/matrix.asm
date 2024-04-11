@@ -12,9 +12,11 @@ main:
 main_i_loop:
     load 0, v1
 main_j_loop:
-    jsr mat_mul
+    tfr v0, vc
+    tfr v1, vd
+    jsr dot_product
 
-    mul v1, .O, v2
+    mul v1, .M, v2
     add v2, v0, v2
     mul v2, 4, v2
 
@@ -31,33 +33,32 @@ main_j_loop:
 
     halt
 
-mat_mul: ; mat_mul(mat1: @va, mat2: @vb, i: @vc, j: @vd) -> @vf
-         ; REQUIREMENTS:
-         ;  - 0 <= i < .M
-         ;  - 0 <= j < .O
+dot_product: ; dot_product(mat1: @va, mat2: @vb, i: @vc, j: @vd) -> @vf
+             ; REQUIREMENTS:
+             ;  - 0 <= i < .M
+             ;  - 0 <= j < .O
     push { v0, v1, v2, v3 }
 
     load 0, v3 ; index
     load 0, vf ; result
 
-mat_mul_loop:
-    mul v3, .M, v0 ; Compute index in mat1
-    add vc, v0, v0
+dot_product_loop:
+    mul vc, .M, v0 ; Compute index in mat1
+    add v3, v0, v0
     mul v0, 4, v0
+    llr va[v0], v0 ; Load value from mat1
 
     mul v3, .O, v1 ; Compute index in mat2
     add vd, v1, v1
     mul v1, 4, v1
-
-    llr va[v0], v0 ; Read values
-    llr vb[v1], v1
+    llr vb[v1], v1 ; Load value from mat2
 
     mul v0, v1, v2 ; Multiply values
     add v2, vf, vf ; Add to sum
 
     add v3, 1, v3
-    cmp v4, .N
-    jlt mat_mul_loop
+    cmp v3, .N
+    jlt dot_product_loop
 
     pop { v0, v1, v2, v3 }
     ret
