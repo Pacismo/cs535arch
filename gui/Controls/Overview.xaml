@@ -7,22 +7,39 @@
              mc:Ignorable="d" 
              d:Background="WhiteSmoke">
     <StackPanel Orientation="Horizontal">
-        <Label HorizontalContentAlignment="Right" Content="Memory Accesses" VerticalAlignment="Center" HorizontalAlignment="Left"/>
-        <Label Name="Accesses" MinWidth="50" Content="0" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+        <StackPanel MinWidth="110">
+            <Label Content="Memory Accesses" HorizontalAlignment="Center"/>
+            <Label Name="Accesses" MinWidth="50" Content="0" HorizontalAlignment="Center" HorizontalContentAlignment="Center"/>
+        </StackPanel>
+
+        <StackPanel MinWidth="110">
+            <Label Content="Cache Hits" HorizontalAlignment="Center"/>
+            <Label Name="Hits" MinWidth="50" Content="0" HorizontalAlignment="Center" HorizontalContentAlignment="Center"/>
+        </StackPanel>
         
-        <Label HorizontalContentAlignment="Right" Content="Cache Hits" VerticalAlignment="Center" HorizontalAlignment="Left"/>
-        <Label Name="Hits" MinWidth="50" Content="0" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+        <StackPanel MinWidth="110">
+            <Label Content="Cache Misses" HorizontalAlignment="Center"/>
+            <Label Name="Misses" MinWidth="50" Content="0" HorizontalAlignment="Center" HorizontalContentAlignment="Center"/>
+        </StackPanel>
         
-        <Label HorizontalContentAlignment="Right" Content="Cache Misses" VerticalAlignment="Center" HorizontalAlignment="Left"/>
-        <Label Name="Misses" MinWidth="50" Content="0" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+        <StackPanel MinWidth="110">
+            <Label Content="Cold Misses" HorizontalAlignment="Center"/>
+            <Label Name="Cold" MinWidth="50" Content="0" HorizontalAlignment="Center" HorizontalContentAlignment="Center"/>
+        </StackPanel>
         
-        <Label HorizontalContentAlignment="Right" Content="Cold Misses" VerticalAlignment="Center" HorizontalAlignment="Left"/>
-        <Label Name="Cold" MinWidth="50" Content="0" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+        <StackPanel MinWidth="110">
+            <Label Content="Conflict Misses" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+            <Label Name="Conflict" MinWidth="50" Content="0" HorizontalAlignment="Center" HorizontalContentAlignment="Center"/>
+        </StackPanel>
         
-        <Label HorizontalContentAlignment="Right" Content="Conflict Misses" VerticalAlignment="Center" HorizontalAlignment="Left"/>
-        <Label Name="Conflict" MinWidth="50" Content="0" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+        <StackPanel MinWidth="110">
+            <Label Content="Evictions" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+            <Label Name="Evictions" MinWidth="50" Content="0" HorizontalAlignment="Center" HorizontalContentAlignment="Center"/>
+        </StackPanel>
         
-        <Label HorizontalContentAlignment="Right" Content="Clocks" VerticalAlignment="Center" HorizontalAlignment="Left"/>
-        <Label Name="Clocks" MinWidth="50" Content="0" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+        <StackPanel MinWidth="110">
+            <Label Content="Clocks" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+            <Label Name="Clocks" MinWidth="50" Content="0" HorizontalAlignment="Center" HorizontalContentAlignment="Center"/>
+        </StackPanel>
     </StackPanel>
 </UserControl>

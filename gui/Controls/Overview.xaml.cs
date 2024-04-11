@@ -23,6 +23,7 @@ namespace gui.Controls
         public uint cold_misses;
         public uint conflict_misses;
         public uint memory_accesses;
+        public uint evictions;
     }
     /// <summary>
     /// Interaction logic for Overview.xaml
@@ -42,6 +43,7 @@ namespace gui.Controls
             Cold.Content = content.cold_misses.ToString();
             Conflict.Content = content.conflict_misses.ToString();
             Accesses.Content = content.memory_accesses.ToString();
+            Evictions.Content = content.evictions.ToString();
         }
     }
 }
