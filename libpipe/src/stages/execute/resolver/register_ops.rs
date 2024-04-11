@@ -175,9 +175,9 @@ impl Resolver for RegisterOp {
                     destination,
                 } => {
                     let (mut value, mask) = if shift == 0 {
-                        (immediate as Word, 0x0000_FFFFu32)
+                        (immediate as Word, 0xFFFF_0000u32)
                     } else if shift == 1 {
-                        ((immediate as Word) << 16, 0xFFFF_0000u32)
+                        ((immediate as Word) << 16, 0x0000_FFFFu32)
                     } else {
                         (0, 0x0000_0000u32)
                     };
