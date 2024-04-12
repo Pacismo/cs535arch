@@ -309,6 +309,7 @@ pub enum State {
     Squashed {
         wregs: RegisterFlags,
     },
+    Halting(usize),
     Halted,
 }
 use State::*;
@@ -409,6 +410,7 @@ impl Serialize for State {
                 map.serialize_entry("write_regs", wregs)?;
                 map.end()
             }
+            Halting(..) => serializer.collect_map([("state", "halting")]),
             Halted => serializer.collect_map([("state", "halted")]),
         }
     }
@@ -428,6 +430,7 @@ impl State {
                 | Popping { .. }
                 | JsrPrep { .. }
                 | RetPrep { .. }
+                | Halting(..)
         )
     }
 
@@ -439,7 +442,8 @@ impl State {
             | Popping { clocks, .. }
             | DummyPop { clocks, .. }
             | JsrPrep { clocks, .. }
-            | RetPrep { clocks, .. } => clocks,
+            | RetPrep { clocks, .. }
+            | Halting(clocks) => clocks,
             _ => 1,
         }
     }
@@ -479,7 +483,7 @@ impl State {
                 _ => [].into(),
             },
             Squashed { wregs } => wregs,
-            Halted => [].into(),
+            Halting(..) | Halted => [].into(),
         }
     }
 }
@@ -1001,11 +1005,13 @@ impl PipelineStage for Memory {
                         if clock.is_ready() {
                             if matches!(result, MemoryResult::Halt) {
                                 self.state = Halted;
+                                self.forward = Some(result);
+                                Clock::Halt
                             } else {
                                 self.state = Idle;
+                                self.forward = Some(result);
+                                clock.to_ready()
                             }
-                            self.forward = Some(result);
-                            clock.to_ready()
                         } else {
                             self.state = Ready { result };
                             clock.to_block()
@@ -1021,6 +1027,24 @@ impl PipelineStage for Memory {
                             clock.to_block()
                         }
                     }
+                    Halting(..) => match memory.immediate_writeback() {
+                        MemStatus::Idle => {
+                            if clock.is_ready() {
+                                self.state = Halted;
+                                self.forward = Some(MemoryResult::Halt);
+                                Clock::Halt
+                            } else {
+                                self.state = Ready {
+                                    result: MemoryResult::Halt,
+                                };
+                                Clock::Halt
+                            }
+                        }
+                        MemStatus::Busy(clocks) => {
+                            self.state = Halting(clocks);
+                            clock.to_block()
+                        }
+                    },
                     Halted => unreachable!(),
                 }
             }
@@ -1224,9 +1248,7 @@ impl PipelineStage for Memory {
                         (1, 0)
                     }
                     ExecuteResult::Halt => {
-                        self.state = Ready {
-                            result: MemoryResult::Halt,
-                        };
+                        self.state = Halting(1);
                         (1, 0)
                     }
                     ExecuteResult::PopStack { sp } => {

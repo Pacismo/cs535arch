@@ -514,6 +514,11 @@ impl<'a> Runtime<'a> {
                 .into_iter()
                 .map(ListItem::new),
             ),
+            libpipe::memory::State::Halting(..) => List::new(
+                [Line::from(vec!["State: ".into(), "Halting".red().bold()])]
+                    .into_iter()
+                    .map(ListItem::from),
+            ),
             libpipe::memory::State::Halted => List::new(
                 [Line::from(vec!["State: ".into(), "Halted".red().bold()])]
                     .into_iter()
