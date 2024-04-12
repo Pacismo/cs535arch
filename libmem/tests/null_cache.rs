@@ -88,7 +88,7 @@ fn read_line() {
     let val = gen();
     memory.write_word(0x0000_0000, val);
 
-    assert!(!cache.write_line(0x0000_0000, &mut memory).disabled());
+    assert!(!cache.get_line(0x0000_0000, &mut memory).disabled());
 
     assert!(matches!(cache.get_word(0x0000_0000), Err(Status::Disabled)))
 }

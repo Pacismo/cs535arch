@@ -90,7 +90,7 @@ impl MemoryModule for SingleLevel {
                     } else if self.writethrough {
                         self.memory.write_byte(addr, value);
                     } else {
-                        if self.data_cache.write_line(addr, &mut self.memory).evicted() {
+                        if self.data_cache.get_line(addr, &mut self.memory).evicted() {
                             self.evictions += 1;
                         }
 
@@ -104,13 +104,13 @@ impl MemoryModule for SingleLevel {
                     } else if self.writethrough {
                         self.memory.write_short(addr, value);
                     } else {
-                        if self.data_cache.write_line(addr, &mut self.memory).evicted() {
+                        if self.data_cache.get_line(addr, &mut self.memory).evicted() {
                             self.evictions += 1;
                         }
                         if self.data_cache.check_address(addr + 1).is_miss() {
                             if self
                                 .data_cache
-                                .write_line(addr + 1, &mut self.memory)
+                                .get_line(addr + 1, &mut self.memory)
                                 .evicted()
                             {
                                 self.evictions += 1;
@@ -127,13 +127,13 @@ impl MemoryModule for SingleLevel {
                     } else if self.writethrough {
                         self.memory.write_word(addr, value);
                     } else {
-                        if self.data_cache.write_line(addr, &mut self.memory).evicted() {
+                        if self.data_cache.get_line(addr, &mut self.memory).evicted() {
                             self.evictions += 1;
                         }
                         if self.data_cache.check_address(addr + 3).is_miss() {
                             if self
                                 .data_cache
-                                .write_line(addr + 3, &mut self.memory)
+                                .get_line(addr + 3, &mut self.memory)
                                 .evicted()
                             {
                                 self.evictions += 1;
@@ -145,18 +145,18 @@ impl MemoryModule for SingleLevel {
                 }
 
                 ReadByte(addr) => {
-                    if self.data_cache.write_line(addr, &mut self.memory).evicted() {
+                    if self.data_cache.get_line(addr, &mut self.memory).evicted() {
                         self.evictions += 1;
                     }
                 }
                 ReadShort(addr) => {
-                    if self.data_cache.write_line(addr, &mut self.memory).evicted() {
+                    if self.data_cache.get_line(addr, &mut self.memory).evicted() {
                         self.evictions += 1;
                     }
                     if self.data_cache.check_address(addr + 1).is_miss() {
                         if self
                             .data_cache
-                            .write_line(addr + 1, &mut self.memory)
+                            .get_line(addr + 1, &mut self.memory)
                             .evicted()
                         {
                             self.evictions += 1;
@@ -164,13 +164,13 @@ impl MemoryModule for SingleLevel {
                     }
                 }
                 ReadWord(addr) => {
-                    if self.data_cache.write_line(addr, &mut self.memory).evicted() {
+                    if self.data_cache.get_line(addr, &mut self.memory).evicted() {
                         self.evictions += 1;
                     }
                     if self.data_cache.check_address(addr + 3).is_miss() {
                         if self
                             .data_cache
-                            .write_line(addr + 3, &mut self.memory)
+                            .get_line(addr + 3, &mut self.memory)
                             .evicted()
                         {
                             self.evictions += 1;
@@ -178,7 +178,7 @@ impl MemoryModule for SingleLevel {
                     }
                 }
                 ReadInstruction(addr) => {
-                    self.instruction_cache.write_line(addr, &mut self.memory);
+                    self.instruction_cache.get_line(addr, &mut self.memory);
                 }
 
                 FlushCache => {
@@ -722,6 +722,16 @@ impl MemoryModule for SingleLevel {
             ),
         ]
         .into()
+    }
+
+    fn immediate_writeback(&mut self) -> Status {
+        if self.current_transaction.is_busy() {
+            Status::Busy(self.clocks)
+        } else {
+            self.data_cache.flush(&mut self.memory);
+            self.instruction_cache.flush(&mut self.memory);
+            Status::Idle
+        }
     }
 
     fn data_cache<'a>(&'a self) -> &'a dyn Cache {
