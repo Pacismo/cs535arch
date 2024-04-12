@@ -529,6 +529,8 @@ impl Cache for MultiAssociative {
                     .iter()
                     .zip(addr..)
                     .for_each(|(&byte, address)| memory.write_byte(address, byte));
+
+                s.dirty = false;
             })
             .count()
     }
