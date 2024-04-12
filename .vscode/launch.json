@@ -185,7 +185,7 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'seis-sim'",
+            "name": "Debug executable 'seis-sim' with matrix multiply benchmark",
             "cargo": {
                 "args": [
                     "build",
@@ -206,7 +206,7 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'seis-sim' in backend mode",
+            "name": "Debug executable 'seis-sim' with exchange sort benchmark",
             "cargo": {
                 "args": [
                     "build",
@@ -219,9 +219,8 @@
                 }
             },
             "args": [
-                "./sim-pipelined.toml",
-                "./test.bin",
-                "-b"
+                "./benchmarks/exchange.toml",
+                "./benchmarks/exchange.bin",
             ],
             "cwd": "${workspaceFolder}"
         },
