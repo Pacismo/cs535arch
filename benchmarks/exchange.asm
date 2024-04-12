@@ -11,13 +11,13 @@ x_loop:
     cmp v0, .LEN
     jge end
 
-    tfr v0, min
+    tfr v0, v2
     tfr v0, v1
 
 y_loop:
-    add v1, 1
+    add v1, 1, v1
     cmp v1, .LEN
-    jge swap
+    jge do_swap
 
     jsr compare
 
@@ -27,9 +27,9 @@ y_loop:
     tfr v1, v2
     jmp y_loop
 
-swap:
+do_swap:
     jsr swap
-    add 1, v0
+    add v0, 1, v0
     jmp x_loop
 
 end:
@@ -37,6 +37,9 @@ end:
 
 compare:
     push { v1, v2 }
+
+    mul v1, 4, v1
+    mul v2, 4, v2
 
     llr v3[v1] => v1
     llr v3[v2] => v2
@@ -47,16 +50,19 @@ compare:
     ret
 
 swap:
-    push { v4, v5 }
+    push { v0, v2, v4, v5 }
+
+    mul v0, 4, v0
+    mul v2, 4, v2
 
     llr v3[v0] => v4
     llr v3[v2] => v5
     slr v5 => v3[v0]
     slr v4 => v3[v2]
 
-    pop { v4, v5 }
+    pop { v0, v2, v4, v5 }
     ret
 
-#[location = 0x00010000]
+#[location = 0x00030000]
 data:
-#word?[0, 65535; 16 %10]
+#word?[0, 90; 16 %10]

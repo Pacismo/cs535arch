@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
-const uint32_t DATA[] = {9, 4, 1, 2, 6, 4, 9, 1, 4, 1, 10, 15, 7, 14, 12, 9};
+uint32_t DATA[] = {9, 4, 1, 2, 6, 4, 9, 1, 4, 1, 10, 15, 7, 14, 12, 9};
 const size_t   COUNT  = sizeof(DATA) / sizeof(uint32_t);
 
 int32_t compare(uint32_t[], uint32_t, uint32_t);
@@ -9,6 +9,10 @@ void    swap(uint32_t[], uint32_t, uint32_t);
 
 int main()
 {
+    for (int i = 0; i < COUNT; ++i)
+        printf("%u ", DATA[i]);
+    printf("\n");
+
     uint32_t x = 0;
     uint32_t y;
     uint32_t min;
@@ -21,10 +25,15 @@ int main()
 
             if (comp < 0)
                 min = y;
+            y = y + 1;
         }
-        swap(DATA, x, y);
+        swap(DATA, x, min);
         x = x + 1;
     }
+
+    for (int i = 0; i < COUNT; ++i)
+        printf("%u ", DATA[i]);
+    printf("\n");
 }
 
 int32_t compare(uint32_t array[], uint32_t idx1, uint32_t idx2)
