@@ -348,7 +348,6 @@ impl BackendState {
         map.insert("cold_misses".to_string(), mem.cold_misses().into());
         map.insert("conflict_misses".to_string(), mem.conflict_misses().into());
         map.insert("cache_hits".to_string(), mem.cache_hits().into());
-        map.insert("evictions".to_string(), mem.evictions().into());
 
         println!("{}", json::to_string(&map)?);
 
