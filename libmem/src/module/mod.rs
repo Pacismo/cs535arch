@@ -113,6 +113,9 @@ pub trait MemoryModule: Debug {
     /// Gets a hashmap containing mutable references to the caches in the memory module
     fn caches_mut<'a>(&'a mut self) -> HashMap<&'static str, &'a mut dyn Cache>;
 
+    /// Writes the cache back to memory. Returns [`Status::Idle`] on success.
+    fn immediate_writeback(&mut self) -> Status;
+
     /// Get the state of the cache structures
     ///
     /// Provides the names of the caches as well
