@@ -851,14 +851,14 @@ impl PipelineStage for Memory {
                                 self.state = Idle;
                                 self.forward = Some(MemoryResult::WriteRegNoStatus {
                                     destination: SP,
-                                    value: sp,
+                                    value: sp.wrapping_sub(4),
                                 });
                                 clock.to_ready()
                             } else {
                                 self.state = Ready {
                                     result: MemoryResult::WriteRegNoStatus {
                                         destination: SP,
-                                        value: sp,
+                                        value: sp.wrapping_sub(4),
                                     },
                                 };
                                 clock.to_block()
