@@ -459,7 +459,7 @@ impl Cache for MultiAssociative {
         }
     }
 
-    fn write_line(&mut self, address: Word, memory: &mut Memory) -> LineReadStatus {
+    fn get_line(&mut self, address: Word, memory: &mut Memory) -> LineReadStatus {
         if self.check_address(address).is_hit() {
             return LineReadStatus::Skipped;
         }

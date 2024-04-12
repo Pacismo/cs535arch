@@ -85,7 +85,7 @@ pub trait Cache: Debug {
     /// Fetches the data to be stored in the cache from main memory.
     ///
     /// Writes any evicted lines back and returns true if an eviction occurred.
-    fn write_line(&mut self, address: Word, memory: &mut Memory) -> LineReadStatus;
+    fn get_line(&mut self, address: Word, memory: &mut Memory) -> LineReadStatus;
 
     /// Flushes all dirty lines to memory.
     ///

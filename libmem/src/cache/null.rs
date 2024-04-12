@@ -82,7 +82,7 @@ impl Cache for NullCache {
         false
     }
 
-    fn write_line(&mut self, address: Word, memory: &mut Memory) -> LineReadStatus {
+    fn get_line(&mut self, address: Word, memory: &mut Memory) -> LineReadStatus {
         self.0 = Populated(address, memory.read_word(address).to_be_bytes());
         LineReadStatus::Disabled
     }
