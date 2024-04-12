@@ -217,7 +217,8 @@ namespace gui
     /// </summary>
     public partial class MainWindow : Window
     {
-        public static string CONFIG_FILE() => Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) + "/seis-sim-gui/config.toml";
+        public static string APPDIR() => Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "seis-sim-gui");
+        public static string CONFIG_FILE() => Path.Join(APPDIR(), "config.toml");
 
         public static RoutedCommand ClockCommand = new();
 
@@ -250,6 +251,9 @@ namespace gui
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            if (!Directory.Exists(APPDIR()))
+                Directory.CreateDirectory(APPDIR());
+
             foreach (TabItem tab in Tabs.Items)
                 tab.Visibility = Visibility.Hidden;
             Tabs_Config.Visibility = Visibility.Visible;
