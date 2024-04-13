@@ -1,3 +1,5 @@
+//! Fetch stage
+
 use crate::{reg_locks::Locks, Clock, PipelineStage, Status};
 use libmem::module::Status::Busy;
 use libseis::types::Word;
@@ -10,11 +12,20 @@ pub enum State {
     #[default]
     Idle,
     /// The next instruction word is being fetched
-    Waiting { clocks: usize },
+    Waiting {
+        /// Represents the number of clocks before the read is finished
+        clocks: usize,
+    },
     /// The next instruction word is available
-    Ready { instruction: Word },
+    Ready {
+        /// The word representing the next instruction
+        instruction: Word,
+    },
     /// The stage has been squashed
-    Squashed { clocks: usize },
+    Squashed {
+        /// Represents the number of clocks before this stage will begin reading instructions again
+        clocks: usize,
+    },
     /// The stage has been halted
     Halted,
 }
@@ -86,12 +97,21 @@ impl State {
     }
 }
 
+/// Represents the result of a fetch
 #[derive(Debug, Clone, Copy)]
 pub enum FetchResult {
-    Ready { word: Word, pc: Word },
+    /// The next instruction is available
+    Ready {
+        /// The word to be decoded
+        word: Word,
+        /// Where this instruction was located
+        pc: Word,
+    },
+    /// No new instructions are available
     Squashed,
 }
 
+/// Represents the fetch pipeline stage
 #[derive(Debug)]
 pub struct Fetch {
     state: State,

@@ -1,3 +1,5 @@
+//! Writeback stage
+
 use super::{memory::MemoryResult, PipelineStage};
 use crate::{Clock, Locks, Registers, Status};
 use libmem::module::MemoryModule;
@@ -5,6 +7,7 @@ use libseis::{pages::PAGE_SIZE, registers::{BP, EPS, INF, LP, NAN, OF, PC, SP, Z
 use serde::Serialize;
 use std::mem::take;
 
+/// Writeback pipeline stage
 #[derive(Debug, Clone, Default)]
 pub struct Writeback {
     job: Option<MemoryResult>,
@@ -18,6 +21,7 @@ impl Serialize for Writeback {
     }
 }
 
+/// The result of the writeback stage
 pub type WritebackResult = ();
 
 impl PipelineStage for Writeback {

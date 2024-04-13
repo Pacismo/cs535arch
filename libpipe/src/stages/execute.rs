@@ -1,3 +1,5 @@
+//! Execute stage
+
 mod resolver;
 #[cfg(test)]
 mod tests;

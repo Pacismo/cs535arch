@@ -1,3 +1,5 @@
+//! Memory stage
+
 use super::execute::ExecuteResult;
 use crate::{Clock, Locks, PipelineStage, Registers, Status};
 use libmem::module::{MemoryModule, Status as MemStatus};
@@ -8,14 +10,30 @@ use libseis::{
 use serde::Serialize;
 use std::fmt::Display;
 
+/// Represents the kind of read being done
 #[derive(Debug, Clone, Copy)]
 pub enum ReadMode {
     /// Reading a byte from memory
-    ReadByte { address: Word, volatile: bool },
+    ReadByte {
+        /// Where to read the value from
+        address: Word,
+        /// Whether to skip the cache
+        volatile: bool,
+    },
     /// Reading a short from memory
-    ReadShort { address: Word, volatile: bool },
+    ReadShort {
+        /// Where to read the value from
+        address: Word,
+        /// Whether to skip the cache
+        volatile: bool,
+    },
     /// Reading a word from memory
-    ReadWord { address: Word, volatile: bool },
+    ReadWord {
+        /// Where to read the value from
+        address: Word,
+        /// Whether to skip the cache
+        volatile: bool,
+    },
 }
 
 impl Serialize for ReadMode {
@@ -91,24 +109,34 @@ impl ReadMode {
     }
 }
 
+/// Represents the kind of write being done
 #[derive(Debug, Clone, Copy)]
 pub enum WriteMode {
     /// Writing a byte to memory
     WriteByte {
+        /// Where to write to
         address: Word,
+        /// What to write
         value: Byte,
+        /// Whether to skip the cache
         volatile: bool,
     },
     /// Writing a short to memory
     WriteShort {
+        /// Where to write to
         address: Word,
+        /// What to write
         value: Short,
+        /// Whether to skip the cache
         volatile: bool,
     },
     /// Writing a word to memory
     WriteWord {
+        /// Where to write to
         address: Word,
+        /// What to write
         value: Word,
+        /// Whether to skip the cache
         volatile: bool,
     },
 }
@@ -202,9 +230,12 @@ impl WriteMode {
     }
 }
 
+/// Represents the state of the JSR instruction
 #[derive(Debug, Clone, Copy)]
 pub enum JsrPrepState {
+    /// We are writing the current value of the link pointer
     WritingLp,
+    /// We are writing the current value of the stack base pointer
     WritingBp,
 }
 use JsrPrepState::*;
@@ -230,9 +261,12 @@ impl Display for JsrPrepState {
     }
 }
 
+/// Represents the state of the RET instruction
 #[derive(Debug, Clone, Copy)]
 pub enum RetPrepState {
+    /// We are reading the base pointer from the stack
     ReadingBp,
+    /// We are reading the link pointer from the stack
     ReadingLp(Word),
 }
 use RetPrepState::*;
@@ -258,58 +292,94 @@ impl Display for RetPrepState {
     }
 }
 
+/// Represents the state of the memory stage
 #[derive(Debug, Clone, Copy, Default)]
 pub enum State {
+    /// Nothing is happening
     #[default]
     Idle,
+    /// This stage is reading memory
     Reading {
+        /// Read mode
         mode: ReadMode,
+        /// Destination register
         destination: Register,
+        /// Clock requirement metadata
         clocks: usize,
     },
+    /// This stage is writing to memory
     Writing {
+        /// Write mode
         mode: WriteMode,
+        /// Clock requirement metadata
         clocks: usize,
     },
+    /// This stage is pushing data to the stack
     Pushing {
+        /// What is being written to the stack
         value: Word,
+        /// Where it is being written to
         sp: Word,
+        /// Clock requirement metadata
         clocks: usize,
     },
+    /// This stage is removing data from the stack
     Popping {
+        /// Where the read data is being written to
         destination: Register,
+        /// Where the data is being read from
         sp: Word,
+        /// Clock requirement metadata
         clocks: usize,
     },
+    /// A pop to an invalid register
     DummyPop {
+        /// Current stack pointer value
         sp: Word,
+        /// Clock requirement metadata
         clocks: usize,
     },
-    /// Write the current BP value to where the SP is, increment the
-    /// SP by 4, and set BP to the current value of SP
+    /// Preparing for a jump to a subroutine
     JsrPrep {
+        /// Where to jump
         address: Word,
+        /// Where to return
         link: Word,
+        /// The current SP value
         sp: Word,
+        /// The current BP value
         bp: Word,
+        /// The curren LP value
         lp: Word,
+        /// Where in the preparation we are
         state: JsrPrepState,
+        /// Clock requirement metadata
         clocks: usize,
     },
     /// Write the current BP value to the SP, read the BP back in
     RetPrep {
+        /// Where to return to
         link: Word,
+        /// Current BP value
         bp: Word,
+        /// Return preparation state
         state: RetPrepState,
+        /// Clock requirement metadata
         clocks: usize,
     },
+    /// Ready to forward the result
     Ready {
+        /// The result to forward
         result: MemoryResult,
     },
+    /// This stage was squashed
     Squashed {
+        /// The values of the write registers
         wregs: RegisterFlags,
     },
+    /// This stage is halting (and writing data back to memory)
     Halting(usize),
+    /// This stage is halted
     Halted,
 }
 use State::*;
@@ -488,70 +558,106 @@ impl State {
     }
 }
 
+/// The result of the memory stage
 #[derive(Debug, Clone, Copy)]
 pub enum MemoryResult {
     /// Nothing
     Nop,
     /// Squashed instruction
     Squashed {
+        /// The held register locks
         wregs: RegisterFlags,
     },
     /// Write data back to a register without any status information
     WriteRegNoStatus {
+        /// Where to write the value
         destination: Register,
+        /// What to write
         value: Word,
     },
     /// Write data back to a register
     WriteReg1 {
+        /// Where to write the value
         destination: Register,
+        /// What to write
         value: Word,
 
+        /// Zero flag state
         zf: bool,
+        /// Overflow flag state
         of: bool,
+        /// Epsilon-equality flag state
         eps: bool,
+        /// NaN flag state
         nan: bool,
+        /// Infinity flag state
         inf: bool,
     },
     /// Write data back to a register, but also update the stack pointer
     WriteReg2 {
+        /// Where to write the value
         destination: Register,
+        /// What to write
         value: Word,
+        /// What to set the stack pointer to
         sp: Word,
 
+        /// Zero flag state
         zf: bool,
+        /// Overflow flag state
         of: bool,
+        /// Epsilon-equality flag state
         eps: bool,
+        /// NaN flag state
         nan: bool,
+        /// Infinity flag state
         inf: bool,
     },
     /// Jump to a subroutine
     JumpSubroutine {
+        /// Where to jump
         address: Word,
+        /// Where to return
         link: Word,
+        /// The new SP value
         sp: Word,
+        /// The new BP value
         bp: Word,
     },
     /// Jump to a location in memory
     Jump {
+        /// Where to jump
         address: Word,
     },
     /// Return from a subroutine
     Return {
+        /// Where to jump
         address: Word,
+        /// The new BP value
         bp: Word,
+        /// The new SP value
         sp: Word,
+        /// The new LP value
         lp: Word,
     },
     /// Stop execution
     Halt,
+    /// The last instruction is to be ignored
     Ignore {
+        /// Currently-held locks
         wregs: RegisterFlags,
     },
+    /// Write to the status registers
     WriteStatus {
+        /// Zero flag state
         zf: bool,
+        /// Overflow flag state
         of: bool,
+        /// Epsilon-equality flag state
         eps: bool,
+        /// NaN flag state
         nan: bool,
+        /// Infinity flag state
         inf: bool,
     },
 }
@@ -667,6 +773,7 @@ impl Serialize for MemoryResult {
     }
 }
 
+/// Represents the memory pipeline stage
 #[derive(Debug, Default)]
 pub struct Memory {
     state: State,
