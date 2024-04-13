@@ -607,10 +607,10 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
                 }
             };
             (fbo $b:ident) => {
-                floating_point::BinaryOp($b.source, $b.opt, $b.destination)
+                floating_point::BinaryOp { left: $b.source, right: $b.opt, destination: $b.destination }
             };
             (fuo $u:ident) => {
-                floating_point::UnaryOp($u.source, $u.destination)
+                floating_point::UnaryOp { source: $u.source, destination: $u.destination }
             };
             (push $p:ident) => {
                 match $p {
@@ -988,12 +988,15 @@ pub fn link_symbols(lines: Lines) -> Result<PageSet, Error> {
                 .into_iter()
                 .zip(address..)
                 .for_each(write),
-            I::Fcmp(c) => FP(Fcmp(floating_point::CompOp(c.left, c.right)))
-                .encode()
-                .to_be_bytes()
-                .into_iter()
-                .zip(address..)
-                .for_each(write),
+            I::Fcmp(c) => FP(Fcmp(floating_point::CompOp {
+                left: c.left,
+                right: c.right,
+            }))
+            .encode()
+            .to_be_bytes()
+            .into_iter()
+            .zip(address..)
+            .for_each(write),
             I::Fneg(u) => FP(Fneg(transform!(fuo u)))
                 .encode()
                 .to_be_bytes()

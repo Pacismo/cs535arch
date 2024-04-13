@@ -1,3 +1,4 @@
+//! Floating-point operations
 use super::{Decode, Encode, Info};
 use crate::{
     instruction_set::{decode, error::DecodeError},
@@ -6,8 +7,16 @@ use crate::{
 };
 use std::fmt::Display;
 
+/// Binary floating-point operation
 #[derive(Debug, Clone, Copy)]
-pub struct BinaryOp(pub Register, pub Register, pub Register);
+pub struct BinaryOp {
+    /// Left register
+    pub left: Register,
+    /// Right register
+    pub right: Register,
+    /// Destination register
+    pub destination: Register,
+}
 
 impl BinaryOp {
     /// Masks for the source, option, and destination registers
@@ -22,30 +31,40 @@ impl BinaryOp {
 
 impl Decode for BinaryOp {
     fn decode(word: Word) -> super::error::DecodeResult<Self> {
-        Ok(Self(
-            ((word & Self::REG_MASK[0]) >> Self::REG_SHIFT[0]) as Register,
-            ((word & Self::REG_MASK[1]) >> Self::REG_SHIFT[1]) as Register,
-            ((word & Self::REG_MASK[2]) >> Self::REG_SHIFT[2]) as Register,
-        ))
+        Ok(Self {
+            left: ((word & Self::REG_MASK[0]) >> Self::REG_SHIFT[0]) as Register,
+            right: ((word & Self::REG_MASK[1]) >> Self::REG_SHIFT[1]) as Register,
+            destination: ((word & Self::REG_MASK[2]) >> Self::REG_SHIFT[2]) as Register,
+        })
     }
 }
 
 impl Encode for BinaryOp {
     fn encode(self) -> Word {
-        ((self.0 as Word) << Self::REG_SHIFT[0])
-            | ((self.1 as Word) << Self::REG_SHIFT[1])
-            | ((self.2 as Word) << Self::REG_SHIFT[2])
+        ((self.left as Word) << Self::REG_SHIFT[0])
+            | ((self.right as Word) << Self::REG_SHIFT[1])
+            | ((self.destination as Word) << Self::REG_SHIFT[2])
     }
 }
 
 impl Display for BinaryOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "V{:X}, V{:X} => V{:X}", self.0, self.1, self.2)
+        write!(
+            f,
+            "V{:X}, V{:X} => V{:X}",
+            self.left, self.right, self.destination
+        )
     }
 }
 
+/// Unary floating-point operation
 #[derive(Debug, Clone, Copy)]
-pub struct UnaryOp(pub Register, pub Register);
+pub struct UnaryOp {
+    /// Source register
+    pub source: Register,
+    /// Destination register
+    pub destination: Register,
+}
 
 impl UnaryOp {
     const REG_MASK: [Word; 2] = [
@@ -57,27 +76,34 @@ impl UnaryOp {
 
 impl Decode for UnaryOp {
     fn decode(word: Word) -> super::error::DecodeResult<Self> {
-        Ok(Self(
-            ((word & Self::REG_MASK[0]) >> Self::REG_SHIFT[0]) as Register,
-            ((word & Self::REG_MASK[1]) >> Self::REG_SHIFT[1]) as Register,
-        ))
+        Ok(Self {
+            source: ((word & Self::REG_MASK[0]) >> Self::REG_SHIFT[0]) as Register,
+            destination: ((word & Self::REG_MASK[1]) >> Self::REG_SHIFT[1]) as Register,
+        })
     }
 }
 
 impl Encode for UnaryOp {
     fn encode(self) -> Word {
-        ((self.0 as Word) << Self::REG_SHIFT[0]) | ((self.1 as Word) << Self::REG_SHIFT[1])
+        ((self.source as Word) << Self::REG_SHIFT[0])
+            | ((self.destination as Word) << Self::REG_SHIFT[1])
     }
 }
 
 impl Display for UnaryOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "V{:X} => V{:X}", self.0, self.1)
+        write!(f, "V{:X} => V{:X}", self.source, self.destination)
     }
 }
 
+/// Binary floating-point comparison
 #[derive(Debug, Clone, Copy)]
-pub struct CompOp(pub Register, pub Register);
+pub struct CompOp {
+    /// Left register
+    pub left: Register,
+    /// Right register
+    pub right: Register,
+}
 
 impl CompOp {
     const REG_MASK: [Word; 2] = [
@@ -89,25 +115,26 @@ impl CompOp {
 
 impl Decode for CompOp {
     fn decode(word: Word) -> super::error::DecodeResult<Self> {
-        Ok(Self(
-            ((word & Self::REG_MASK[0]) >> Self::REG_SHIFT[0]) as Register,
-            ((word & Self::REG_MASK[1]) >> Self::REG_SHIFT[1]) as Register,
-        ))
+        Ok(Self {
+            left: ((word & Self::REG_MASK[0]) >> Self::REG_SHIFT[0]) as Register,
+            right: ((word & Self::REG_MASK[1]) >> Self::REG_SHIFT[1]) as Register,
+        })
     }
 }
 
 impl Encode for CompOp {
     fn encode(self) -> Word {
-        ((self.0 as Word) << Self::REG_SHIFT[0]) | ((self.1 as Word) << Self::REG_SHIFT[1])
+        ((self.left as Word) << Self::REG_SHIFT[0]) | ((self.right as Word) << Self::REG_SHIFT[1])
     }
 }
 
 impl Display for CompOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "V{:X}, V{:X}", self.0, self.1)
+        write!(f, "V{:X}, V{:X}", self.left, self.right)
     }
 }
 
+/// Floating-point check operation (NAN/INF)
 #[derive(Debug, Clone, Copy)]
 pub struct CheckOp(pub Register);
 
@@ -133,29 +160,74 @@ impl Display for CheckOp {
     }
 }
 
+/// Floating point instructions
 #[derive(Debug, Clone, Copy)]
 pub enum FloatingPointOp {
     /// Floating-point addition
+    ///
+    /// ```seis
+    /// FADD Vx, Vy, Vz
+    /// ```
     Fadd(BinaryOp),
     /// Floating-point subtraction
+    ///
+    /// ```seis
+    /// FSUB Vx, Vy, Vz
+    /// ```
     Fsub(BinaryOp),
     /// Floating-point multiplication
+    ///
+    /// ```seis
+    /// FMUL Vx, Vy, Vz
+    /// ```
     Fmul(BinaryOp),
     /// Floating-point division
+    ///
+    /// ```seis
+    /// FDIV Vx, Vy, Vz
+    /// ```
     Fdiv(BinaryOp),
     /// Floating-point modulo
+    ///
+    /// ```seis
+    /// FMOD Vx, Vy, Vz
+    /// ```
     Fmod(BinaryOp),
     /// Floating-point comparison
+    ///
+    /// ```seis
+    /// FCMP Vx, Vy
+    /// ```
     Fcmp(CompOp),
     /// Floating-point negation
+    ///
+    /// ```seis
+    /// FNEG Vx, Vy
+    /// ```
     Fneg(UnaryOp),
     /// Floating-point reciporacle
+    ///
+    /// ```seis
+    /// FREC Vx, Vy
+    /// ```
     Frec(UnaryOp),
     /// Integer-to-float
+    ///
+    /// ```seis
+    /// ITOF Vx, Vy
+    /// ```
     Itof(UnaryOp),
     /// Float-to-integer
+    ///
+    /// ```seis
+    /// FTOI Vx, Vy
+    /// ```
     Ftoi(UnaryOp),
     /// Floating-point check
+    ///
+    /// ```seis
+    /// FCHK Vx
+    /// ```
     Fchk(CheckOp),
 }
 
@@ -234,15 +306,47 @@ impl Info for FloatingPointOp {
         use FloatingPointOp::*;
 
         match self {
-            Fadd(BinaryOp(_, _, r))
-            | Fsub(BinaryOp(_, _, r))
-            | Fmul(BinaryOp(_, _, r))
-            | Fdiv(BinaryOp(_, _, r))
-            | Fmod(BinaryOp(_, _, r))
-            | Fneg(UnaryOp(_, r))
-            | Frec(UnaryOp(_, r))
-            | Itof(UnaryOp(_, r))
-            | Ftoi(UnaryOp(_, r)) => [r, ZF, OF, EPS, NAN, INF].into(),
+            Fadd(BinaryOp {
+                left: _,
+                right: _,
+                destination: r,
+            })
+            | Fsub(BinaryOp {
+                left: _,
+                right: _,
+                destination: r,
+            })
+            | Fmul(BinaryOp {
+                left: _,
+                right: _,
+                destination: r,
+            })
+            | Fdiv(BinaryOp {
+                left: _,
+                right: _,
+                destination: r,
+            })
+            | Fmod(BinaryOp {
+                left: _,
+                right: _,
+                destination: r,
+            })
+            | Fneg(UnaryOp {
+                source: _,
+                destination: r,
+            })
+            | Frec(UnaryOp {
+                source: _,
+                destination: r,
+            })
+            | Itof(UnaryOp {
+                source: _,
+                destination: r,
+            })
+            | Ftoi(UnaryOp {
+                source: _,
+                destination: r,
+            }) => [r, ZF, OF, EPS, NAN, INF].into(),
 
             _ => [].into(),
         }
@@ -252,15 +356,53 @@ impl Info for FloatingPointOp {
         use FloatingPointOp::*;
 
         match self {
-            Fadd(BinaryOp(r0, r1, _))
-            | Fsub(BinaryOp(r0, r1, _))
-            | Fmul(BinaryOp(r0, r1, _))
-            | Fdiv(BinaryOp(r0, r1, _))
-            | Fmod(BinaryOp(r0, r1, _))
-            | Fcmp(CompOp(r0, r1)) => [r0, r1].into(),
+            Fadd(BinaryOp {
+                left: r0,
+                right: r1,
+                destination: _,
+            })
+            | Fsub(BinaryOp {
+                left: r0,
+                right: r1,
+                destination: _,
+            })
+            | Fmul(BinaryOp {
+                left: r0,
+                right: r1,
+                destination: _,
+            })
+            | Fdiv(BinaryOp {
+                left: r0,
+                right: r1,
+                destination: _,
+            })
+            | Fmod(BinaryOp {
+                left: r0,
+                right: r1,
+                destination: _,
+            })
+            | Fcmp(CompOp {
+                left: r0,
+                right: r1,
+            }) => [r0, r1].into(),
 
-            Fneg(UnaryOp(r, _)) | Frec(UnaryOp(r, _)) | Itof(UnaryOp(r, _))
-            | Ftoi(UnaryOp(r, _)) | Fchk(CheckOp(r)) => [r].into(),
+            Fneg(UnaryOp {
+                source: r,
+                destination: _,
+            })
+            | Frec(UnaryOp {
+                source: r,
+                destination: _,
+            })
+            | Itof(UnaryOp {
+                source: r,
+                destination: _,
+            })
+            | Ftoi(UnaryOp {
+                source: r,
+                destination: _,
+            })
+            | Fchk(CheckOp(r)) => [r].into(),
         }
     }
 }
