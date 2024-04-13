@@ -19,10 +19,14 @@ pub use null::NullCache;
 use serde::Serialize;
 use std::fmt::Debug;
 
+/// Represents the data in a cache
 #[derive(Debug, Serialize)]
 pub struct LineData<'a> {
+    /// Where, in memory, the cache's data is located
     pub base_address: Word,
+    /// Whether the line has been written to before
     pub dirty: bool,
+    /// The data contained in the line
     pub data: &'a [u8],
 }
 
@@ -124,6 +128,7 @@ pub enum Status {
     Conflict,
 }
 
+/// The status of a cache line read
 #[derive(Debug, Clone, Copy)]
 pub enum LineReadStatus {
     /// An eviction ocurred
@@ -137,21 +142,26 @@ pub enum LineReadStatus {
 }
 
 impl LineReadStatus {
+    /// Returns true if a cache line got evicted
     #[inline(always)]
     pub fn evicted(self) -> bool {
         matches!(self, Self::Evicted)
     }
 
+    /// Returns true if the cache returned the [`Disabled`](LineReadStatus::Disabled)
+    /// status
     #[inline(always)]
     pub fn disabled(self) -> bool {
         matches!(self, Self::Disabled)
     }
 
+    /// Returns true if the read got skipped
     #[inline(always)]
     pub fn skipped(self) -> bool {
         matches!(self, Self::Skipped)
     }
 
+    /// Returns true if the data got inserted, but no eviction had occurred
     #[inline(always)]
     pub fn inserted(self) -> bool {
         matches!(self, Self::Inserted)
@@ -159,15 +169,18 @@ impl LineReadStatus {
 }
 
 impl Status {
+    /// Returns true if the result is a [`Cold`](Status::Cold) or [`Conflict`](Status::Conflict)
     pub fn is_miss(self) -> bool {
         matches!(self, Self::Cold | Self::Conflict)
     }
 
+    /// Returns true if the result is a [`Hit`](Status::Hit)
     pub fn is_hit(self) -> bool {
         matches!(self, Self::Hit)
     }
 }
 
+/// The result of a cache line read
 type ReadResult<T> = Result<T, Status>;
 
 impl Serialize for dyn Cache {

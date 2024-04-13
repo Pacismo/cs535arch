@@ -9,6 +9,8 @@
 //! [`module`] contains the [`Module`](module::MemoryModule) trait and
 //! datastructures implementing the trait.
 
+#![warn(missing_docs)]
+
 pub mod cache;
 pub mod memory;
 pub mod module;

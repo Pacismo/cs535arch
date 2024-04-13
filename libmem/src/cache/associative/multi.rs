@@ -1,3 +1,4 @@
+//! N-way set-associative cache
 use super::{construct_address, line::Line, split_address};
 use crate::{
     cache::{Cache, LineData, LineReadStatus, ReadResult, Status},

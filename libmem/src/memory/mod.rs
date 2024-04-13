@@ -16,8 +16,11 @@ use std::{
     slice::Iter,
 };
 
+/// Data from an [`AllocatedPageIterator`]
 pub struct AllocatedPage<'a> {
+    /// The page ID
     pub id: usize,
+    /// The data in the page
     pub data: &'a [u8],
 }
 
@@ -27,6 +30,7 @@ impl<'a> From<(usize, &'a [u8])> for AllocatedPage<'a> {
     }
 }
 
+/// A page of data (an array of [`PAGE_SIZE`] [Bytes](Byte))
 type Page = [Byte; PAGE_SIZE];
 /// An iterator over the pages of the [`Memory`] datastructure
 pub type PageIterator<'a> =
@@ -38,6 +42,7 @@ pub type AllocatedPageIterator<'a> = FlatMap<
     fn((usize, Option<&'a [u8]>)) -> Option<AllocatedPage<'a>>,
 >;
 
+/// Wrapper type enabling the printing of allocated page information
 #[repr(transparent)]
 struct AllocDebugWrapper<'a>(&'a Option<Box<Page>>);
 
@@ -61,6 +66,7 @@ fn allocate_page() -> Box<Page> {
 ///
 /// This takes extensive advantage of Rust's [`u32::from_be_bytes`] and [`u32::to_be_bytes`].
 pub struct Memory {
+    /// The pages of memory in this memory datastructure
     pages: Box<[Option<Box<Page>>]>,
 }
 
@@ -76,6 +82,7 @@ impl std::fmt::Debug for Memory {
 }
 
 impl Memory {
+    /// Create a new memory datastructure containing up to `count` pages
     pub fn new(count: usize) -> Self {
         assert!(count > 0, "Count must be greater than 0");
 
@@ -84,10 +91,12 @@ impl Memory {
         }
     }
 
+    /// The largest possible address that can be accessed
     pub fn max_address(&self) -> Word {
         ((self.pages.len() as Word) << 16) - 1
     }
 
+    /// Read a byte from memory
     pub fn read_byte(&self, address: Word) -> Byte {
         let address = address as usize % (self.pages.len() << 16);
         let page = (address & 0xFFFF_0000) >> 16;
@@ -100,6 +109,7 @@ impl Memory {
         }
     }
 
+    /// Read a short from memory
     pub fn read_short(&self, address: Word) -> Short {
         let address = address as usize % (self.pages.len() << 16);
 
@@ -137,6 +147,7 @@ impl Memory {
         }
     }
 
+    /// Read a word from memory
     pub fn read_word(&self, address: Word) -> Word {
         let address = address as usize % (self.pages.len() << 16);
         match address & 0xFFFF < 0xFFFD {
@@ -171,6 +182,7 @@ impl Memory {
         }
     }
 
+    /// Write a byte to memory
     pub fn write_byte(&mut self, address: Word, value: Byte) {
         let address = address as usize % (self.pages.len() << 16);
 
@@ -187,6 +199,7 @@ impl Memory {
         }
     }
 
+    /// Write a short to memory
     pub fn write_short(&mut self, address: Word, value: Short) {
         let address = address as usize % (self.pages.len() << 16);
         let page = (address & 0xFFFF_0000) >> 16;
@@ -220,6 +233,7 @@ impl Memory {
         }
     }
 
+    /// Write a word to memory
     pub fn write_word(&mut self, address: Word, value: Word) {
         let address = address as usize % (self.pages.len() << 16);
         let page = (address & 0xFFFF_0000) >> 16;
@@ -251,36 +265,42 @@ impl Memory {
         }
     }
 
+    /// Read a series of words from memory
     pub fn read_words(&self, address: Word, amount: usize) -> Box<[u8]> {
         let mut data = vec![0; amount].into_boxed_slice();
         self.read_words_to(address, &mut data);
         data
     }
 
+    /// Reads data from memory into a buffer
     pub fn read_words_to(&self, address: Word, to: &mut [u8]) {
         (address..(address.saturating_add(to.len() as Word)))
             .enumerate()
             .for_each(|(i, a)| to[i] = self.read_byte(a))
     }
 
+    /// Erases the entire memory space
     pub fn erase(&mut self) {
         for page in self.pages.iter_mut() {
             *page = None;
         }
     }
 
+    /// Creates an iterator over all pages
     pub fn pages(&self) -> PageIterator {
         self.pages
             .iter()
             .map(|p| p.as_ref().map(|p| p.deref().as_ref()))
     }
 
+    /// Creates an iterator over all allocated pages
     pub fn allocated_pages(&self) -> AllocatedPageIterator {
         self.pages()
             .enumerate()
             .flat_map(|(i, p)| p.map(|p| AllocatedPage::from((i, p))))
     }
 
+    /// Sets the data in a page
     pub fn set_page(&mut self, address: Word, data: &[u8]) {
         assert!(data.len() <= PAGE_SIZE);
 
@@ -295,6 +315,7 @@ impl Memory {
         }
     }
 
+    /// Gets the data in a page, if it is allocated
     pub fn get_page(&self, index: usize) -> Option<&Page> {
         self.pages[index].as_ref().map(|p| p.as_ref())
     }

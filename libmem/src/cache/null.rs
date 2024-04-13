@@ -1,3 +1,6 @@
+//! Null cache -- does not store data; only temporarily holds read data in a
+//! register to allow for a "disabled" cache mode and prevent lock-ups
+
 use super::*;
 use ReadRegister::*;
 
@@ -113,6 +116,7 @@ impl Cache for NullCache {
 }
 
 impl<'a> NullCache {
+    /// Creates a new [`NullCache`]
     #[inline(always)]
     pub fn new() -> Self {
         Self(ReadRegister::Empty)

@@ -1,3 +1,5 @@
+//! Associative ([one-way](single) and [n-way](multi)) caches
+
 mod line;
 mod multi;
 mod single;

@@ -19,9 +19,12 @@ use serde::Serialize;
 pub use single_level::SingleLevel;
 use std::{collections::HashMap, fmt::Debug};
 
+/// Represents the data in a cache.
 #[derive(Debug, Serialize)]
 pub struct CacheData<'a> {
+    /// The name of the cache that generated the data
     pub name: String,
+    /// The lines in the cache (`Some` or `None`)
     pub lines: Vec<Option<LineData<'a>>>,
 }
 
@@ -34,6 +37,7 @@ impl<'a, T: ToString + 'a> From<(T, Vec<Option<LineData<'a>>>)> for CacheData<'a
     }
 }
 
+/// The status of a cache operation
 #[derive(Debug, Clone, Copy)]
 pub enum Status {
     /// The module is idle, awaiting a new command.
@@ -45,6 +49,7 @@ pub enum Status {
     Busy(usize),
 }
 
+/// Represents the result of a cache operation
 pub type Result<T> = std::result::Result<T, Status>;
 
 /// Represents a memory module containing a cache and a DRAM memory.
