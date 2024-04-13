@@ -1,3 +1,4 @@
+//! Integer operations
 use super::{error::DecodeResult, Decode, Encode, Info};
 use crate::{
     instruction_set::{decode, error::DecodeError},
@@ -87,6 +88,7 @@ impl Display for BinaryOp {
     }
 }
 
+/// Sign extension operation
 #[derive(Debug, Clone, Copy)]
 pub struct SignExtendOp(pub Word, pub Register);
 
@@ -166,7 +168,9 @@ impl Display for UnaryOp {
 /// Comparison operation (explicitly different from [`UnaryOp`])
 #[derive(Debug, Clone, Copy)]
 pub enum CompOp {
+    /// Compare two registers
     Registers(Register, Register, bool),
+    /// Compare a register value to an immediate
     Immediate(Register, Word, bool),
 }
 
@@ -257,7 +261,9 @@ impl Display for CompOp {
 /// Comparison operation (explicitly different from [`UnaryOp`])
 #[derive(Debug, Clone, Copy)]
 pub enum TestOp {
+    /// Test two registers
     Registers(Register, Register),
+    /// Test a register against an immediate
     Immediate(Register, Word),
 }
 
@@ -333,40 +339,112 @@ impl Display for TestOp {
 #[derive(Debug, Clone, Copy)]
 pub enum IntegerOp {
     /// Add
+    ///
+    /// ```seis
+    /// ADD Vx, Vy, Vz
+    /// ```
     Add(BinaryOp),
     /// Subtract
+    ///
+    /// ```seis
+    /// SUB Vx, Vy, Vz
+    /// ```
     Sub(BinaryOp),
     /// Multiply
+    ///
+    /// ```seis
+    /// MUL Vx, Vy, Vz
+    /// ```
     Mul(BinaryOp),
     /// Divide unsigned
+    ///
+    /// ```seis
+    /// DVU Vx, Vy, Vz
+    /// ```
     Dvu(BinaryOp),
     /// Divide signed
+    ///
+    /// ```seis
+    /// DVS Vx, Vy, Vz
+    /// ```
     Dvs(BinaryOp),
     /// Modulo
+    ///
+    /// ```seis
+    /// MOD Vx, Vy, Vz
+    /// ```
     Mod(BinaryOp),
     /// Compare
+    ///
+    /// ```seis
+    /// CMP Vx, Vy
+    /// ```
     Cmp(CompOp),
     /// Test
+    ///
+    /// ```seis
+    /// TST Vx, Vy
+    /// ```
     Tst(TestOp),
     /// And
+    ///
+    /// ```seis
+    /// AND Vx, Vy, Vz
+    /// ```
     And(BinaryOp),
     /// Inclusive or
+    ///
+    /// ```seis
+    /// IOR Vx, Vy, Vz
+    /// ```
     Ior(BinaryOp),
     /// Exclusive or
+    ///
+    /// ```seis
+    /// XOR Vx, Vy, Vz
+    /// ```
     Xor(BinaryOp),
     /// Bitwise not
+    ///
+    /// ```seis
+    /// NOT Vx, Vy
+    /// ```
     Not(UnaryOp),
     /// Sign-extend
+    ///
+    /// ```seis
+    /// SXT Vx, Vy
+    /// ```
     Sxt(SignExtendOp),
     /// Logical-shift left
+    ///
+    /// ```seis
+    /// BSL Vx, Vy, Vz
+    /// ```
     Bsl(BinaryOp),
     /// Logical-shift right
+    ///
+    /// ```seis
+    /// BSR Vx, Vy, Vz
+    /// ```
     Bsr(BinaryOp),
     /// Arithmetic shift right
+    ///
+    /// ```seis
+    /// ASR Vx, Vy, Vz
+    /// ```
     Asr(BinaryOp),
     /// Rotate left
+    ///
+    /// ```seis
+    /// ROL Vx, Vy, Vz
+    /// ```
     Rol(BinaryOp),
     /// Rotate right
+    ///
+    /// ```seis
+    /// ROR Vx, Vy, Vz
+    /// ```
     Ror(BinaryOp),
 }
 
