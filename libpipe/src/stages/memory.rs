@@ -912,8 +912,8 @@ impl PipelineStage for Memory {
                                     self.forward = Some(MemoryResult::JumpSubroutine {
                                         address,
                                         link,
-                                        sp: sp.wrapping_add(8),
-                                        bp,
+                                        sp: stack_address!(sp + 8),
+                                        bp: stack_address!(sp + 8),
                                     });
                                     clock.to_ready()
                                 } else {
@@ -921,8 +921,8 @@ impl PipelineStage for Memory {
                                         result: MemoryResult::JumpSubroutine {
                                             address,
                                             link,
-                                            sp: sp.wrapping_add(8),
-                                            bp,
+                                            sp: stack_address!(sp + 8),
+                                            bp: stack_address!(sp + 8),
                                         },
                                     };
                                     clock.to_block()
@@ -945,7 +945,7 @@ impl PipelineStage for Memory {
                     RetPrep {
                         link, bp, state, ..
                     } => match state {
-                        ReadingBp => match memory.read_word(stack_address!(bp + 8)) {
+                        ReadingBp => match memory.read_word(stack_address!(bp - 4)) {
                             Ok(value) => {
                                 self.state = RetPrep {
                                     link,
@@ -966,14 +966,14 @@ impl PipelineStage for Memory {
                             }
                             Err(MemStatus::Idle) => unreachable!(),
                         },
-                        ReadingLp(bpval) => match memory.read_word(stack_address!(bp + 4)) {
+                        ReadingLp(bpval) => match memory.read_word(stack_address!(bp - 8)) {
                             Ok(value) => {
                                 if clock.is_ready() {
                                     self.state = Idle;
                                     self.forward = Some(MemoryResult::Return {
                                         address: link,
                                         bp: bpval,
-                                        sp: bp,
+                                        sp: bp.wrapping_sub(8),
                                         lp: value,
                                     });
                                     clock.to_ready()
@@ -982,7 +982,7 @@ impl PipelineStage for Memory {
                                         result: MemoryResult::Return {
                                             address: link,
                                             bp: bpval,
-                                            sp: bp,
+                                            sp: bp.wrapping_sub(8),
                                             lp: value,
                                         },
                                     };
