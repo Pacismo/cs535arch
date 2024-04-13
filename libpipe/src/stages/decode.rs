@@ -1,3 +1,5 @@
+//! Decode stage
+
 use crate::{reg_locks::Locks, regmap::RegMap, Clock, PipelineStage, Registers, Status};
 use libmem::module::MemoryModule;
 use libseis::{
@@ -10,18 +12,28 @@ use serde::Serialize;
 /// The state of the [`Decode`] object
 #[derive(Debug, Clone, Copy, Default)]
 pub enum State {
+    /// This stage is decoding an instruction
     Decoding {
+        /// The word value being decoded
         word: Word,
+        /// The location from which the value was fetched
         pc: Word,
     },
+    /// This stage is ready to forward a decoded instruction
     Ready {
+        /// The word value that was decoded
         word: Word,
+        /// The location from which the value was fetched
         pc: Word,
     },
+    /// This stage is awaiting the next instruction
     #[default]
     Idle,
+    /// This stage is squashed
     Squashed,
+    /// The last stage was a squash
     PrevSquash,
+    /// This stage has ceased execution
     Halted,
 }
 use State::*;
@@ -93,16 +105,23 @@ impl State {
     }
 }
 
+/// The result of a decode operation
 #[derive(Debug, Clone)]
 pub enum DecodeResult {
+    /// This stage is forwarding an instruction
     Forward {
+        /// The instruction that was decoded
         instruction: Instruction,
+        /// The values of the registers
         regvals: RegMap,
+        /// The registers that got locked
         reglocks: RegisterFlags,
     },
+    /// This stage is forwarding a squashed instruction
     Squashed,
 }
 
+/// The decode stage
 #[derive(Debug, Default)]
 pub struct Decode {
     state: State,
@@ -119,6 +138,7 @@ impl Serialize for Decode {
 }
 
 impl Decode {
+    /// Gets the state of this stage
     pub fn get_state(&self) -> &State {
         &self.state
     }

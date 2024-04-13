@@ -9,7 +9,7 @@ use crate::{
 use crate::{Pipeline, Registers};
 use libmem::module::MemoryModule;
 
-/// Represents an unpipelined processor
+/// Represents a pipelined processor
 #[derive(Debug)]
 pub struct Pipelined {
     memory_module: Box<dyn MemoryModule>,
@@ -94,6 +94,7 @@ impl Pipeline for Pipelined {
 }
 
 impl Pipelined {
+    /// Creates a new pipelined processor
     pub fn new(memory_module: Box<dyn MemoryModule>) -> Self {
         Self {
             memory_module,

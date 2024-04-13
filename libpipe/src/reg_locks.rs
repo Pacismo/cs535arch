@@ -1,28 +1,42 @@
+//! Register locking
+
 use std::{
     fmt::Debug,
     ops::{Deref, DerefMut, Index, IndexMut},
 };
-
 use libseis::{registers::COUNT, types::Register};
 use serde::Serialize;
 
+/// Registers by name
 #[repr(C)]
 #[derive(Serialize, Debug, Clone, Copy)]
 pub struct Named {
+    /// Variable registers
     pub v: [u8; 16],
+    /// Stack pointer
     pub sp: u8,
+    /// Stack base pointer
     pub bp: u8,
+    /// Link pointer
     pub lp: u8,
+    /// Program counter
     pub pc: u8,
+    /// Zero flag
     pub zf: u8,
+    /// Overflow flag
     pub of: u8,
+    /// Epsilon equality flag
     pub eps: u8,
+    /// NaN flag
     pub nan: u8,
+    /// Infinity flag
     pub inf: u8,
 }
 
+/// Register indexing by ID
 type Indexed = [u8; COUNT];
 
+/// Represents the locks on the processor's registers
 #[repr(C)]
 pub union Locks {
     by_name: Named,
@@ -72,10 +86,12 @@ impl IndexMut<Register> for Locks {
 }
 
 impl Locks {
+    /// Returns true if the register lock count is not zero
     pub fn is_locked(&self, reg: Register) -> bool {
         !self.is_unlocked(reg)
     }
 
+    /// Returns true if the register lock count is zero
     pub fn is_unlocked(&self, reg: Register) -> bool {
         self[reg] == 0
     }

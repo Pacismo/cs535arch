@@ -69,6 +69,7 @@ where
     fn get_state(&self) -> &Self::State;
 }
 
+/// Represents a clock signal
 #[derive(Debug, Clone, Copy)]
 pub enum Clock {
     /// The next stage is ready to receive
@@ -144,6 +145,7 @@ impl Clock {
         next.clock(self, registers, reg_locks, memory)
     }
 
+    /// Forwards the signal to the last stage
     pub fn finally<T: PipelineStage>(
         self,
         next: &mut T,
@@ -193,22 +195,27 @@ impl Status<()> {
 }
 
 impl<T: Debug> Status<T> {
+    /// Returns true if the status is [`stall`](Status::Stall)
     pub fn is_stall(&self) -> bool {
         matches!(self, Self::Stall(..))
     }
 
+    /// Returns true if the status is [`flow`](Status::Flow)
     pub fn is_flow(&self) -> bool {
         matches!(self, Self::Flow(..))
     }
 
+    /// Returns true if the status is [`ready`](Status::Ready)
     pub fn is_ready(&self) -> bool {
         matches!(self, Self::Ready(_))
     }
 
+    /// Returns true if the status is [`squashed`](Status::Squashed)
     pub fn is_squashed(&self) -> bool {
         matches!(self, Self::Squashed)
     }
 
+    /// Returns true if the status is [`dry`](Status::Dry)
     pub fn is_dry(&self) -> bool {
         matches!(self, Self::Dry)
     }

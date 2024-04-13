@@ -15,23 +15,36 @@ use std::{
     ops::{Deref, DerefMut, Index, IndexMut},
 };
 
+/// Named registers
 #[repr(C)]
 #[derive(Serialize, Debug, Clone, Copy)]
 pub struct Named {
+    /// Variable registers
     pub v: [Word; 16],
+    /// Stack pointer
     pub sp: Word,
+    /// Stack base pointer
     pub bp: Word,
+    /// Link pointer
     pub lp: Word,
+    /// Program counter
     pub pc: Word,
+    /// Zero flag
     pub zf: Word,
+    /// Overflow flag
     pub of: Word,
+    /// Epsilon equality flag
     pub eps: Word,
+    /// NaN flag
     pub nan: Word,
+    /// Infinity flag
     pub inf: Word,
 }
 
+/// Enables ID indexing
 type Indexed = [Word; COUNT];
 
+/// Represents the registers of the processor.
 #[repr(C)]
 pub union Registers {
     by_name: Named,
@@ -39,6 +52,7 @@ pub union Registers {
 }
 
 impl Registers {
+    /// Creates an iterator over the registers
     pub fn iter(&self) -> std::slice::Iter<Word> {
         unsafe { self.by_id.iter() }
     }

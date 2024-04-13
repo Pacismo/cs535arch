@@ -55,76 +55,126 @@ pub enum ExecuteResult {
     ///
     /// Sets the flag registers
     WriteReg {
+        /// The destination register
         destination: Register,
+        /// What to write to the destination register
         value: Word,
 
+        /// ZF register state
         zf: bool,
+        /// OF register state
         of: bool,
+        /// EPS register state
         eps: bool,
+        /// NAN register state
         nan: bool,
+        /// INF register state
         inf: bool,
     },
     /// Write back a sequence of bits to the status registers
     WriteStatus {
+        /// ZF register state
         zf: bool,
+        /// OF register state
         of: bool,
+        /// EPS register state
         eps: bool,
+        /// NAN register state
         nan: bool,
+        /// INF register state
         inf: bool,
     },
     /// Write a value from a register to a location in memory
     ///
     /// Only considers the least significant byte
     WriteMemByte {
+        /// Where to write to
         address: Word,
+        /// What to write
         value: Byte,
+        /// Whether to skip the cache
         volatile: bool,
     },
     /// Write a value from a register to a location in memory
     ///
     /// Only considers the least significant two bytes
     WriteMemShort {
+        /// Where to write to
         address: Word,
+        /// What to write
         value: Short,
+        /// Whether to skip the cache
         volatile: bool,
     },
     /// Write a value from a register to a location in memory
     WriteMemWord {
+        /// Where to write to
         address: Word,
+        /// What to write
         value: Word,
+        /// Whether to skip the cache
         volatile: bool,
     },
     /// Read a byte from a location in memory into a register
     ReadMemByte {
+        /// Where to read from
         address: Word,
+        /// Where to write the read value
         destination: Register,
+        /// Whether to skip the cache
         volatile: bool,
     },
     /// Read a short from a location in memory into a register
     ReadMemShort {
+        /// Where to read from
         address: Word,
+        /// Where to write the read value
         destination: Register,
+        /// Whether to skip the cache
         volatile: bool,
     },
     /// Read a word from a location in memory into a register
     ReadMemWord {
+        /// Where to read from
         address: Word,
+        /// Where to write the read value
         destination: Register,
+        /// Whether to skip the cache
         volatile: bool,
     },
     /// Read a register from the stack
-    ReadRegStack { register: Register, sp: Word },
+    ReadRegStack {
+        /// The register to write the value to
+        register: Register,
+        /// The current stack pointer value
+        sp: Word,
+    },
     /// Write a register to the stack
-    WriteRegStack { value: Word, sp: Word },
+    WriteRegStack {
+        /// The value to write to the stack
+        value: Word,
+        /// The current stack pointer value
+        sp: Word,
+    },
     /// Squash all instructions in the pipeline
-    Squash { regs: RegisterFlags },
+    Squash {
+        /// The set of all register locks owned by the squashed instruction
+        regs: RegisterFlags,
+    },
     /// Ignore a jump instruction
-    Ignore { regs: RegisterFlags },
+    Ignore {
+        /// The set of all register locks owned by the squashed instruction
+        regs: RegisterFlags,
+    },
     /// Simply remove a word from the stack (since the destination was invalid)
-    PopStack { sp: Word },
+    PopStack {
+        /// The current stack pointer value
+        sp: Word,
+    },
 }
 
 impl ExecuteResult {
+    /// Returns true if the result requires a squash signal to be sent
     #[inline]
     pub fn should_squash(&self) -> bool {
         matches!(
@@ -133,29 +183,43 @@ impl ExecuteResult {
         )
     }
 
+    /// Returns true if the result is a halt
     #[inline]
     pub fn is_halt(&self) -> bool {
         matches!(self, ExecuteResult::Halt)
     }
 }
 
+/// Represents the current state of the execute stage
 #[derive(Debug, Clone, Default)]
 pub enum State {
+    /// Awaiting the next instruction
     #[default]
     Idle,
+    /// Executing the next instruction
     Executing {
+        /// The instruction being executed
         instruction: Instruction,
+        /// The registers owned by this instruction
         wregs: RegisterFlags,
+        /// The values read by the decode stage
         rvals: RegMap,
+        /// The number of clocks required before the instruction is finished executing
         clocks: usize,
     },
+    /// This stage is ready to forward a result
     Ready {
+        /// The result to be forwarded
         result: ExecuteResult,
+        /// The registers owned by this instruction
         wregs: RegisterFlags,
     },
+    /// This stage has been squashed and is waiting to send the signal forward
     Squashed {
+        /// The register locks being held by this (squashed) instruction
         wregs: RegisterFlags,
     },
+    /// This stage has been halted
     Halted,
 }
 use State::*;
@@ -234,6 +298,7 @@ impl State {
     }
 }
 
+/// Represents the execute pipeline stage
 #[derive(Debug, Default)]
 pub struct Execute {
     state: State,

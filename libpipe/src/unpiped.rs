@@ -9,6 +9,7 @@ use crate::{
 use crate::{Pipeline, Registers};
 use libmem::module::MemoryModule;
 
+/// The current stage of the pipeline
 #[derive(Debug, Default, Clone)]
 enum Stage {
     #[default]
@@ -170,6 +171,7 @@ impl Pipeline for Unpipelined {
 }
 
 impl Unpipelined {
+    /// Create a new unpipelined processor
     pub fn new(memory_module: Box<dyn MemoryModule>) -> Self {
         Self {
             memory_module,

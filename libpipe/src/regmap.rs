@@ -1,3 +1,5 @@
+//! The datastructures necessary to map values to registers and minimize overhead
+
 use libseis::{
     registers::get_name,
     types::{Register, Word},
@@ -5,9 +7,12 @@ use libseis::{
 use serde::Serialize;
 use std::ops::{Index, IndexMut};
 
+/// Represents a pair of registers
 #[derive(Debug, Clone, Copy, Serialize)]
 pub struct RegMapPair {
+    /// The register ID
     pub register: Register,
+    /// The register value
     pub value: Word,
 }
 

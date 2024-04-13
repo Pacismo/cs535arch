@@ -4,6 +4,8 @@
 //! The expectation is that the processor will implement the
 //! fetch, decode, execute, memory, and writeback stages.
 
+#![warn(missing_docs)]
+
 mod piped;
 mod reg_locks;
 mod registers;
@@ -20,12 +22,18 @@ pub use stages::*;
 use std::fmt::Debug;
 pub use unpiped::Unpipelined;
 
+/// Represents the major stages in a [`Pipeline`]
 #[derive(Debug)]
 pub struct PipelineStages<'a> {
+    /// The [`fetch`](Fetch) stage
     pub fetch: &'a Fetch,
+    /// The [`decode`](Decode) stage
     pub decode: &'a Decode,
+    /// The [`execute`](Execute) stage
     pub execute: &'a Execute,
+    /// The [`memory`](Memory) stage
     pub memory: &'a Memory,
+    /// The [`writeback`](Writeback) stage
     pub writeback: &'a Writeback,
 }
 
