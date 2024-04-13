@@ -4,12 +4,10 @@ mod parse;
 #[cfg(test)]
 mod test;
 
-use std::fs::File;
-
 use clap::Parser;
+use linker::link_symbols;
 use parse::{tokenize, Error, Lines};
-
-use crate::linker::link_symbols;
+use std::fs::File;
 
 fn main() {
     let cli = cli::Command::parse();
