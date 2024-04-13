@@ -1,3 +1,5 @@
+//! Control instructions
+
 use super::{
     error::{DecodeError, DecodeResult},
     Decode, Encode, Info,
@@ -106,7 +108,7 @@ pub enum ControlOp {
     /// ```seis
     /// JMP Vx     ; Absolute jump
     /// JMP N      ; Relative jump
-    /// JMP .label ; Expands to N
+    /// JMP label ; Expands to N
     /// ```
     Jmp(Jump),
     /// Jump to subroutine
@@ -119,7 +121,7 @@ pub enum ControlOp {
     /// ```seis
     /// JSR Vx     ; Jump to subroutine (absolute)
     /// JSR N      ; Jump to subroutine (relative)
-    /// JSR .label ; Expands to Vx with load or N
+    /// JSR label ; Expands to Vx with load or N
     /// ```
     Jsr(Jump),
     /// Jump if equal (ZF = 1)
@@ -127,7 +129,7 @@ pub enum ControlOp {
     /// ```seis
     /// JEQ Vx
     /// JEQ N
-    /// JEQ .label ; Expands to N
+    /// JEQ label ; Expands to N
     /// ```
     Jeq(Jump),
     /// Jump if not equal (ZF = 0)
@@ -135,7 +137,7 @@ pub enum ControlOp {
     /// ```seis
     /// JNE Vx
     /// JNE N
-    /// JNE .label ; Expands to N
+    /// JNE label ; Expands to N
     /// ```
     Jne(Jump),
     /// Jump if greater than (ZF = 0 & OF = 1)
@@ -143,7 +145,7 @@ pub enum ControlOp {
     /// ```seis
     /// JGT Vx
     /// JGT N
-    /// JGT .label ; Expands to N
+    /// JGT label ; Expands to N
     /// ```
     Jgt(Jump),
     /// Jump if less than (ZF = 0 & OF = 0)
@@ -151,7 +153,7 @@ pub enum ControlOp {
     /// ```seis
     /// JLT Vx
     /// JLT N
-    /// JLT .label ; Expands to N
+    /// JLT label ; Expands to N
     /// ```
     Jlt(Jump),
     /// Jump if greater than or equal to (OF = 1 | ZF = 1)
@@ -159,7 +161,7 @@ pub enum ControlOp {
     /// ```seis
     /// JGE Vx
     /// JGE N
-    /// JGE .label ; Expands to N
+    /// JGE label ; Expands to N
     /// ```
     Jge(Jump),
     /// Jump if less than or equal to (OF = 0 | ZF = 1)
@@ -167,7 +169,7 @@ pub enum ControlOp {
     /// ```seis
     /// JLE Vx
     /// JLE N
-    /// JLE .label ; Expands to N
+    /// JLE label ; Expands to N
     /// ```
     Jle(Jump),
 }

@@ -1,32 +1,47 @@
-use serde::Serialize;
+//! Constants for the registers, including getting the names of a
+//! register based on an index
 
+use serde::Serialize;
 use crate::types::{Register, Word};
 use std::{
     fmt::{Display, Write},
     ops::{BitOr, BitOrAssign},
 };
 
+/// Variable registers
 pub const V: [Register; 16] = [
     0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
 ];
 
+/// Stack pointer
 pub const SP: Register = 0x10;
+/// Stack base pointer
 pub const BP: Register = 0x11;
+/// Link pointer
 pub const LP: Register = 0x12;
+/// Program counter
 pub const PC: Register = 0x13;
+/// Zero flag
 pub const ZF: Register = 0x14;
+/// Overflow flag
 pub const OF: Register = 0x15;
+/// Epsilon-equality flag
 pub const EPS: Register = 0x16;
+/// Not-a-number flag
 pub const NAN: Register = 0x17;
+/// Infinity flag
 pub const INF: Register = 0x18;
 
+/// The number of registers in the processor
 pub const COUNT: usize = (INF as usize) + 1;
 
+/// The names of the registers
 pub const NAME: [&'static str; COUNT] = [
     "V0", "V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "VA", "VB", "VC", "VD", "VE", "VF",
     "SP", "BP", "LP", "PC", "ZF", "OF", "EPS", "NAN", "INF",
 ];
 
+/// Gets the name of the provided `reg` based on the contents of [`NAME`]
 pub const fn get_name(reg: Register) -> Option<&'static str> {
     if (reg as usize) >= COUNT {
         None
@@ -35,6 +50,7 @@ pub const fn get_name(reg: Register) -> Option<&'static str> {
     }
 }
 
+/// Transforms the register name into its corresponding ID.
 pub fn get_id(name: &str) -> Option<Register> {
     let target = name.to_uppercase();
 
@@ -44,10 +60,14 @@ pub fn get_id(name: &str) -> Option<Register> {
         .map(|(i, _)| i as Register)
 }
 
+/// An iterator over the flags of the register.
+///
+/// Returns an integer ID representing the register.
 #[derive(Debug, Clone)]
 pub struct RegFlagIterator(Word, Register);
 
 impl RegFlagIterator {
+    /// Transforms the iterator into a vector.
     pub fn to_vec(self) -> Vec<Register> {
         self.collect()
     }
@@ -79,6 +99,7 @@ impl Iterator for RegFlagIterator {
 
 impl ExactSizeIterator for RegFlagIterator {}
 
+/// A bitset representing the registers.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct RegisterFlags(pub Word);
 
@@ -99,18 +120,22 @@ impl IntoIterator for RegisterFlags {
 }
 
 impl RegisterFlags {
+    /// Returns `true` if the register is in the bitset
     pub fn has_register(self, reg_id: Register) -> bool {
         self.0 & (1 << reg_id as Word) != 0
     }
 
+    /// Returns an iterator over the bitset
     pub fn registers(self) -> RegFlagIterator {
         self.into_iter()
     }
 
+    /// Transforms the bitset into a vector of integer IDs
     pub fn to_vec(self) -> Vec<Register> {
         self.into_iter().collect()
     }
 
+    /// Gets the number of registers enabled in the bitset.
     pub fn count(&self) -> usize {
         self.into_iter().count()
     }

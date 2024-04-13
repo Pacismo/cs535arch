@@ -1,3 +1,5 @@
+//! Type definitions for the simulation
+
 /// One byte \[0, 255]
 pub type Byte = u8;
 /// One byte \[-128, 127]

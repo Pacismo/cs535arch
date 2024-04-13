@@ -1,3 +1,5 @@
+//! Register operations
+
 use super::{error::DecodeResult, Decode, Encode, Info};
 use crate::registers::{get_name, RegisterFlags, EPS, INF, NAN, OF, SP, ZF};
 use crate::{
@@ -21,16 +23,26 @@ impl Encode for Register {
     }
 }
 
+/// Represents an immediate load operation
 #[derive(Debug, Clone, Copy)]
 pub enum ImmOp {
+    /// An immediate value, with a shift
     Immediate {
+        /// Whether to zero out the entire register
         zero: bool,
+        /// How many bytes to shift the number
         shift: Byte,
+        /// What to set the register to
         immediate: Short,
+        /// Where to store the immediate value
         destination: Register,
     },
+    /// Loads the address value in the lower-order bits
+    /// and the short page's ID in the higher-order bits
     ZeroPageTranslate {
+        /// The short-page address
         address: Short,
+        /// The register to store the address to
         destination: Register,
     },
 }
@@ -135,9 +147,12 @@ impl Display for ImmOp {
     }
 }
 
+/// Represents a register transfer operation
 #[derive(Debug, Clone, Copy)]
 pub struct RegOp {
+    /// Where to read the value from
     pub source: Register,
+    /// Where to store the value to
     pub destination: Register,
 }
 
@@ -184,29 +199,50 @@ impl Display for RegOp {
 #[derive(Debug, Clone, Copy)]
 pub enum WriteOp {
     /// Address with the zero-page ID in the upper bytes
-    ZeroPage { address: Short, source: Register },
+    ZeroPage {
+        /// The address to write to
+        address: Short,
+        /// The source register
+        source: Register,
+    },
     /// Data from an address
     Indirect {
+        /// Whether to skip the cache
         volatile: bool,
+        /// The register containing the effective address
         address: Register,
+        /// The source register
         source: Register,
     },
     /// Data from an address at an offset (times the width of the read)
     OffsetIndirect {
+        /// Whether to skip the cache
         volatile: bool,
+        /// The register from which the address comes from
         address: Register,
+        /// The immediate offset
         offset: Short,
+        /// The source register
         source: Register,
     },
     /// Data from an address at an index (times the width of the read)
     IndexedIndirect {
+        /// Whether to skip the cache
         volatile: bool,
+        /// The register from which the address comes from
         address: Register,
+        /// The offset from that address
         index: Register,
+        /// The source register
         source: Register,
     },
-    /// Data from the stack, offset (multiplied by the width of the read) from the stack pointer
-    StackOffset { offset: Short, source: Register },
+    /// Data from the stack, offset from the stack base pointer
+    StackOffset {
+        /// The offset from the base pointer
+        offset: Short,
+        /// The source register
+        source: Register,
+    },
 }
 
 impl WriteOp {
@@ -416,32 +452,47 @@ impl Display for WriteOp {
 pub enum ReadOp {
     /// Address with the zero-page ID in the upper bytes
     ZeroPage {
+        /// The effective address from within the short page
         address: Short,
+        /// Where to store the read value
         destination: Register,
     },
     /// Data from an address
     Indirect {
+        /// Whether to skip the cache
         volatile: bool,
+        /// The register containing the effective address
         address: Register,
+        /// Where to store the read value
         destination: Register,
     },
     /// Data from an address at an offset (times the width of the read)
     OffsetIndirect {
+        /// Whether to skip the cache
         volatile: bool,
+        /// The register containing an address
         address: Register,
+        /// An immediate offset
         offset: Short,
+        /// Where to store the read value
         destination: Register,
     },
     /// Data from an address at an index (times the width of the read)
     IndexedIndirect {
+        /// Whether to skip the cache
         volatile: bool,
+        /// The register containing an address
         address: Register,
+        /// The register containing the offset
         index: Register,
+        /// Where to store the read value
         destination: Register,
     },
-    /// Data from the stack, offset (multiplied by the width of the read) from the stack base
+    /// Data from the stack, offset from the stack base
     StackOffset {
+        /// The immediate offset
         offset: Short,
+        /// Where to store the read value
         destination: Register,
     },
 }
@@ -659,17 +710,95 @@ impl Display for ReadOp {
     }
 }
 
+/// Instructions for any [register operations](crate::instruction_set::Instruction::Register)
 #[derive(Debug, Clone, Copy)]
 pub enum RegisterOp {
+    /// Load byte to register
+    ///
+    /// ```seis
+    /// LBR Va, Vx     ; Indirect
+    /// LBR Va + n, Vx ; Offset indirect
+    /// LBR Va[Vi], Vx ; Indexed indirect
+    /// LBR @zpg, Vx   ; Zero page
+    /// LBR %bpo, Vx   ; Base pointer offset
+    /// ```
     Lbr(ReadOp),
+    /// Load short to register
+    ///
+    /// ```seis
+    /// LSR Va, Vx     ; Indirect
+    /// LSR Va + n, Vx ; Offset indirect
+    /// LSR Va[Vi], Vx ; Indexed indirect
+    /// LSR @zpg, Vx   ; Zero page
+    /// LSR %bpo, Vx   ; Base pointer offset
+    /// ```
     Lsr(ReadOp),
+    /// Load long (word) to register
+    ///
+    /// ```seis
+    /// LLR Va, Vx     ; Indirect
+    /// LLR Va + n, Vx ; Offset indirect
+    /// LLR Va[Vi], Vx ; Indexed indirect
+    /// LLR @zpg, Vx   ; Zero page
+    /// LLR %bpo, Vx   ; Base pointer offset
+    /// ```
     Llr(ReadOp),
+    /// Store byte from register
+    ///
+    /// ```seis
+    /// SBR Vx, Va     ; Indirect
+    /// SBR Vx, Va + n ; Offset indirect
+    /// SBR Vx, Va[Vi] ; Indexed indirect
+    /// SBR Vx, @zpg   ; Zero page
+    /// SBR Vx, %bpo   ; Base pointer offset
+    /// ```
     Sbr(WriteOp),
+    /// Store short from register
+    ///
+    /// ```seis
+    /// SSR Vx, Va     ; Indirect
+    /// SSR Vx, Va + n ; Offset indirect
+    /// SSR Vx, Va[Vi] ; Indexed indirect
+    /// SSR Vx, @zpg   ; Zero page
+    /// SSR Vx, %bpo   ; Base pointer offset
+    /// ```
     Ssr(WriteOp),
+    /// Store long (word) from register
+    ///
+    /// ```seis
+    /// SLR Vx, Va     ; Indirect
+    /// SLR Vx, Va + n ; Offset indirect
+    /// SLR Vx, Va[Vi] ; Indexed indirect
+    /// SLR Vx, @zpg   ; Zero page
+    /// SLR Vx, %bpo   ; Base pointer offset
+    /// ```
     Slr(WriteOp),
+    /// Transfer
+    ///
+    /// ```seis
+    /// TFR Vs, Vd
+    /// ```
     Tfr(RegOp),
+    /// Push to stack
+    ///
+    /// ```seis
+    /// PUSH { V1, V2, ..., Vn } ; Expands to a sequence of PUSH operations
+    /// ```
     Push(Register),
+    /// Pop
+    ///
+    /// ```seis
+    /// POP { V1, V2, ..., Vn } ; Expands to a sequence of POP instructions (in reverse order)
+    /// ```
     Pop(Register),
+    /// Load immediate value to register
+    ///
+    /// ```seis
+    /// LDR imm, Vx   ; Load and zero
+    /// LDR imm, Vx.0 ; Load lower without zeroing
+    /// LDR imm, Vx.1 ; Load upper without zeroing
+    /// LDR &zpa, Vx  ; Load zero page address
+    /// ```
     Ldr(ImmOp),
 }
 

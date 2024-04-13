@@ -1,22 +1,35 @@
+//! Decoding errors
+
 use crate::{
     registers,
     types::{Register, Word},
 };
 use std::{error::Error, fmt::Display};
 
+/// An enumerator representing the kinds of errors that may
+/// happen in decoding
 #[derive(Debug, Clone)]
 pub enum DecodeError {
+    /// The operation type was invalid
     InvalidOpType(Word),
 
+    /// The control operation was invalid
     InvalidControlOp(Word),
 
+    /// The integer operation was invalid
     InvalidIntegerOp(Word),
+    /// The floating-point operation was invalid
     InvalidFloatingPointOp(Word),
 
+    /// The register operation was invalid
     InvalidRegisterOp(Word),
+    /// Invalid addressing mode
     InvalidAddressingMode(Word),
+    /// Invalid push operation
     InvalidPushOp(Word),
+    /// Invalid pop operation
     InvalidPopOp(Word),
+    /// Invalid register operation
     InvalidRegister(Register, Register),
 }
 
@@ -55,4 +68,5 @@ impl Display for DecodeError {
     }
 }
 
+/// Type alias for a decode result
 pub type DecodeResult<T> = std::result::Result<T, DecodeError>;

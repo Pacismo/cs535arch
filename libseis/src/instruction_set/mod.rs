@@ -1,3 +1,12 @@
+//! Enumerators representing the structure of an instruction.
+//!
+//! Each enumerator contains data representing the instruction and
+//! its operands. Instructions here are represented as a tree, where
+//! the value of the previous level dictates the structure of the next.
+//!
+//! This also contains a set of traits defining the interfaces for encoding
+//! and decoding instructions.
+
 pub mod control;
 pub mod error;
 pub mod floating_point;
@@ -24,6 +33,8 @@ pub trait Encode: Sized {
     fn encode(self) -> Word;
 }
 
+/// Represents an interface for getting information about the
+/// registers involved in the instruction.
 pub trait Info: Sized {
     /// Gets the registers being written to
     fn get_write_regs(self) -> RegisterFlags;
@@ -44,11 +55,16 @@ pub fn encode<E: Encode>(e: E) -> Word {
     e.encode()
 }
 
+/// Instruction categories
 #[derive(Debug, Clone, Copy)]
 pub enum Instruction {
+    /// Control operations
     Control(ControlOp),
+    /// Integer arithmetic
     Integer(IntegerOp),
+    /// Floating-point arithmetic
     FloatingPoint(FloatingPointOp),
+    /// Register operations
     Register(RegisterOp),
 }
 
