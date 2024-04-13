@@ -21,6 +21,7 @@
             <DataGridTextColumn Header="Decimal" Binding="{Binding Decimal}"/>
             <DataGridTextColumn Header="Hexadecimal" Binding="{Binding Hexdecimal}"/>
             <DataGridTextColumn Header="Binary" Binding="{Binding Binary}"/>
+            <DataGridTextColumn Header="FP32" Binding="{Binding FP}"/>
         </DataGrid.Columns>
     </DataGrid>
 </UserControl>

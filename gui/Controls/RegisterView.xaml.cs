@@ -4,6 +4,14 @@ using System.Windows.Controls;
 
 namespace gui.Controls
 {
+    public static class FloatConvert
+    {
+        public static unsafe float FromInteger(uint value)
+        {
+            return *((float*) &value);
+        }
+    }
+
     public struct RegisterViewRow(string register, uint value)
     {
         public string Register { get; set; } = register;
@@ -11,7 +19,9 @@ namespace gui.Controls
         public string Decimal { get; set; } = value.ToString("d");
 
         public string Hexdecimal { get; set; } = value.ToString("X8");
+        public float FP { get; set; } = FloatConvert.FromInteger(value);
     }
+
     /// <summary>
     /// Interaction logic for RegisterView.xaml
     /// </summary>
