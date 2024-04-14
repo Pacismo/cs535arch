@@ -220,7 +220,6 @@
                 }
             },
             "args": [
-                "-f",
                 "./benchmarks/exchange.bin",
                 "./benchmarks/exchange.toml",
             ],
