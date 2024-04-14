@@ -48,8 +48,6 @@ fn prepare_config(
 fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
 
-    println!("{cli:#?}");
-
     if let Some(info) = cli.info {
         let example = SimulationConfiguration {
             cache: [
