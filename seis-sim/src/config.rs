@@ -5,7 +5,7 @@ use libmem::{
     module::SingleLevel,
 };
 use libpipe::{Pipeline, Pipelined, Unpipelined};
-use std::{collections::HashMap, error::Error, fmt::Display, path::PathBuf, str::FromStr};
+use std::{collections::HashMap, error::Error, fmt::Display, str::FromStr};
 
 #[derive(Debug, Clone, Copy)]
 pub enum CacheConfiguration {
@@ -264,11 +264,5 @@ impl SimulationConfiguration {
         table.insert("cache".to_string(), caches.into());
 
         table
-    }
-
-    pub fn from_toml_file(file: PathBuf) -> Result<Self, Box<dyn Error>> {
-        let fdata = std::fs::read_to_string(file)?;
-        let table = toml::from_str(&fdata)?;
-        Self::from_toml(&table)
     }
 }

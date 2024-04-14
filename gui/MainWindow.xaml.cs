@@ -118,8 +118,7 @@ namespace gui
         public void Start(string binary_file, Configuration config)
         {
             running_config = config;
-            File.WriteAllText(MainWindow.CONFIG_FILE(), Toml.FromModel(config.IntoToml()));
-            string[] args = [MainWindow.CONFIG_FILE(), binary_file, "-b"];
+            string[] args = [binary_file, "-i", Toml.FromModel(config.IntoToml()), "-b"];
             backend_process = Process.Start(new ProcessStartInfo(SEIS_SIM_BIN_PATH, args)
             {
                 RedirectStandardInput = true,
@@ -128,7 +127,7 @@ namespace gui
                 ErrorDialog = true,
             });
 
-            lock(proc_mtx)
+            lock (proc_mtx)
             {
                 Dictionary<string, uint> dict = DeserializeResult<Dictionary<string, uint>>("info pages")?.result!;
                 max_page = dict["page_count"];
@@ -217,9 +216,6 @@ namespace gui
     /// </summary>
     public partial class MainWindow : Window
     {
-        public static string APPDIR() => Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "seis-sim-gui");
-        public static string CONFIG_FILE() => Path.Join(APPDIR(), "config.toml");
-
         public static RoutedCommand ClockCommand = new();
 
         string binary_file = "";
@@ -251,9 +247,6 @@ namespace gui
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            if (!Directory.Exists(APPDIR()))
-                Directory.CreateDirectory(APPDIR());
-
             foreach (TabItem tab in Tabs.Items)
                 tab.Visibility = Visibility.Hidden;
             Tabs_Config.Visibility = Visibility.Visible;
@@ -279,30 +272,11 @@ namespace gui
                     {
                         new OkDialog("Error Reading Configuration", $"There was a problem loading the configuration from {cli[1]}\n{x}").ShowDialog();
                     }
-
-            if (!File.Exists(CONFIG_FILE()))
-                try
-                {
-                    string[] args = ["-e", CONFIG_FILE()];
-                    Process proc = Process.Start(SimulationState.SEIS_SIM_BIN_PATH, args);
-                    proc.WaitForExit();
-                }
-                catch { }
-            LoadConfigurationFrom(CONFIG_FILE());
         }
 
         private void Window_Closed(object sender, EventArgs e)
         {
             state.backend_process?.Kill();
-            if (ValidateConfiguration())
-                try
-                {
-                    File.WriteAllText(CONFIG_FILE(), Toml.FromModel(GetConfiguration().IntoToml()));
-                }
-                catch (Exception ex)
-                {
-                    new OkDialog("Failed To Store Configuration", $"There was an issue while saving this configuration\n{ex}").ShowDialog();
-                }
         }
 
         private void Exit_Click(object sender, RoutedEventArgs e)

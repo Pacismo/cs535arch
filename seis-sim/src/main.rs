@@ -10,14 +10,24 @@ use libpipe::Pipeline;
 use libseis::{pages::PAGE_SIZE, types::Word};
 use std::{error::Error, fs::read, path::PathBuf};
 
+fn into_toml(file: Option<PathBuf>, string: Option<String>) -> Result<toml::Table, Box<dyn Error>> {
+    if let Some(f) = file {
+        Ok(toml::from_str(&std::fs::read_to_string(f)?)?)
+    } else if let Some(s) = string {
+        Ok(toml::from_str(&s)?)
+    } else {
+        Err("Etiher a string or a file configuration is required".into())
+    }
+}
+
 /// However many pages of memory are supported by the simulator
 const PAGES: usize = 16;
 
 fn prepare_config(
-    conf: PathBuf,
+    conf: toml::Table,
     bin: PathBuf,
 ) -> Result<(Box<dyn Pipeline>, SimulationConfiguration), Box<dyn Error>> {
-    let conf = SimulationConfiguration::from_toml_file(conf)?;
+    let conf = SimulationConfiguration::from_toml(&conf)?;
     let mut pipeline = conf.clone().into_boxed_pipeline();
 
     let memory = pipeline.memory_module_mut().memory_mut();
@@ -37,6 +47,8 @@ fn prepare_config(
 
 fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
+
+    println!("{cli:#?}");
 
     if let Some(info) = cli.info {
         let example = SimulationConfiguration {
@@ -67,18 +79,22 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         }
     } else if let Some(SimulatorConfig {
-        configuration,
+        file_config,
+        inline_config,
         image_file,
         backend_mode,
     }) = cli.config
     {
-        let (pipeline, config) = prepare_config(configuration, image_file)?;
+        let (pipeline, config) =
+            prepare_config(into_toml(file_config, inline_config)?, image_file)?;
 
         if backend_mode {
             interface::Backend.run(pipeline, config)?;
         } else {
             interface::Tui.run(pipeline, config)?;
         }
+    } else {
+        panic!("No configuration provided")
     }
 
     Ok(())
