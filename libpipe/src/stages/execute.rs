@@ -36,8 +36,6 @@ pub enum ExecuteResult {
         sp: Word,
         /// The current value of the BP
         bp: Word,
-        /// The current value of the LP
-        lp: Word,
     },
     /// Jumps to a location
     JumpTo {

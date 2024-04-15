@@ -26,14 +26,12 @@ impl Resolver for ControlOp {
             ControlOp::Jsr(Jump::Register(reg)) => Subroutine {
                 address: regvals[reg],
                 link: regvals[PC].wrapping_add(4),
-                lp: regvals[LP],
                 sp: regvals[SP],
                 bp: regvals[BP],
             },
             ControlOp::Jsr(Jump::Relative(rel)) => Subroutine {
                 address: regvals[PC].wrapping_add_signed(rel),
                 link: regvals[PC].wrapping_add(4),
-                lp: regvals[LP],
                 sp: regvals[SP],
                 bp: regvals[BP],
             },

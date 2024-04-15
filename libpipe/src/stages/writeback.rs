@@ -142,17 +142,14 @@ impl PipelineStage for Writeback {
                     address,
                     bp,
                     sp,
-                    lp,
                 } => {
                     registers[PC] = address;
                     registers[BP] = bp;
                     registers[SP] = sp;
-                    registers[LP] = lp;
 
                     locks[PC] -= 1;
                     locks[BP] -= 1;
                     locks[SP] -= 1;
-                    locks[LP] -= 1;
                 }
             }
         }

@@ -275,7 +275,7 @@ impl Info for ControlOp {
         use ControlOp::*;
 
         match self {
-            Ret => [PC, LP, SP, BP].into(),
+            Ret => [PC, SP, BP].into(),
             Jmp(_) | Jeq(_) | Jne(_) | Jgt(_) | Jlt(_) | Jge(_) | Jle(_) => [PC].into(),
             Jsr(_) => [PC, LP, SP, BP].into(),
 
@@ -310,8 +310,8 @@ impl Info for ControlOp {
             Jle(Register(r)) => [r, PC, ZF, OF].into(),
             Jle(Relative(_)) => [PC, ZF, OF].into(),
 
-            Jsr(Register(r)) => [r, PC, LP, SP, BP].into(),
-            Jsr(Relative(_)) => [PC, LP, SP, BP].into(),
+            Jsr(Register(r)) => [r, PC, SP, BP].into(),
+            Jsr(Relative(_)) => [PC, SP, BP].into(),
             Ret => [LP, BP].into(),
 
             _ => [].into(),

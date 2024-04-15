@@ -8,7 +8,6 @@ use libseis::{
     types::{Byte, Register, Short, Word},
 };
 use serde::Serialize;
-use std::fmt::Display;
 
 /// Represents the kind of read being done
 #[derive(Debug, Clone, Copy)]
@@ -230,68 +229,6 @@ impl WriteMode {
     }
 }
 
-/// Represents the state of the JSR instruction
-#[derive(Debug, Clone, Copy)]
-pub enum JsrPrepState {
-    /// We are writing the current value of the link pointer
-    WritingLp,
-    /// We are writing the current value of the stack base pointer
-    WritingBp,
-}
-use JsrPrepState::*;
-
-impl Serialize for JsrPrepState {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        match self {
-            WritingLp => serializer.serialize_str("writing_lp"),
-            WritingBp => serializer.serialize_str("writing_bp"),
-        }
-    }
-}
-
-impl Display for JsrPrepState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            WritingLp => write!(f, "Writing the LP"),
-            WritingBp => write!(f, "Writing the BP"),
-        }
-    }
-}
-
-/// Represents the state of the RET instruction
-#[derive(Debug, Clone, Copy)]
-pub enum RetPrepState {
-    /// We are reading the base pointer from the stack
-    ReadingBp,
-    /// We are reading the link pointer from the stack
-    ReadingLp(Word),
-}
-use RetPrepState::*;
-
-impl Serialize for RetPrepState {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        match self {
-            ReadingBp => serializer.serialize_str("reading_bp"),
-            ReadingLp(..) => serializer.serialize_str("reading_lp"),
-        }
-    }
-}
-
-impl Display for RetPrepState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ReadingLp(_) => write!(f, "Reading the LP"),
-            ReadingBp => write!(f, "Reading the BP"),
-        }
-    }
-}
-
 /// Represents the state of the memory stage
 #[derive(Debug, Clone, Copy, Default)]
 pub enum State {
@@ -349,10 +286,6 @@ pub enum State {
         sp: Word,
         /// The current BP value
         bp: Word,
-        /// The curren LP value
-        lp: Word,
-        /// Where in the preparation we are
-        state: JsrPrepState,
         /// Clock requirement metadata
         clocks: usize,
     },
@@ -362,8 +295,6 @@ pub enum State {
         link: Word,
         /// Current BP value
         bp: Word,
-        /// Return preparation state
-        state: RetPrepState,
         /// Clock requirement metadata
         clocks: usize,
     },
@@ -444,32 +375,22 @@ impl Serialize for State {
                 link,
                 sp,
                 bp,
-                lp,
-                state,
                 clocks,
             } => {
-                let mut map = serializer.serialize_map(Some(8))?;
+                let mut map = serializer.serialize_map(Some(6))?;
                 map.serialize_entry("state", "jsr_prep")?;
                 map.serialize_entry("address", address)?;
                 map.serialize_entry("link", link)?;
                 map.serialize_entry("bp", bp)?;
                 map.serialize_entry("sp", sp)?;
-                map.serialize_entry("lp", lp)?;
-                map.serialize_entry("state", state)?;
                 map.serialize_entry("clocks", clocks)?;
                 map.end()
             }
-            RetPrep {
-                link,
-                bp,
-                state,
-                clocks,
-            } => {
-                let mut map = serializer.serialize_map(Some(5))?;
+            RetPrep { link, bp, clocks } => {
+                let mut map = serializer.serialize_map(Some(4))?;
                 map.serialize_entry("state", "return_prep")?;
                 map.serialize_entry("link", link)?;
                 map.serialize_entry("bp", bp)?;
-                map.serialize_entry("state", state)?;
                 map.serialize_entry("clocks", clocks)?;
                 map.end()
             }
@@ -637,8 +558,6 @@ pub enum MemoryResult {
         bp: Word,
         /// The new SP value
         sp: Word,
-        /// The new LP value
-        lp: Word,
     },
     /// Stop execution
     Halt,
@@ -736,17 +655,11 @@ impl Serialize for MemoryResult {
             MemoryResult::Jump { address } => {
                 serializer.collect_map([("job", "jump"), ("address", &format!("{address:#010X}"))])
             }
-            MemoryResult::Return {
-                address,
-                bp,
-                sp,
-                lp,
-            } => serializer.collect_map([
+            MemoryResult::Return { address, bp, sp } => serializer.collect_map([
                 ("job", "return"),
                 ("address", &format!("{address:#010X}")),
                 ("bp", bp.to_string().as_str()),
                 ("sp", sp.to_string().as_str()),
-                ("lp", lp.to_string().as_str()),
             ]),
             MemoryResult::Halt => serializer.collect_map([("job", "halt")]),
             MemoryResult::Ignore { wregs } => {
@@ -982,131 +895,68 @@ impl PipelineStage for Memory {
                         link,
                         sp,
                         bp,
-                        lp,
-                        state,
                         ..
-                    } => match state {
-                        WritingLp => match memory.write_word(stack_address!(sp), link) {
-                            MemStatus::Idle => {
-                                self.state = JsrPrep {
+                    } => match memory.write_word(stack_address!(sp + 4), bp) {
+                        MemStatus::Idle => {
+                            if clock.is_ready() {
+                                self.state = Idle;
+                                self.forward = Some(MemoryResult::JumpSubroutine {
                                     address,
                                     link,
-                                    sp,
-                                    bp,
-                                    lp,
-                                    state: WritingBp,
-                                    clocks: 1,
-                                };
-                                clock.to_block()
-                            }
-                            MemStatus::Busy(clocks) => {
-                                self.state = JsrPrep {
-                                    address,
-                                    link,
-                                    sp,
-                                    bp,
-                                    lp,
-                                    state,
-                                    clocks,
-                                };
-                                clock.to_block()
-                            }
-                        },
-                        WritingBp => match memory.write_word(stack_address!(sp + 4), bp) {
-                            MemStatus::Idle => {
-                                if clock.is_ready() {
-                                    self.state = Idle;
-                                    self.forward = Some(MemoryResult::JumpSubroutine {
+                                    sp: stack_address!(sp + 4),
+                                    bp: stack_address!(sp + 4),
+                                });
+                                clock.to_ready()
+                            } else {
+                                self.state = Ready {
+                                    result: MemoryResult::JumpSubroutine {
                                         address,
                                         link,
-                                        sp: stack_address!(sp + 8),
-                                        bp: stack_address!(sp + 8),
-                                    });
-                                    clock.to_ready()
-                                } else {
-                                    self.state = Ready {
-                                        result: MemoryResult::JumpSubroutine {
-                                            address,
-                                            link,
-                                            sp: stack_address!(sp + 8),
-                                            bp: stack_address!(sp + 8),
-                                        },
-                                    };
-                                    clock.to_block()
-                                }
-                            }
-                            MemStatus::Busy(clocks) => {
-                                self.state = JsrPrep {
-                                    address,
-                                    link,
-                                    sp,
-                                    bp,
-                                    lp,
-                                    state,
-                                    clocks,
+                                        sp: stack_address!(sp + 4),
+                                        bp: stack_address!(sp + 4),
+                                    },
                                 };
                                 clock.to_block()
                             }
-                        },
+                        }
+                        MemStatus::Busy(clocks) => {
+                            self.state = JsrPrep {
+                                address,
+                                link,
+                                sp,
+                                bp,
+                                clocks,
+                            };
+                            clock.to_block()
+                        }
                     },
-                    RetPrep {
-                        link, bp, state, ..
-                    } => match state {
-                        ReadingBp => match memory.read_word(stack_address!(bp - 4)) {
-                            Ok(value) => {
-                                self.state = RetPrep {
-                                    link,
-                                    bp,
-                                    state: ReadingLp(value),
-                                    clocks: 1,
-                                };
-                                clock.to_block()
-                            }
-                            Err(MemStatus::Busy(clocks)) => {
-                                self.state = RetPrep {
-                                    link,
-                                    bp,
-                                    state,
-                                    clocks,
-                                };
-                                clock.to_block()
-                            }
-                            Err(MemStatus::Idle) => unreachable!(),
-                        },
-                        ReadingLp(bpval) => match memory.read_word(stack_address!(bp - 8)) {
-                            Ok(value) => {
-                                if clock.is_ready() {
-                                    self.state = Idle;
-                                    self.forward = Some(MemoryResult::Return {
+
+                    RetPrep { link, bp, .. } => match memory.read_word(stack_address!(bp - 4)) {
+                        Ok(value) => {
+                            if clock.is_ready() {
+                                self.state = Idle;
+                                self.forward = Some(MemoryResult::Return {
+                                    address: link,
+                                    bp: value,
+                                    sp: bp.wrapping_sub(4),
+                                });
+                                clock.to_ready()
+                            } else {
+                                self.state = Ready {
+                                    result: MemoryResult::Return {
                                         address: link,
-                                        bp: bpval,
-                                        sp: bp.wrapping_sub(8),
-                                        lp: value,
-                                    });
-                                    clock.to_ready()
-                                } else {
-                                    self.state = Ready {
-                                        result: MemoryResult::Return {
-                                            address: link,
-                                            bp: bpval,
-                                            sp: bp.wrapping_sub(8),
-                                            lp: value,
-                                        },
-                                    };
-                                    clock.to_block()
-                                }
-                            }
-                            Err(MemStatus::Busy(clocks)) => {
-                                self.state = RetPrep {
-                                    link,
-                                    bp,
-                                    state,
-                                    clocks,
+                                        bp: value,
+                                        sp: bp.wrapping_sub(4),
+                                    },
                                 };
                                 clock.to_block()
                             }
-                            Err(MemStatus::Idle) => unreachable!(),
-                        },
+                        }
+                        Err(MemStatus::Busy(clocks)) => {
+                            self.state = RetPrep { link, bp, clocks };
+                            clock.to_block()
+                        }
+                        Err(MemStatus::Idle) => unreachable!(),
                     },
                     Ready { result } => {
                         if clock.is_ready() {
@@ -1177,15 +1027,12 @@ impl PipelineStage for Memory {
                         link,
                         sp,
                         bp,
-                        lp,
                     } => {
                         self.state = JsrPrep {
                             address,
                             link,
                             sp,
                             bp,
-                            lp,
-                            state: WritingLp,
                             clocks: 1,
                         };
                         (1, 0)
@@ -1200,7 +1047,6 @@ impl PipelineStage for Memory {
                         self.state = RetPrep {
                             bp,
                             link,
-                            state: ReadingBp,
                             clocks: 1,
                         };
                         (1, 0)
