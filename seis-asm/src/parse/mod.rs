@@ -117,7 +117,10 @@ fn tokenize_data_block(mut pair: Pairs<Rule>) -> Result<Data, ErrorSource> {
             .map(Data::Float),
         "string" => pair
             .map(|s| match s.as_rule() {
-                Rule::string => Ok(s.as_str().to_owned()),
+                Rule::string => {
+                    let string = s.as_str();
+                    Ok(string[1..string.len() - 1].to_owned())
+                }
                 _ => Err(PestError::new_from_span(
                     ErrorVariant::CustomError {
                         message: "String blocks can only store strings".into(),
@@ -837,7 +840,10 @@ fn tokenize_line(line: Pair<'_, Rule>, span: Span) -> Result<Option<LineType>, E
             span,
         )),
         Rule::datablock => Some(Data(tokenize_data_block(line.into_inner())?, span)),
-        Rule::randatablock => Some(RandomData(tokenize_randomized_data_block(line.into_inner())?, span)),
+        Rule::randatablock => Some(RandomData(
+            tokenize_randomized_data_block(line.into_inner())?,
+            span,
+        )),
 
         Rule::EOI => None,
         _ => unreachable!("{line:#?}"),

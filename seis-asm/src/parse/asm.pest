@@ -123,13 +123,13 @@ oct       = ${ "0" ~ ASCII_OCT_DIGIT+ }
 integer   = @{ sign? ~ uinteger }
 uinteger  = _{ hex | oct | dec }
 character = @{
-    (!("\\" | "\"") ~ ANY)
+    (!"\\" ~ ANY)
   | ("\\" ~ ("\"" | "\\" | "'" | "/" | "n" | "r" | "t"))
 }
 
 float  = ${ sign? ~ ASCII_DIGIT* ~ "." ~ ASCII_DIGIT* ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)? }
-string = @{ "\"" ~ (!"\"" ~ character)* ~ "\"" }
-char   = @{ "'" ~ (!"\'" ~ character) ~ "'" }
+string = ${ "\"" ~ (!"\"" ~ character)* ~ "\"" }
+char   = ${ "'" ~ (!"\'" ~ character) ~ "'" }
 
 zpgaddr = ${ "@" ~ (uinteger | ident) }
 zpgref  = ${ "&" ~ (uinteger | ident) }
