@@ -5,7 +5,7 @@ use std::path::PathBuf;
 #[clap(version, about, long_about = None)]
 pub struct Command {
     /// The files to assemble.
-    #[clap(num_args=1.., value_delimiter=' ', value_hint=FilePath)]
+    #[clap(num_args=1.., value_hint=FilePath)]
     pub files: Vec<PathBuf>,
     /// Where to store the output.
     ///
