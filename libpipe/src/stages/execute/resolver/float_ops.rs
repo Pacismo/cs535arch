@@ -203,6 +203,7 @@ impl Resolver for FloatingPointOp {
 
     #[inline]
     fn clock_requirement(self) -> usize {
+        // I arbitrarily selected 20 to be the number of clocks required for a floating-point operation to finish
         20
     }
 }
