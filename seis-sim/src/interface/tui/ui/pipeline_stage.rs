@@ -436,8 +436,6 @@ impl<'a> Runtime<'a> {
                 link,
                 sp,
                 bp,
-                lp,
-                state,
                 clocks,
             } => List::new(
                 [
@@ -448,7 +446,6 @@ impl<'a> Runtime<'a> {
                     ]),
                     Line::from(vec!["Address: ".into(), address.to_string().red().bold()]),
                     Line::from(vec!["Link: ".into(), link.to_string().red().bold()]),
-                    Line::from(vec!["State: ".into(), state.to_string().red().bold()]),
                     Line::from(vec![
                         "SP".red().bold(),
                         " = ".into(),
@@ -459,21 +456,11 @@ impl<'a> Runtime<'a> {
                         " = ".into(),
                         bp.to_string().red().bold(),
                     ]),
-                    Line::from(vec![
-                        "LP".red().bold(),
-                        " = ".into(),
-                        lp.to_string().red().bold(),
-                    ]),
                 ]
                 .into_iter()
                 .map(ListItem::new),
             ),
-            libpipe::memory::State::RetPrep {
-                link,
-                bp,
-                state,
-                clocks,
-            } => List::new(
+            libpipe::memory::State::RetPrep { link, bp, clocks } => List::new(
                 [
                     Line::from(vec!["State: ".into(), "Preparing for JSR".red().bold()]),
                     Line::from(vec![
@@ -481,7 +468,6 @@ impl<'a> Runtime<'a> {
                         clocks.to_string().red().bold(),
                     ]),
                     Line::from(vec!["Link: ".into(), link.to_string().red().bold()]),
-                    Line::from(vec!["State: ".into(), state.to_string().red().bold()]),
                     Line::from(vec![
                         "BP".red().bold(),
                         " = ".into(),
