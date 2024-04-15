@@ -1,0 +1,19 @@
+miss_penalty = 1
+pipelining = false
+volatile_penalty = 1
+writethrough = true
+
+[cache.data]
+mode = "associative"
+offset_bits = 2
+set_bits = 2
+ways = 2
+
+[cache.instruction]
+mode = "associative"
+offset_bits = 6
+set_bits = 2
+ways = 2
+
+[simulation]
+binary = "strexchange.bin"
