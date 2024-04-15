@@ -96,6 +96,45 @@ impl Display for UnaryOp {
     }
 }
 
+/// floating-point conversion operation
+#[derive(Debug, Clone, Copy)]
+pub struct ConversionOp {
+    /// Source register
+    pub source: Register,
+    /// Destination register
+    pub destination: Register,
+}
+
+impl ConversionOp {
+    const REG_MASK: [Word; 2] = [
+        0b0000_0000_0000_0000_0000_0000_1111_0000,
+        0b0000_0000_0000_0000_0000_0000_0000_1111,
+    ];
+    const REG_SHIFT: [Word; 2] = [4, 0];
+}
+
+impl Decode for ConversionOp {
+    fn decode(word: Word) -> super::error::DecodeResult<Self> {
+        Ok(Self {
+            source: ((word & Self::REG_MASK[0]) >> Self::REG_SHIFT[0]) as Register,
+            destination: ((word & Self::REG_MASK[1]) >> Self::REG_SHIFT[1]) as Register,
+        })
+    }
+}
+
+impl Encode for ConversionOp {
+    fn encode(self) -> Word {
+        ((self.source as Word) << Self::REG_SHIFT[0])
+            | ((self.destination as Word) << Self::REG_SHIFT[1])
+    }
+}
+
+impl Display for ConversionOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "V{:X} => V{:X}", self.source, self.destination)
+    }
+}
+
 /// Binary floating-point comparison
 #[derive(Debug, Clone, Copy)]
 pub struct CompOp {
@@ -216,13 +255,13 @@ pub enum FloatingPointOp {
     /// ```seis
     /// ITOF Vx, Vy
     /// ```
-    Itof(UnaryOp),
+    Itof(ConversionOp),
     /// Float-to-integer
     ///
     /// ```seis
     /// FTOI Vx, Vy
     /// ```
-    Ftoi(UnaryOp),
+    Ftoi(ConversionOp),
     /// Floating-point check
     ///
     /// ```seis
@@ -339,11 +378,11 @@ impl Info for FloatingPointOp {
                 source: _,
                 destination: r,
             })
-            | Itof(UnaryOp {
+            | Itof(ConversionOp {
                 source: _,
                 destination: r,
             })
-            | Ftoi(UnaryOp {
+            | Ftoi(ConversionOp {
                 source: _,
                 destination: r,
             }) => [r, ZF, OF, EPS, NAN, INF].into(),
@@ -394,11 +433,11 @@ impl Info for FloatingPointOp {
                 source: r,
                 destination: _,
             })
-            | Itof(UnaryOp {
+            | Itof(ConversionOp {
                 source: r,
                 destination: _,
             })
-            | Ftoi(UnaryOp {
+            | Ftoi(ConversionOp {
                 source: r,
                 destination: _,
             })
