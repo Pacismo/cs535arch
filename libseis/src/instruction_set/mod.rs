@@ -58,13 +58,13 @@ pub fn encode<E: Encode>(e: E) -> Word {
 /// Instruction categories
 #[derive(Debug, Clone, Copy)]
 pub enum Instruction {
-    /// Control operations
+    /// [Control operations](ControlOp)
     Control(ControlOp),
-    /// Integer arithmetic
+    /// [Integer arithmetic](IntegerOp)
     Integer(IntegerOp),
-    /// Floating-point arithmetic
+    /// [Floating-point arithmetic](FloatingPointOp)
     FloatingPoint(FloatingPointOp),
-    /// Register operations
+    /// [Register operations](RegisterOp)
     Register(RegisterOp),
 }
 

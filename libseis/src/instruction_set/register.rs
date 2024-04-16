@@ -711,6 +711,11 @@ impl Display for ReadOp {
 }
 
 /// Instructions for any [register operations](crate::instruction_set::Instruction::Register)
+///
+/// Load and store instructions support volatile operation. Specifically, they support volatile
+/// operation for the Indirect, Offset Indirect, and Indexed Indirect addressing modes.
+///
+/// For such operation, replace the last comma with `=>>`.
 #[derive(Debug, Clone, Copy)]
 pub enum RegisterOp {
     /// Load byte to register
