@@ -19,7 +19,7 @@ pub enum State {
     /// The next instruction word is available
     Ready {
         /// The word representing the next instruction
-        instruction: Word,
+        word: Word,
     },
     /// The stage has been squashed
     Squashed {
@@ -50,7 +50,7 @@ impl Serialize for State {
                 map.serialize_entry("clocks", clocks)?;
                 map.end()
             }
-            Ready { instruction } => {
+            Ready { word: instruction } => {
                 let mut map = serializer.serialize_map(Some(2))?;
                 map.serialize_entry("state", "ready")?;
                 map.serialize_entry("word", instruction)?;
@@ -90,10 +90,6 @@ impl State {
 
     fn is_halted(&self) -> bool {
         matches!(self, Halted)
-    }
-
-    fn is_idle(&self) -> bool {
-        matches!(self, Idle)
     }
 }
 
@@ -156,55 +152,73 @@ impl PipelineStage for Fetch {
             self.state = Squashed { clocks: 2 };
             self.forward = None;
             return clock;
-        } else if let Waiting { ref mut clocks } = self.state {
-            *clocks = clocks.saturating_sub(clock.clocks());
-            if *clocks == 0 {
-                self.state = Idle;
-            } else {
-                return clock.to_block();
-            }
-        } else if let Squashed { ref mut clocks } = self.state {
-            if clock.is_ready() {
-                *clocks = clocks.saturating_sub(1);
-                if *clocks == 0 {
-                    self.state = Idle;
-                }
-                self.forward = Some(FetchResult::Squashed);
-            }
-            return clock;
-        }
-
-        if self.state.is_idle() {
-            match memory.read_instruction(registers.pc) {
-                Ok(instruction) => {
-                    self.state = Ready { instruction };
-                    registers.pc = registers.pc.wrapping_add(4);
-                }
-                Err(Busy(clocks)) => {
-                    self.state = Waiting { clocks };
-                }
-                _ => unreachable!("read_instruction should never return Idle"),
-            }
         }
 
         match self.state {
-            Ready { instruction } if !clock.is_block() => {
+            Ready { word } if clock.is_ready() => {
                 self.forward = Some(FetchResult::Ready {
-                    word: instruction,
-                    pc: registers.pc.wrapping_sub(4),
+                    word,
+                    pc: registers.pc,
                 });
                 self.state = Idle;
+                registers.pc = registers.pc.wrapping_add(4);
                 clock.to_ready()
             }
             Ready { .. } => clock.to_block(),
-            Waiting { .. } => clock.to_block(),
+            Waiting { .. } => match memory.read_instruction(registers.pc) {
+                Ok(word) if clock.is_ready() => {
+                    self.forward = Some(FetchResult::Ready {
+                        word,
+                        pc: registers.pc,
+                    });
+                    self.state = Idle;
+                    registers.pc = registers.pc.wrapping_add(4);
+                    clock.to_ready()
+                }
+                Ok(word) => {
+                    self.state = Ready { word };
+                    clock.to_block()
+                }
+                Err(Busy(clocks)) => {
+                    self.state = Waiting { clocks };
+                    clock.to_block()
+                }
+                Err(_) => unreachable!(),
+            },
             Halted => Clock::Halt,
 
-            Squashed { .. } => {
-                unreachable!("The squashed state can never be the result of a clock")
+            Squashed { clocks } if clock.is_ready() => {
+                if clocks > 0 {
+                    self.state = Squashed { clocks: clocks - 1 };
+                    clock.to_squash()
+                } else {
+                    self.state = Idle;
+                    clock.to_ready()
+                }
             }
 
-            Idle => unreachable!("The idle state can never be the result of a clock"),
+            Squashed { .. } => clock.to_block(),
+
+            Idle => match memory.read_instruction(registers.pc) {
+                Ok(word) if clock.is_ready() => {
+                    self.forward = Some(FetchResult::Ready {
+                        word,
+                        pc: registers.pc,
+                    });
+                    self.state = Idle;
+                    registers.pc = registers.pc.wrapping_add(4);
+                    clock.to_ready()
+                }
+                Ok(word) => {
+                    self.state = Ready { word };
+                    clock.to_block()
+                }
+                Err(Busy(clocks)) => {
+                    self.state = Waiting { clocks };
+                    clock.to_block()
+                }
+                Err(_) => unreachable!(),
+            },
         }
     }
 

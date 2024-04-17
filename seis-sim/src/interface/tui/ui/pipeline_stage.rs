@@ -70,10 +70,10 @@ impl<'a> Runtime<'a> {
                 .into_iter()
                 .map(ListItem::new),
             ),
-            libpipe::fetch::State::Ready { instruction } => List::new(
+            libpipe::fetch::State::Ready { word } => List::new(
                 [
                     Line::from(vec!["State: ".into(), "Ready".red().bold()]),
-                    Line::from(vec!["Word: ".into(), instruction.to_string().red().bold()]),
+                    Line::from(vec!["Word: ".into(), word.to_string().red().bold()]),
                 ]
                 .into_iter()
                 .map(ListItem::new),
