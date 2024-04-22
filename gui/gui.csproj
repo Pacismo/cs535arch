@@ -23,7 +23,7 @@
   </ItemGroup>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="cargo install --path ../seis-sim --root ./$(OutDir)&#xD;&#xA;cargo install --path ../seis-asm --root ./$(OutDir)&#xD;&#xA;cargo install --path ../seis-disasm --root ./$(OutDir)" />
+    <Exec Command="cargo install --path ../seis-sim --root ./$(OutDir)&#xD;&#xA;cargo install --path ../seis-asm --root ./$(OutDir)" />
   </Target>
 
 </Project>
