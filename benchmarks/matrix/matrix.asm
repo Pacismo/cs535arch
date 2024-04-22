@@ -1,6 +1,6 @@
-.M = 10
+.M = 1000
 .N = 10
-.O = 10
+.O = 1000
 
 #[location = 0x00000000]
 main:
@@ -66,11 +66,11 @@ dot_product_loop:
 
 #[location = 0x00030000]
 left_matrix: ; M * N
-#word?[0, 5000; 100 %15]
+#word?[0, 5000; 10000 %15]
 
 #[location = 0x00040000]
 right_matrix: ; N * O
-#word?[0, 5000; 100 %20]
+#word?[0, 5000; 10000 %20]
 
 #[location = 0x00050000]
 result_matrix: ; M * O

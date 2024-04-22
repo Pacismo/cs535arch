@@ -1,4 +1,4 @@
-.LEN = 16
+.LEN = 1000
 
 #[location = 0x00000000]
 main:
@@ -65,4 +65,4 @@ swap:
 
 #[location = 0x00030000]
 data:
-#word?[0, 90; 16 %10]
+#word?[0, 8192; 1000 %10]
