@@ -1,17 +1,16 @@
 $benchmark = $args[0]
+$dependencies = [System.Collections.ArrayList]::new();
 
-$configuration = "./benchmarks/$benchmark.toml"
-$codefile = "./benchmarks/$benchmark.asm"
-$binfile = "./benchmarks/$benchmark.bin"
+if ($args.Length -gt 1) {
+    for ($i = 1; i -lt $args.Length; $i++) {
+        [void]$dependencies.Add("./benchmarks/$benchmark/$($args[$i])")
+    }
+}
 
-$cargo_install_dir = "./gui/bin/Release/net8.0-windows/"
+$configuration = "./benchmarks/$benchmark/$benchmark.toml"
+$codefile = "./benchmarks/$benchmark/$benchmark.asm"
+$binfile = "./benchmarks/$benchmark/$benchmark.bin"
 
-cargo run --bin seis-asm -- $codefile -o $binfile
+cargo run --release --bin seis-asm -- $codefile $dependencies -o $binfile
 
-
-
-cargo install --path ./seis-sim --root ./$cargo_install_dir
-cargo install --path ./seis-asm --root ./$cargo_install_dir
-cargo install --path ./seis-disasm --root ./$cargo_install_dir
-
-./gui/bin/Release/net8.0-windows/gui.exe $configuration
+& "./gui/bin/Release/net8.0-windows/gui.exe" $configuration
