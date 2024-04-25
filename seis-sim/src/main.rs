@@ -48,51 +48,48 @@ fn prepare_config(
 fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
 
-    if let Some(info) = cli.info {
-        let example = SimulationConfiguration {
-            cache: [
-                ("instruction".into(), CacheConfiguration::Disabled),
-                (
-                    "data".into(),
-                    CacheConfiguration::Associative {
-                        set_bits: 2,
-                        offset_bits: 2,
-                        ways: 2,
-                    },
-                ),
-            ]
-            .into(),
-            miss_penalty: 100,
-            volatile_penalty: 20,
-            writethrough: false,
+    match cli {
+        Cli::Run(SimulatorConfig {
+            image_file,
+            inline_config,
+            file_config,
+            backend_mode,
+        }) => {
+            let (pipeline, config) =
+                prepare_config(into_toml(file_config, inline_config)?, image_file)?;
 
-            pipelining: PipelineMode::Enabled,
-        };
+            if backend_mode {
+                interface::Backend.run(pipeline, config)?;
+            } else {
+                interface::Tui.run(pipeline, config)?;
+            }
+        }
+        Cli::PrintExampleConfiguration { output_file } => {
+            let example = SimulationConfiguration {
+                cache: [
+                    ("instruction".into(), CacheConfiguration::Disabled),
+                    (
+                        "data".into(),
+                        CacheConfiguration::Associative {
+                            set_bits: 2,
+                            offset_bits: 2,
+                            ways: 2,
+                        },
+                    ),
+                ]
+                .into(),
+                miss_penalty: 100,
+                volatile_penalty: 20,
+                writethrough: false,
+                pipelining: PipelineMode::Enabled,
+            };
 
-        if let Some(ex) = info.print_example_config {
-            if let Some(out) = ex {
+            if let Some(out) = output_file {
                 std::fs::write(&out, example.to_toml().to_string())?;
             } else {
                 println!("{}", example.to_toml());
             }
         }
-    } else if let Some(SimulatorConfig {
-        file_config,
-        inline_config,
-        image_file,
-        backend_mode,
-    }) = cli.config
-    {
-        let (pipeline, config) =
-            prepare_config(into_toml(file_config, inline_config)?, image_file)?;
-
-        if backend_mode {
-            interface::Backend.run(pipeline, config)?;
-        } else {
-            interface::Tui.run(pipeline, config)?;
-        }
-    } else {
-        panic!("No configuration provided")
     }
 
     Ok(())
