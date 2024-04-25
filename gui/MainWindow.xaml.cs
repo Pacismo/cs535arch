@@ -188,7 +188,7 @@ namespace gui
         public void Start(string binary_file, Configuration config)
         {
             running_config = config;
-            string[] args = ["run", binary_file, "-i", Toml.FromModel(config.IntoToml()), "-b"];
+            string[] args = ["run", "-i", Toml.FromModel(config.IntoToml()), binary_file, "-b"];
             backend_process = Process.Start(new ProcessStartInfo(SEIS_SIM_BIN_PATH, args)
             {
                 RedirectStandardInput = true,

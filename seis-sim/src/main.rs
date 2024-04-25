@@ -51,12 +51,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     match cli {
         Cli::Run(SimulatorConfig {
             image_file,
-            inline_config,
-            file_config,
+            // inline_config,
+            // file_config,
+            configuration,
             backend_mode,
         }) => {
-            let (pipeline, config) =
-                prepare_config(into_toml(file_config, inline_config)?, image_file)?;
+            let (pipeline, config) = prepare_config(
+                into_toml(configuration.file, configuration.inline)?,
+                image_file,
+            )?;
 
             if backend_mode {
                 interface::Backend.run(pipeline, config)?;
