@@ -3,17 +3,17 @@ mod config;
 mod interface;
 
 use clap::Parser;
-use cli::{Cli, SimulatorConfig};
+use cli::{Cli, Configuration, SimulatorConfig};
 use config::{CacheConfiguration, PipelineMode, SimulationConfiguration};
 use interface::Interface;
 use libpipe::Pipeline;
 use libseis::{pages::PAGE_SIZE, types::Word};
 use std::{error::Error, fs::read, path::PathBuf};
 
-fn into_toml(file: Option<PathBuf>, string: Option<String>) -> Result<toml::Table, Box<dyn Error>> {
-    if let Some(f) = file {
+fn into_toml(config: Configuration) -> Result<toml::Table, Box<dyn Error>> {
+    if let Some(f) = config.file {
         Ok(toml::from_str(&std::fs::read_to_string(f)?)?)
-    } else if let Some(s) = string {
+    } else if let Some(s) = config.inline {
         Ok(toml::from_str(&s)?)
     } else {
         Err("Etiher a string or a file configuration is required".into())
@@ -51,15 +51,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     match cli {
         Cli::Run(SimulatorConfig {
             image_file,
-            // inline_config,
-            // file_config,
             configuration,
             backend_mode,
         }) => {
-            let (pipeline, config) = prepare_config(
-                into_toml(configuration.file, configuration.inline)?,
-                image_file,
-            )?;
+            let (pipeline, config) = prepare_config(into_toml(configuration)?, image_file)?;
 
             if backend_mode {
                 interface::Backend.run(pipeline, config)?;
