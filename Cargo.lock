@@ -663,6 +663,7 @@ name = "seis-bench"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "crossterm 0.27.0",
  "libmem",
  "libpipe",
  "libseis",

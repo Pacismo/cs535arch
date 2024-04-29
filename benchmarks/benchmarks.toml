@@ -24,3 +24,15 @@ name = "matrix multiply"
 path = "matrix/"
 sources = ["matrix.asm"]
 binary = "matrix.bin"
+
+[[benchmark]]
+name = "matrix multiply fp32"
+path = "fpmatrix/"
+sources = ["fpmatrix.asm"]
+binary = "fpmatrix.bin"
+
+[[benchmark]]
+name = "string exchange sort"
+path = "strexchange/"
+sources = ["strexchange.asm", "strcmp.asm"]
+binary = "strexchange.bin"

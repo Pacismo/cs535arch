@@ -5,11 +5,21 @@ mod results;
 use crate::cli::Cli;
 use clap::Parser;
 use config::{Benchmark, SimulationConfig};
+use crossterm::{
+    cursor::{Hide, MoveToColumn, Show},
+    execute,
+    style::Stylize,
+};
 use libmem::memory::Memory;
 use libpipe::ClockResult;
 use libseis::{pages::PAGE_SIZE, types::Word};
 use results::RunResult;
-use std::{error::Error, fs::File, io::Write, time::Instant};
+use std::{
+    error::Error,
+    fs::File,
+    io::{stdout, Write},
+    time::Instant,
+};
 
 const PAGES: usize = 16;
 
@@ -86,18 +96,47 @@ fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
     let mut config = config::read_configuration(&cli.bench_conf)?;
 
-    println!("Building benchmarks...");
+    if config.benchmark.len() == 0 {
+        println!("There are no benchmarks to run.");
+        return Ok(());
+    }
+
+    execute!(stdout(), Hide)?;
+    println!("  {} benchmarks...", "Building".green().bold());
+
+    let name_width = config.benchmark.iter().map(|b| b.name.len()).max().unwrap();
 
     let conf_path = cli.bench_conf.parent().unwrap();
-    config.benchmark.iter_mut().try_for_each(|b| {
-        b.path = conf_path.join(&b.path);
-        build_binary(b)
-    })?;
+    config
+        .benchmark
+        .iter_mut()
+        .try_for_each(|b| -> Result<(), Box<dyn Error>> {
+            print!(
+                "  {} benchmark {}",
+                "Building".bold().cyan(),
+                format!("{:>name_width$}", b.name).italic()
+            );
+            stdout().flush()?;
 
-    println!("Done.");
+            b.path = conf_path.join(&b.path);
+            build_binary(b)?;
+
+            execute!(stdout(), MoveToColumn(0))?;
+            println!(
+                "  {} benchmark {}",
+                "   Built".bold().green(),
+                format!("{:>name_width$}", b.name).italic()
+            );
+
+            Ok(())
+        })?;
+
+    println!("      {}", "Done".bold().green());
 
     let mut results = vec![];
     results.reserve(config.benchmark.len() * 4);
+
+    println!("   {} benchmarks...", "Running".green().bold());
 
     for (benchmark, pipeline, cache) in config.benchmark.iter().flat_map(|bench| {
         [
@@ -107,46 +146,63 @@ fn main() -> Result<(), Box<dyn Error>> {
             (bench, true, true),
         ]
     }) {
-        println!(
-            "Doing benchmark \"{}\" with {} and {}...",
-            benchmark.name,
+        print!(
+            "  {} benchmark {} ({}, {})",
+            " Running".bold().cyan(),
+            format!("{:>name_width$}", benchmark.name).italic(),
             if pipeline {
-                "pipelining"
+                "pipeline".green()
             } else {
-                "no pipelining"
+                "pipeline".red()
             },
-            if cache { "cache" } else { "no cache" }
+            if cache {
+                "cache".green()
+            } else {
+                "cache".red()
+            },
         );
+        stdout().flush()?;
 
         let run = run_benchmark(benchmark, &config.configuration, pipeline, cache)?;
 
+        execute!(stdout(), MoveToColumn(0))?;
         println!(
-            "Finished benchmark \"{}\" with {} and {}; took {:.2} seconds",
-            benchmark.name,
+            "  {} benchmark {} ({}, {}); took {:.2} seconds",
+            "Finished".bold().green(),
+            format!("{:>name_width$}", benchmark.name).italic(),
             if pipeline {
-                "pipelining"
+                "pipeline".green()
             } else {
-                "no pipelining"
+                "pipeline".red()
             },
-            if cache { "cache" } else { "no cache" },
-            run.rtc.as_secs_f64()
+            if cache {
+                "cache".green()
+            } else {
+                "cache".red()
+            },
+            run.rtc.as_secs_f64(),
         );
 
         results.push(run);
     }
 
-    let file = cli.output_file();
     println!(
-        "Finished benchmarking; writing results to {}",
-        file.display()
+        "      {} (took {:.2} seconds)",
+        "Done".bold().green(),
+        results.iter().fold(0.0, |a, r| a + r.rtc.as_secs_f64())
     );
 
-    let mut file = File::open(file)?;
+    let file = cli.output_file();
+    println!("Writing results to {}...", file.display());
+
+    let mut file = File::create(file)?;
 
     writeln!(file, "name, pipeline, cache, clocks, rtc")?;
     results
         .into_iter()
         .try_for_each(|line| writeln!(file, "{}", line))?;
+
+    execute!(stdout(), Show)?;
 
     Ok(())
 }
