@@ -13,6 +13,13 @@ pub struct Cli {
     /// in a file called "results.csv"
     #[arg(value_hint = FilePath)]
     pub output: Option<PathBuf>,
+
+    /// How many threads to spawn at most.
+    ///
+    /// Not specifying this option will spawn the default number of threads
+    /// that Rayon would spawn
+    #[arg(short = 'n', long = "threads")]
+    pub threads: Option<usize>,
 }
 
 impl Cli {

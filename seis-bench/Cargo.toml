@@ -26,3 +26,6 @@ version = "1.0.197"
 
 [dependencies.toml]
 version = "0.8.12"
+
+[dependencies.rayon]
+version = "1.10.0"

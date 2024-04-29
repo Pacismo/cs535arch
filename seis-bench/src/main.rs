@@ -1,3 +1,4 @@
+//! This is a highly-parallelized benchmarking software
 mod cli;
 mod config;
 mod results;
@@ -6,13 +7,14 @@ use crate::cli::Cli;
 use clap::Parser;
 use config::{Benchmark, SimulationConfig};
 use crossterm::{
-    cursor::{Hide, MoveToColumn, Show},
+    cursor::{Hide, MoveTo, MoveToColumn, Show},
     execute,
     style::Stylize,
 };
 use libmem::memory::Memory;
 use libpipe::ClockResult;
 use libseis::{pages::PAGE_SIZE, types::Word};
+use rayon::prelude::*;
 use results::RunResult;
 use std::{
     error::Error,
@@ -106,7 +108,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     execute!(stdout(), Hide)?;
-    println!("  {} benchmarks...", "Building".green().bold());
 
     let name_width = config.benchmark.iter().map(|b| b.name.len()).max().unwrap();
 
@@ -135,63 +136,113 @@ fn main() -> Result<(), Box<dyn Error>> {
             Ok(())
         })?;
 
-    println!("      {}", "Done".bold().green());
+    let row = crossterm::cursor::position()?.1;
 
-    let mut results = vec![];
-    results.reserve(config.benchmark.len() * 4);
+    let configurations: Vec<_> = config
+        .benchmark
+        .iter()
+        .flat_map(|bench| {
+            [
+                (bench, false, false),
+                (bench, false, true),
+                (bench, true, false),
+                (bench, true, true),
+            ]
+        })
+        .collect();
 
-    println!("   {} benchmarks...", "Running".green().bold());
+    configurations
+        .iter()
+        .enumerate()
+        .for_each(|(i, &(benchmark, pipeline, cache))| {
+            print!(
+                "  {} benchmark {} ({}, {})",
+                "Queueing".bold().yellow(),
+                format!("{:>name_width$}", benchmark.name).italic(),
+                if pipeline {
+                    "pipeline".green()
+                } else {
+                    "pipeline".red()
+                },
+                if cache {
+                    "cache".green()
+                } else {
+                    "cache".red()
+                },
+            );
 
-    for (benchmark, pipeline, cache) in config.benchmark.iter().flat_map(|bench| {
-        [
-            (bench, false, false),
-            (bench, false, true),
-            (bench, true, false),
-            (bench, true, true),
-        ]
-    }) {
-        print!(
-            "  {} benchmark {} ({}, {})",
-            " Running".bold().cyan(),
-            format!("{:>name_width$}", benchmark.name).italic(),
-            if pipeline {
-                "pipeline".green()
-            } else {
-                "pipeline".red()
-            },
-            if cache {
-                "cache".green()
-            } else {
-                "cache".red()
-            },
-        );
-        stdout().flush()?;
+            if i != configurations.len() {
+                println!();
+            }
+        });
+    let end = crossterm::cursor::position()?.1;
+    stdout().flush()?;
 
-        let run = run_benchmark(benchmark, &config.configuration, pipeline, cache)?;
-
-        execute!(stdout(), MoveToColumn(0))?;
-        println!(
-            "  {} benchmark {} ({}, {}); took {:.2} seconds",
-            "Finished".bold().green(),
-            format!("{:>name_width$}", benchmark.name).italic(),
-            if pipeline {
-                "pipeline".green()
-            } else {
-                "pipeline".red()
-            },
-            if cache {
-                "cache".green()
-            } else {
-                "cache".red()
-            },
-            run.rtc.as_secs_f64(),
-        );
-
-        results.push(run);
+    if let Some(threads) = cli.threads {
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(threads)
+            .build_global()?;
     }
 
+    let n = configurations.len();
+
+    let results: Vec<_> = configurations
+        .into_par_iter()
+        .enumerate()
+        .flat_map(
+            |(i, (benchmark, pipeline, cache))| -> Result<RunResult, Box<dyn Error>> {
+                let row = row - (n - i) as u16;
+                let mut lock = stdout().lock();
+                execute!(lock, MoveTo(0, row))?;
+                write!(
+                    lock,
+                    "  {} benchmark {} ({}, {})",
+                    " Running".bold().cyan(),
+                    format!("{:>name_width$}", benchmark.name).italic(),
+                    if pipeline {
+                        "pipeline".green()
+                    } else {
+                        "pipeline".red()
+                    },
+                    if cache {
+                        "cache".green()
+                    } else {
+                        "cache".red()
+                    },
+                )?;
+                lock.flush()?;
+                drop(lock);
+
+                let run = run_benchmark(benchmark, &config.configuration, pipeline, cache)?;
+
+                lock = stdout().lock();
+                execute!(lock, MoveTo(0, row))?;
+                write!(
+                    lock,
+                    "  {} benchmark {} ({}, {}); took {:.2} seconds",
+                    "Finished".bold().green(),
+                    format!("{:>name_width$}", benchmark.name).italic(),
+                    if pipeline {
+                        "pipeline".green()
+                    } else {
+                        "pipeline".red()
+                    },
+                    if cache {
+                        "cache".green()
+                    } else {
+                        "cache".red()
+                    },
+                    run.rtc.as_secs_f64(),
+                )?;
+
+                Ok(run)
+            },
+        )
+        .collect();
+
+    execute!(stdout(), MoveTo(0, end))?;
     println!(
-        "      {} (took {:.2} seconds)",
+        "\n      {} (took {:.2} seconds)",
         "Done".bold().green(),
         results.iter().fold(0.0, |a, r| a + r.rtc.as_secs_f64())
     );
