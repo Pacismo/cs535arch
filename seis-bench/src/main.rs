@@ -136,8 +136,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             Ok(())
         })?;
 
-    let row = crossterm::cursor::position()?.1;
-
     let configurations: Vec<_> = config
         .benchmark
         .iter()
@@ -191,7 +189,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .enumerate()
         .flat_map(
             |(i, (benchmark, pipeline, cache))| -> Result<RunResult, Box<dyn Error>> {
-                let row = row - (n - i) as u16;
+                let row = end - (n - i) as u16;
                 let mut lock = stdout().lock();
                 execute!(lock, MoveTo(0, row))?;
                 write!(
