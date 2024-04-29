@@ -26,7 +26,7 @@ const PAGES: usize = 16;
 pub fn build_binary(benchmark: &Benchmark) -> Result<(), Box<dyn Error>> {
     use std::process::Command;
 
-    Command::new("seis-asm")
+    let status = Command::new("seis-asm")
         .args(&benchmark.sources)
         .arg("-o")
         .arg(&benchmark.binary)
@@ -34,7 +34,11 @@ pub fn build_binary(benchmark: &Benchmark) -> Result<(), Box<dyn Error>> {
         .spawn()?
         .wait()?;
 
-    Ok(())
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("Failed to build file (process exited with code {status})").into())
+    }
 }
 
 pub fn prepare_sim(mem: &mut Memory, benchmark: &Benchmark) -> Result<(), Box<dyn Error>> {
