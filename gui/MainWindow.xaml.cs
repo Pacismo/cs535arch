@@ -13,21 +13,52 @@ using System.Windows.Input;
 
 namespace gui
 {
+    /// <summary>
+    /// The configuration to use when creating the simulation.
+    /// 
+    /// This is turned into a string and forwarded to the frontend when initializing the simulation.
+    /// </summary>
     public struct Configuration
     {
+        /// <summary>
+        /// Penalty for a miss
+        /// </summary>
         public uint miss_penalty;
+        /// <summary>
+        /// Penalty for a cache bypass
+        /// </summary>
         public uint volatile_penalty;
+        /// <summary>
+        /// Whether to enable pipelining
+        /// </summary>
         public bool pipelining;
+        /// <summary>
+        /// Whether to read memory to the cache on write
+        /// </summary>
         public bool writethrough;
 
+        /// <summary>
+        /// The configuration to use for the data cache
+        /// </summary>
         public CacheConfig data_cache;
+        /// <summary>
+        /// The configuration to use for the instruction cache
+        /// </summary>
         public CacheConfig instruction_cache;
 
+        /// <summary>
+        /// Validate the configuration
+        /// </summary>
+        /// <returns>True if the configuration is valid</returns>
         public bool Validate()
         {
             return miss_penalty > 0 && volatile_penalty > 0 && data_cache.Validate() && instruction_cache.Validate();
         }
 
+        /// <summary>
+        /// Transforms the configuration into a TOML table
+        /// </summary>
+        /// <returns>A TOML table representing the configuration</returns>
         public TomlTable IntoToml()
         {
             TomlTable caches = new()
@@ -46,6 +77,12 @@ namespace gui
                     };
         }
 
+        /// <summary>
+        /// Transforms the TOML table into this object
+        /// </summary>
+        /// <param name="table">The table to read from</param>
+        /// <returns>The Configuration object representing the table</returns>
+        /// <exception cref="InvalidDataException">If the TOML data does not contain the required keys</exception>
         public static Configuration FromToml(TomlTable table)
         {
             TomlTable caches = table["cache"] as TomlTable
@@ -68,6 +105,13 @@ namespace gui
         }
     }
 
+    /// <summary>
+    /// Represents a set of flags determining whether re-fetching data is necessary to update the controls.
+    /// 
+    /// Stores a boolean flag representing whether the control had previously been updated since the last clock.
+    /// 
+    /// Stores a hash to prevent re-writing the state to the control.
+    /// </summary>
     struct ViewUpdateFlags()
     {
         public bool overview = true;
@@ -84,6 +128,9 @@ namespace gui
         public int? disassembly_hash = null;
         public int? pipeline_hash = null;
 
+        /// <summary>
+        /// Sets the flags to require an update.
+        /// </summary>
         public void NeedUpdate()
         {
             overview = true;
@@ -95,17 +142,32 @@ namespace gui
         }
     }
 
-    struct PotentialUpdate<T>(T? result, int hash)
+    /// <summary>
+    /// Represents an update. Contains the result (if applicable) and the hash of the string used to generate the result.
+    /// </summary>
+    /// <typeparam name="T">The type of the result</typeparam>
+    /// <param name="result">The result of an update</param>
+    /// <param name="hash">The hash of the string used to generate the result</param>
+    struct PotentialUpdate<T>(T result, int hash)
     {
-        public T? result = result;
+        public T result = result;
         public int hash = hash;
     }
 
+    /// <summary>
+    /// Represents the state of the simulation backend.
+    /// </summary>
     class SimulationState()
     {
         public const string SEIS_SIM_BIN_PATH = "bin/seis-sim";
 
+        /// <summary>
+        /// Mutex to prevent multiple reads
+        /// </summary>
         public Mutex proc_mtx = new();
+        /// <summary>
+        /// The process being used to run the backend
+        /// </summary>
         public Process? backend_process = null;
         Task? run_task;
         public uint page_id = 0;
@@ -113,12 +175,20 @@ namespace gui
         public ViewUpdateFlags update = new();
         public Configuration running_config = new();
 
+        /// <summary>
+        /// The number of pages in the memoryspace.
+        /// </summary>
         public uint MaxPage { get { return max_page; } }
 
+        /// <summary>
+        /// Initializes the simulation
+        /// </summary>
+        /// <param name="binary_file">The binary file to run</param>
+        /// <param name="config">The configuration to run the simulation</param>
         public void Start(string binary_file, Configuration config)
         {
             running_config = config;
-            string[] args = [binary_file, "-i", Toml.FromModel(config.IntoToml()), "-b"];
+            string[] args = ["run", "-i", Toml.FromModel(config.IntoToml()), binary_file, "-b"];
             backend_process = Process.Start(new ProcessStartInfo(SEIS_SIM_BIN_PATH, args)
             {
                 RedirectStandardInput = true,
@@ -134,8 +204,15 @@ namespace gui
             }
         }
 
+        /// <summary>
+        /// Whether there is a running backend process
+        /// </summary>
+        /// <returns></returns>
         public bool IsRunning() => backend_process != null;
 
+        /// <summary>
+        /// Stops the runtime.
+        /// </summary>
         public void Stop()
         {
             run_task = null;
@@ -143,6 +220,11 @@ namespace gui
             backend_process = null;
         }
 
+        /// <summary>
+        /// Submits a command to the backend
+        /// </summary>
+        /// <param name="command">The string command to send</param>
+        /// <exception cref="InvalidOperationException">Thrown if the process is not running</exception>
         public void Command(string command)
         {
             if (backend_process == null)
@@ -152,6 +234,12 @@ namespace gui
                 backend_process.StandardInput.WriteLine(command);
         }
 
+        /// <summary>
+        /// Reads a line from the stdout
+        /// </summary>
+        /// <returns>The line written by the simulation</returns>
+        /// <exception cref="InvalidOperationException">Thrown if the process is not running</exception>
+        /// <exception cref="IOException">If the read failed</exception>
         public string GetLine()
         {
             if (backend_process == null)
@@ -164,6 +252,20 @@ namespace gui
             return line;
         }
 
+        /// <summary>
+        /// Submits a command and reads a line. A hash is generated and the object is deserialized from the output.
+        /// 
+        /// Accepts a hash representing the previous time the object was requested. This is used to determine whether to deserialize the new object.
+        /// 
+        /// Not specifying the previous hash will always result in the object being deserialized.
+        /// </summary>
+        /// <typeparam name="T">The type to be deserialized</typeparam>
+        /// <param name="command">The command to run</param>
+        /// <param name="previous">The previous hash</param>
+        /// <returns>A <see cref="PotentialUpdate{T}"/> representing the possibly deserialized result</returns>
+        /// <exception cref="InvalidOperationException">If the process is not running</exception>
+        /// <exception cref="IOException">If there was an error reading the output</exception>
+        /// <exception cref="InvalidDataException">If the deserialization failed</exception>
         public PotentialUpdate<T>? DeserializeResult<T>(string command, int? previous = null)
         {
             if (backend_process == null)
@@ -177,11 +279,14 @@ namespace gui
             }
             int hash = line.GetHashCode();
             if (previous == null || hash != previous)
-                return new(JsonConvert.DeserializeObject<T>(line), hash);
+                return new(JsonConvert.DeserializeObject<T>(line) ?? throw new InvalidDataException("Error deserializing object"), hash);
             else
                 return null;
         }
 
+        /// <summary>
+        /// Runs the simulation's code, returning when the backend says it's done.
+        /// </summary>
         void run_proc()
         {
             lock (proc_mtx!)
@@ -192,6 +297,10 @@ namespace gui
             run_task = null;
         }
 
+        /// <summary>
+        /// Runs the simulation's code.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">If the backend process is not running</exception>
         public void Run()
         {
             if (backend_process == null)
@@ -203,6 +312,9 @@ namespace gui
             run_task = Task.Run(run_proc);
         }
 
+        /// <summary>
+        /// Stops running the code in the simulation
+        /// </summary>
         public void Break()
         {
             if (run_task != null)
@@ -216,6 +328,11 @@ namespace gui
     /// </summary>
     public partial class MainWindow : Window
     {
+        /// <summary>
+        /// Allows for the use of a hotkey to clock the simulation.
+        /// 
+        /// By default, it is [SPACE].
+        /// </summary>
         public static RoutedCommand ClockCommand = new();
 
         string binary_file = "";
