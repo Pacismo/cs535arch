@@ -1,0 +1,26 @@
+[configuration]
+miss_penalty = 100
+volatile_penalty = 100
+writethrough = true
+
+[configuration.cache.instruction]
+set_bits = 4
+offset_bits = 6
+ways = 1
+
+[configuration.cache.data]
+set_bits = 4
+offset_bits = 6
+ways = 1
+
+[[benchmark]]
+name = "exchange sort"
+path = "exchange/"
+sources = ["exchange.asm"]
+binary = "exchange.bin"
+
+[[benchmark]]
+name = "matrix multiply"
+path = "matrix/"
+sources = ["matrix.asm"]
+binary = "matrix.bin"

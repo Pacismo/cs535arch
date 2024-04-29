@@ -659,6 +659,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "seis-bench"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "libmem",
+ "libpipe",
+ "libseis",
+ "serde",
+ "toml",
+]
+
+[[package]]
 name = "seis-disasm"
 version = "0.1.0"
 dependencies = [
