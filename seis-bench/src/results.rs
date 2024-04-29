@@ -14,7 +14,7 @@ impl<'a> Display for RunResult<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "\"{}\", {}, {}, {}, {}",
+            "\"{}\",{},{},{},{}",
             self.bench_name,
             self.pipeline_enable,
             self.cache_enable,

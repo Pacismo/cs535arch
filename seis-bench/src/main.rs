@@ -152,9 +152,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     configurations
         .iter()
         .enumerate()
-        .for_each(|(i, &(benchmark, pipeline, cache))| {
+        .for_each(|(_, &(benchmark, pipeline, cache))| {
             print!(
-                "  {} benchmark {} ({}, {})",
+                "\n  {} benchmark {} ({}, {})",
                 "Queueing".bold().yellow(),
                 format!("{:>name_width$}", benchmark.name).italic(),
                 if pipeline {
@@ -168,10 +168,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                     "cache".red()
                 },
             );
-
-            if i != configurations.len() {
-                println!();
-            }
         });
     let end = crossterm::cursor::position()?.1;
     stdout().flush()?;
@@ -250,7 +246,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut file = File::create(file)?;
 
-    writeln!(file, "name, pipeline, cache, clocks, rtc")?;
+    writeln!(file, "name,pipeline,cache,clocks,rtc")?;
     results
         .into_iter()
         .try_for_each(|line| writeln!(file, "{}", line))?;
