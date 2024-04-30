@@ -7,7 +7,7 @@ use crate::cli::Cli;
 use clap::Parser;
 use config::{Benchmark, SimulationConfig};
 use crossterm::{
-    cursor::{Hide, MoveTo, MoveToColumn, Show},
+    cursor::{Hide, MoveTo, MoveToColumn, MoveToPreviousLine, Show},
     execute,
     style::Stylize,
 };
@@ -149,6 +149,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         })
         .collect();
 
+    execute!(stdout(), MoveToPreviousLine(1))?;
+
     configurations
         .iter()
         .enumerate()
@@ -185,7 +187,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .enumerate()
         .flat_map(
             |(i, (benchmark, pipeline, cache))| -> Result<RunResult, Box<dyn Error>> {
-                let row = end - (n - i) as u16;
+                let row = end + 1 - (n - i) as u16;
                 let mut lock = stdout().lock();
                 execute!(lock, MoveTo(0, row))?;
                 write!(
