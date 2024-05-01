@@ -16,8 +16,7 @@ pub struct Cli {
 
     /// How many threads to spawn at most.
     ///
-    /// Not specifying this option will spawn the default number of threads
-    /// that Rayon would spawn
+    /// Not specifying this option will spawn the default number of threads (4)
     #[arg(short = 'n', long = "threads")]
     pub threads: Option<usize>,
 }

@@ -9,7 +9,7 @@ use config::{Benchmark, SimulationConfig};
 use crossterm::{
     cursor::{Hide, MoveTo, MoveToColumn, MoveToPreviousLine, Show},
     execute,
-    style::Stylize,
+    style::{StyledContent, Stylize},
 };
 use libmem::memory::Memory;
 use libpipe::ClockResult;
@@ -98,6 +98,20 @@ fn run_benchmark<'a>(
     })
 }
 
+const STATUS_WIDTH: usize = 12;
+
+fn pending_status(text: &str) -> StyledContent<String> {
+    format!("{text:>STATUS_WIDTH$}").yellow().bold()
+}
+
+fn processing_status(text: &str) -> StyledContent<String> {
+    format!("{text:>STATUS_WIDTH$}").cyan().bold()
+}
+
+fn finished_status(text: &str) -> StyledContent<String> {
+    format!("{text:>STATUS_WIDTH$}").green().bold()
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
     let mut config = config::read_configuration(&cli.bench_conf)?;
@@ -117,8 +131,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         .iter_mut()
         .try_for_each(|b| -> Result<(), Box<dyn Error>> {
             print!(
-                "  {} benchmark {}",
-                "Building".bold().cyan(),
+                "{} benchmark {}",
+                processing_status("Building"),
                 format!("{:>name_width$}", b.name).italic()
             );
             stdout().flush()?;
@@ -128,8 +142,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             execute!(stdout(), MoveToColumn(0))?;
             println!(
-                "  {} benchmark {}",
-                "   Built".bold().green(),
+                "{} benchmark {}",
+                finished_status("Built"),
                 format!("{:>name_width$}", b.name).italic()
             );
 
@@ -156,8 +170,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         .enumerate()
         .for_each(|(_, &(benchmark, pipeline, cache))| {
             print!(
-                "\n  {} benchmark {} ({}, {})",
-                "Queueing".bold().yellow(),
+                "\n{} benchmark {} ({}, {})",
+                pending_status("Queueing"),
                 format!("{:>name_width$}", benchmark.name).italic(),
                 if pipeline {
                     "pipeline".green()
@@ -178,6 +192,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         rayon::ThreadPoolBuilder::new()
             .num_threads(threads)
             .build_global()?;
+    } else {
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(4)
+            .build_global()?;
     }
 
     let n = configurations.len();
@@ -192,8 +210,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 execute!(lock, MoveTo(0, row))?;
                 write!(
                     lock,
-                    "  {} benchmark {} ({}, {})",
-                    " Running".bold().cyan(),
+                    "{} benchmark {} ({}, {})",
+                    processing_status("Running"),
                     format!("{:>name_width$}", benchmark.name).italic(),
                     if pipeline {
                         "pipeline".green()
@@ -215,8 +233,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 execute!(lock, MoveTo(0, row))?;
                 write!(
                     lock,
-                    "  {} benchmark {} ({}, {}); took {:.2} seconds",
-                    "Finished".bold().green(),
+                    "{} benchmark {} ({}, {}); took {:.2} seconds",
+                    finished_status("Finished"),
                     format!("{:>name_width$}", benchmark.name).italic(),
                     if pipeline {
                         "pipeline".green()
@@ -238,13 +256,17 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     execute!(stdout(), MoveTo(0, end))?;
     println!(
-        "\n      {} (took {:.2} seconds)",
-        "Done".bold().green(),
+        "\n{} (took {:.2} seconds)",
+        finished_status("Done"),
         results.iter().fold(0.0, |a, r| a + r.rtc.as_secs_f64())
     );
 
     let file = cli.output_file();
-    println!("Writing results to {}...", file.display());
+    println!(
+        "{} results to {}...",
+        finished_status("Writing"),
+        file.display()
+    );
 
     let mut file = File::create(file)?;
 
