@@ -7,10 +7,12 @@ use std::{
 pub trait Node: Display + Debug + Send + Sync {
     fn matches(&self, input: &str) -> bool;
 
+    #[allow(unused)]
     fn exact(&self, input: &str) -> bool;
 
     fn complete(&self, input: &[&str], display: bool) -> Vec<String>;
 
+    #[allow(unused)]
     fn subtree(&self) -> &[Arc<dyn Node>];
 }
 
