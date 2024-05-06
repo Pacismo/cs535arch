@@ -1,5 +1,5 @@
-<!-- TODO --->
 # TO-DO LIST
+<!-- TODO --->
 
 - [ ] ~~New address space configurations (beyond a memory-only address space)~~
 - [ ] Deserialization support to enable state reload
