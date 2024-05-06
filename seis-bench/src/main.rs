@@ -7,7 +7,7 @@ use crate::cli::Cli;
 use clap::Parser;
 use config::{Benchmark, SimulationConfig};
 use crossterm::{
-    cursor::{Hide, MoveTo, MoveToColumn, MoveToPreviousLine, Show},
+    cursor::{Hide, MoveToColumn, MoveToPreviousLine, RestorePosition, SavePosition, Show},
     execute,
     style::{StyledContent, Stylize},
 };
@@ -20,6 +20,7 @@ use std::{
     error::Error,
     fs::File,
     io::{stdout, Write},
+    sync::Mutex,
     time::Instant,
 };
 
@@ -62,10 +63,8 @@ pub fn prepare_sim(mem: &mut Memory, benchmark: &Benchmark) -> Result<(), Box<dy
 fn run_benchmark<'a>(
     benchmark: &'a Benchmark,
     config: &'a SimulationConfig,
-    pipeline_enable: bool,
-    cache_enable: bool,
-) -> Result<RunResult<'a>, Box<dyn Error>> {
-    let mut pipeline = config.build_config(pipeline_enable, cache_enable);
+) -> Result<RunResult, Box<dyn Error>> {
+    let mut pipeline = config.build_config();
     prepare_sim(pipeline.memory_module_mut().memory_mut(), benchmark)?;
 
     let mut clocks = 0;
@@ -90,19 +89,14 @@ fn run_benchmark<'a>(
     let end = Instant::now();
 
     Ok(RunResult {
-        bench_name: &benchmark.name,
-        cache_enable,
-        pipeline_enable,
+        bench_name: benchmark.name.clone(),
+        config_name: config.name.clone(),
         clocks,
         rtc: end - start,
     })
 }
 
 const STATUS_WIDTH: usize = 12;
-
-fn pending_status(text: &str) -> StyledContent<String> {
-    format!("{text:>STATUS_WIDTH$}").yellow().bold()
-}
 
 fn processing_status(text: &str) -> StyledContent<String> {
     format!("{text:>STATUS_WIDTH$}").cyan().bold()
@@ -121,9 +115,20 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
+    if config.configuration.len() == 0 {
+        println!("There are no configurations to use.");
+        return Ok(());
+    }
+
     execute!(stdout(), Hide)?;
 
-    let name_width = config.benchmark.iter().map(|b| b.name.len()).max().unwrap();
+    let bench_name_width = config.benchmark.iter().map(|b| b.name.len()).max().unwrap();
+    let config_name_width = config
+        .configuration
+        .iter()
+        .map(|c| c.name.len())
+        .max()
+        .unwrap();
 
     let conf_path = cli.bench_conf.parent().unwrap();
     config
@@ -133,7 +138,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             print!(
                 "{} benchmark {}",
                 processing_status("Building"),
-                format!("{:>name_width$}", b.name).italic()
+                format!("{:>bench_name_width$}", b.name).italic()
             );
             stdout().flush()?;
 
@@ -144,7 +149,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             println!(
                 "{} benchmark {}",
                 finished_status("Built"),
-                format!("{:>name_width$}", b.name).italic()
+                format!("{:>bench_name_width$}", b.name).italic()
             );
 
             Ok(())
@@ -154,38 +159,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         .benchmark
         .iter()
         .flat_map(|bench| {
-            [
-                (bench, false, false),
-                (bench, false, true),
-                (bench, true, false),
-                (bench, true, true),
-            ]
+            config
+                .configuration
+                .iter()
+                .map(move |conf| (bench.clone(), conf.clone()))
         })
         .collect();
 
     execute!(stdout(), MoveToPreviousLine(1))?;
-
-    configurations
-        .iter()
-        .enumerate()
-        .for_each(|(_, &(benchmark, pipeline, cache))| {
-            print!(
-                "\n{} benchmark {} ({}, {})",
-                pending_status("Queueing"),
-                format!("{:>name_width$}", benchmark.name).italic(),
-                if pipeline {
-                    "pipeline".green()
-                } else {
-                    "pipeline".red()
-                },
-                if cache {
-                    "cache".green()
-                } else {
-                    "cache".red()
-                },
-            );
-        });
-    let end = crossterm::cursor::position()?.1;
     stdout().flush()?;
 
     if let Some(threads) = cli.threads {
@@ -198,63 +179,45 @@ fn main() -> Result<(), Box<dyn Error>> {
             .build_global()?;
     }
 
-    let n = configurations.len();
+    let n = Mutex::new(0u16);
 
     let results: Vec<_> = configurations
         .into_par_iter()
-        .enumerate()
-        .flat_map(
-            |(i, (benchmark, pipeline, cache))| -> Result<RunResult, Box<dyn Error>> {
-                let row = end + 1 - (n - i) as u16;
-                let mut lock = stdout().lock();
-                execute!(lock, MoveTo(0, row))?;
-                write!(
-                    lock,
-                    "{} benchmark {} ({}, {})",
-                    processing_status("Running"),
-                    format!("{:>name_width$}", benchmark.name).italic(),
-                    if pipeline {
-                        "pipeline".green()
-                    } else {
-                        "pipeline".red()
-                    },
-                    if cache {
-                        "cache".green()
-                    } else {
-                        "cache".red()
-                    },
-                )?;
-                lock.flush()?;
-                drop(lock);
+        .flat_map(|(benchmark, config)| -> Result<RunResult, Box<dyn Error>> {
+            let mut lock = stdout().lock();
+            let mut n_lock = n.lock().unwrap();
+            let i = *n_lock;
+            *n_lock += 1;
+            write!(
+                lock,
+                "\n{} benchmark {} {:<config_name_width$}",
+                processing_status("Running"),
+                format!("{:>bench_name_width$}", benchmark.name).italic(),
+                config.name
+            )?;
+            lock.flush()?;
+            drop((lock, n_lock));
 
-                let run = run_benchmark(benchmark, &config.configuration, pipeline, cache)?;
+            let run = run_benchmark(&benchmark, &config)?;
 
-                lock = stdout().lock();
-                execute!(lock, MoveTo(0, row))?;
-                write!(
-                    lock,
-                    "{} benchmark {} ({}, {}); took {:.2} seconds",
-                    finished_status("Finished"),
-                    format!("{:>name_width$}", benchmark.name).italic(),
-                    if pipeline {
-                        "pipeline".green()
-                    } else {
-                        "pipeline".red()
-                    },
-                    if cache {
-                        "cache".green()
-                    } else {
-                        "cache".red()
-                    },
-                    run.rtc.as_secs_f64(),
-                )?;
+            let mut lock = stdout().lock();
+            let n_lock = n.lock().unwrap();
+            execute!(lock, SavePosition)?;
+            execute!(lock, MoveToPreviousLine(*n_lock - i))?;
+            write!(
+                lock,
+                "\n{} benchmark {} {:<config_name_width$}; took {:.2} seconds",
+                finished_status("Finished"),
+                format!("{:>bench_name_width$}", benchmark.name).italic(),
+                config.name,
+                run.rtc.as_secs_f64(),
+            )?;
+            execute!(lock, RestorePosition)?;
 
-                Ok(run)
-            },
-        )
+            Ok(run)
+        })
         .collect();
 
-    execute!(stdout(), MoveTo(0, end))?;
     println!(
         "\n{} (took {:.2} seconds)",
         finished_status("Done"),
@@ -270,7 +233,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut file = File::create(file)?;
 
-    writeln!(file, "name,pipeline,cache,clocks,rtc")?;
+    writeln!(file, "benchmark,configuration,clocks,rtc")?;
     results
         .into_iter()
         .try_for_each(|line| writeln!(file, "{}", line))?;

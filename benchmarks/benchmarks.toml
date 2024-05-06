@@ -1,7 +1,26 @@
-[configuration]
+# ---------------------------------------- No Enhancements -----------------------------------------
+[[configuration]]
+name = "no_pipe_no_cache"
 miss_penalty = 100
 volatile_penalty = 100
 writethrough = true
+pipeline = false
+
+# ---------------------------------------- Only Pipelining -----------------------------------------
+[[configuration]]
+name = "pipe_only"
+miss_penalty = 100
+volatile_penalty = 100
+writethrough = true
+pipeline = true
+
+# --------------------------------- One-Way Set-Associative Cache ----------------------------------
+[[configuration]]
+name = "one_way_cache_only"
+miss_penalty = 100
+volatile_penalty = 100
+writethrough = true
+pipeline = false
 
 [configuration.cache.instruction]
 set_bits = 4
@@ -13,18 +32,111 @@ set_bits = 4
 offset_bits = 6
 ways = 1
 
+# ------------------------- One-Way Set-Associative Cache With Pipelining --------------------------
+[[configuration]]
+name = "one_way_cache_and_pipelining"
+miss_penalty = 100
+volatile_penalty = 100
+writethrough = true
+pipeline = true
+
+[configuration.cache.instruction]
+set_bits = 4
+offset_bits = 6
+ways = 1
+
+[configuration.cache.data]
+set_bits = 4
+offset_bits = 6
+ways = 1
+
+# --------------------------------- Two-Way Set-Associative Cache ----------------------------------
+[[configuration]]
+name = "two_way_cache_only"
+miss_penalty = 100
+volatile_penalty = 100
+writethrough = true
+pipeline = false
+
+[configuration.cache.instruction]
+set_bits = 4
+offset_bits = 6
+ways = 2
+
+[configuration.cache.data]
+set_bits = 4
+offset_bits = 6
+ways = 2
+
+# ------------------------- Two-Way Set-Associative Cache With Pipelining --------------------------
+[[configuration]]
+name = "two_way_cache_and_pipelining"
+miss_penalty = 100
+volatile_penalty = 100
+writethrough = true
+pipeline = true
+
+[configuration.cache.instruction]
+set_bits = 4
+offset_bits = 6
+ways = 2
+
+[configuration.cache.data]
+set_bits = 4
+offset_bits = 6
+ways = 2
+
+# -------------------------------- Four-Way Set-Associative Cache ----------------------------------
+[[configuration]]
+name = "four_way_cache_only"
+miss_penalty = 100
+volatile_penalty = 100
+writethrough = true
+pipeline = false
+
+[configuration.cache.instruction]
+set_bits = 4
+offset_bits = 6
+ways = 4
+
+[configuration.cache.data]
+set_bits = 4
+offset_bits = 6
+ways = 4
+
+# ------------------------ Four-Way Set-Associative Cache With Pipelining --------------------------
+[[configuration]]
+name = "four_way_cache_and_pipelining"
+miss_penalty = 100
+volatile_penalty = 100
+writethrough = true
+pipeline = true
+
+[configuration.cache.instruction]
+set_bits = 4
+offset_bits = 6
+ways = 4
+
+[configuration.cache.data]
+set_bits = 4
+offset_bits = 6
+ways = 4
+
+# ----------------------------------------- Exchange Sort ------------------------------------------
 [[benchmark]]
 name = "exchange sort"
 path = "exchange/"
 sources = ["exchange.asm"]
 binary = "exchange.bin"
 
+# ------------------------------------- Matrix Multiply Int32 --------------------------------------
 [[benchmark]]
 name = "matrix multiply"
 path = "matrix/"
 sources = ["matrix.asm"]
 binary = "matrix.bin"
 
+# ------------------------------------- Matrix Multiply FP32 ---------------------------------------
 [[benchmark]]
 name = "matrix multiply fp32"
 path = "fpmatrix/"

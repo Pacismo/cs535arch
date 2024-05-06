@@ -1,7 +1,3 @@
-use std::{
-    error::Error,
-    path::{Path, PathBuf},
-};
 use libmem::{
     cache::{Associative, Cache, MultiAssociative, NullCache},
     memory::Memory,
@@ -9,19 +5,26 @@ use libmem::{
 };
 use libpipe::{Pipeline, Pipelined, Unpipelined};
 use serde::Deserialize;
+use std::{
+    error::Error,
+    path::{Path, PathBuf},
+};
 
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct SimulationConfig {
+    pub name: String,
+
     pub writethrough: bool,
     pub miss_penalty: usize,
     pub volatile_penalty: usize,
+    pub pipeline: bool,
+    #[serde(default)]
     pub cache: CacheConfig,
 }
 
 impl SimulationConfig {
-    pub fn build_config(&self, pipeline_enable: bool, cache_enable: bool) -> Box<dyn Pipeline> {
-        let data_cache = self.cache.data.build_config(cache_enable);
-        let instruction_cache = self.cache.instruction.build_config(cache_enable);
+    pub fn build_config(&self) -> Box<dyn Pipeline> {
+        let (data_cache, instruction_cache) = self.cache.build_config();
 
         let mem = Box::new(SingleLevel::new(
             data_cache,
@@ -32,7 +35,7 @@ impl SimulationConfig {
             self.writethrough,
         ));
 
-        if pipeline_enable {
+        if self.pipeline {
             Box::new(Pipelined::new(mem))
         } else {
             Box::new(Unpipelined::new(mem))
@@ -48,27 +51,40 @@ pub struct CacheModuleConfig {
 }
 
 impl CacheModuleConfig {
-    pub fn build_config(&self, cache_enable: bool) -> Box<dyn Cache> {
-        if cache_enable {
-            if self.ways == 1 {
-                Box::new(Associative::new(self.offset_bits, self.set_bits))
-            } else {
-                Box::new(MultiAssociative::new(
-                    self.offset_bits,
-                    self.set_bits,
-                    self.ways,
-                ))
-            }
+    pub fn build_config(&self) -> Box<dyn Cache> {
+        if self.ways == 1 {
+            Box::new(Associative::new(self.offset_bits, self.set_bits))
         } else {
-            Box::new(NullCache::new())
+            Box::new(MultiAssociative::new(
+                self.offset_bits,
+                self.set_bits,
+                self.ways,
+            ))
         }
     }
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct CacheConfig {
-    pub instruction: CacheModuleConfig,
-    pub data: CacheModuleConfig,
+    pub instruction: Option<CacheModuleConfig>,
+    pub data: Option<CacheModuleConfig>,
+}
+
+impl CacheConfig {
+    pub fn build_config(&self) -> (Box<dyn Cache>, Box<dyn Cache>) {
+        (
+            if let Some(ref conf) = self.instruction {
+                conf.build_config()
+            } else {
+                Box::new(NullCache::new())
+            },
+            if let Some(ref conf) = self.data {
+                conf.build_config()
+            } else {
+                Box::new(NullCache::new())
+            },
+        )
+    }
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -81,7 +97,7 @@ pub struct Benchmark {
 
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct BenchmarkConfig {
-    pub configuration: SimulationConfig,
+    pub configuration: Vec<SimulationConfig>,
     pub benchmark: Vec<Benchmark>,
 }
 
