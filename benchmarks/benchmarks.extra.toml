@@ -122,22 +122,6 @@ set_bits = 4
 offset_bits = 6
 ways = 4
 
-# ------------------------------- No Enhancements, No Writethrough ---------------------------------
-[[configuration]]
-name = "no_pipe_no_cache_no_writethrough"
-miss_penalty = 100
-volatile_penalty = 100
-writethrough = false
-pipeline = false
-
-# ------------------------------- Only Pipelining, No Writethrough ---------------------------------
-[[configuration]]
-name = "pipe_only_no_writethrough"
-miss_penalty = 100
-volatile_penalty = 100
-writethrough = false
-pipeline = true
-
 # ------------------------ One-Way Set-Associative Cache, No Writethrough --------------------------
 [[configuration]]
 name = "one_way_cache_only_no_writethrough"
