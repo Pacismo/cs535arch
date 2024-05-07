@@ -26,6 +26,7 @@ use std::{
 
 const PAGES: usize = 16;
 
+/// Calls the assembler to build the binary for the benchmark.
 pub fn build_binary(benchmark: &Benchmark) -> Result<(), Box<dyn Error>> {
     use std::process::Command;
 
@@ -44,6 +45,7 @@ pub fn build_binary(benchmark: &Benchmark) -> Result<(), Box<dyn Error>> {
     }
 }
 
+/// Prepares a simulation. Loads benchmark to memory.
 pub fn prepare_sim(mem: &mut Memory, benchmark: &Benchmark) -> Result<(), Box<dyn Error>> {
     use std::fs::read;
     let path = benchmark.path.join(&benchmark.binary);
@@ -60,6 +62,7 @@ pub fn prepare_sim(mem: &mut Memory, benchmark: &Benchmark) -> Result<(), Box<dy
     Ok(())
 }
 
+/// Runs a benchmark with a given configuration.
 fn run_benchmark<'a>(
     benchmark: &'a Benchmark,
     config: &'a SimulationConfig,
@@ -158,12 +161,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let configurations: Vec<_> = config
         .benchmark
         .iter()
-        .flat_map(|bench| {
-            config
-                .configuration
-                .iter()
-                .map(move |conf| (bench.clone(), conf.clone()))
-        })
+        .flat_map(|bench| config.configuration.iter().map(move |conf| (bench, conf)))
         .collect();
 
     execute!(stdout(), MoveToPreviousLine(1))?;
@@ -198,7 +196,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             lock.flush()?;
             drop((lock, n_lock));
 
-            let run = run_benchmark(&benchmark, &config)?;
+            let run = run_benchmark(benchmark, config)?;
 
             let mut lock = stdout().lock();
             let n_lock = n.lock().unwrap();
