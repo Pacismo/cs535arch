@@ -104,6 +104,7 @@ fn run_benchmark<'a>(
     })
 }
 
+/// How wide to make the status field of a line
 const STATUS_WIDTH: usize = 12;
 
 /// Formats the text for the "processing" status. Sets color to cyan and makes
