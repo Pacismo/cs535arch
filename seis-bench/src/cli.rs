@@ -1,3 +1,4 @@
+//! The command line arguments for the benchmarking software
 use clap::{Parser, ValueHint::FilePath};
 use std::path::PathBuf;
 

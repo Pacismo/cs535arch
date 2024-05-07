@@ -24,6 +24,9 @@ use std::{
     time::Instant,
 };
 
+/// The maximum number of pages allocated for each instance of the simulation.
+///
+/// This may not ever be reached by a given benchmark.
 const PAGES: usize = 16;
 
 /// Calls the assembler to build the binary for the benchmark.

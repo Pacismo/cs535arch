@@ -1,3 +1,4 @@
+//! Datastructures representing a configuration for the benchmarker to run.
 use libmem::{
     cache::{Associative, Cache, MultiAssociative, NullCache},
     memory::Memory,
@@ -10,21 +11,31 @@ use std::{
     path::{Path, PathBuf},
 };
 
+/// A singular configuration for the benchmark.
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct SimulationConfig {
+    /// The name of the configuration
     pub name: String,
 
+    // Whether to enable writethrough
     pub writethrough: bool,
+    /// The penalty of a miss
     pub miss_penalty: usize,
+    /// The penalty of a volatile operation
     pub volatile_penalty: usize,
+    /// Whether to enable the pipeline
     pub pipeline: bool,
+    /// The configuration of a cache
+    ///
+    /// This field is optional in the file
     #[serde(default)]
     pub cache: CacheConfig,
 }
 
 impl SimulationConfig {
+    /// Construct a pipeline out of this configuration
     pub fn build_config(&self) -> Box<dyn Pipeline> {
-        let (data_cache, instruction_cache) = self.cache.build_config();
+        let (instruction_cache, data_cache) = self.cache.build_config();
 
         let mem = Box::new(SingleLevel::new(
             data_cache,
@@ -43,14 +54,19 @@ impl SimulationConfig {
     }
 }
 
+/// The configuration of a singular cache module
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct CacheModuleConfig {
+    /// Bits for offset
     pub offset_bits: usize,
+    /// Bits for set
     pub set_bits: usize,
+    /// The number of ways per set
     pub ways: usize,
 }
 
 impl CacheModuleConfig {
+    /// Construct a cache out of this configuration
     pub fn build_config(&self) -> Box<dyn Cache> {
         if self.ways == 1 {
             Box::new(Associative::new(self.offset_bits, self.set_bits))
@@ -64,13 +80,17 @@ impl CacheModuleConfig {
     }
 }
 
+/// The configuration of the entire cache
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct CacheConfig {
+    /// Configuration for the instruction cache
     pub instruction: Option<CacheModuleConfig>,
+    /// Configuration for the data cache
     pub data: Option<CacheModuleConfig>,
 }
 
 impl CacheConfig {
+    /// Create the instruction and data caches
     pub fn build_config(&self) -> (Box<dyn Cache>, Box<dyn Cache>) {
         (
             if let Some(ref conf) = self.instruction {
@@ -89,18 +109,28 @@ impl CacheConfig {
 
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct Benchmark {
+    /// The name of the benchmark
     pub name: String,
+    /// Where to find the benchmark relative to the configuration file
     pub path: PathBuf,
+    /// What source files to include in the build process, relative to the benchmark's root directory
     pub sources: Vec<String>,
+    /// What to call the resulting binary file
     pub binary: String,
 }
 
+/// The entire configuration for the benchmarking tool
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct BenchmarkConfig {
+    /// The set of configurations to run for each benchmark
     pub configuration: Vec<SimulationConfig>,
+    /// The set of benchmarks
     pub benchmark: Vec<Benchmark>,
 }
 
+/// Read a configuration from a file.
+///
+/// Reads the entire contents of the `file` to memory and deserializes it.
 pub fn read_configuration(file: &Path) -> Result<BenchmarkConfig, Box<dyn Error>> {
     let content = std::fs::read_to_string(file)?;
 
