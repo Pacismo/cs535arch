@@ -1,26 +1,27 @@
 //! This is a highly-parallelized benchmarking software
+mod bench;
 mod cli;
 mod config;
+mod error;
 mod results;
 
-use crate::cli::Cli;
+use crate::{bench::BenchmarkHelper, cli::Cli, error::Error};
 use clap::Parser;
 use config::{Benchmark, SimulationConfig};
 use crossterm::{
-    cursor::{Hide, MoveToColumn, MoveToPreviousLine, RestorePosition, SavePosition, Show},
+    cursor::{Hide, MoveToColumn, MoveToPreviousLine, Show},
     execute,
     style::{StyledContent, Stylize},
 };
 use libmem::memory::Memory;
 use libpipe::ClockResult;
 use libseis::{pages::PAGE_SIZE, types::Word};
-use rayon::prelude::*;
 use results::RunResult;
 use std::{
-    error::Error,
+    collections::{HashMap, HashSet},
     fs::File,
     io::{stdout, Write},
-    sync::Mutex,
+    sync::Arc,
     time::Instant,
 };
 
@@ -30,7 +31,7 @@ use std::{
 const PAGES: usize = 16;
 
 /// Calls the assembler to build the binary for the benchmark.
-pub fn build_binary(benchmark: &Benchmark) -> Result<(), Box<dyn Error>> {
+pub fn build_binary(benchmark: &Benchmark) -> Result<(), Error> {
     use std::process::Command;
 
     let status = Command::new("seis-asm")
@@ -49,7 +50,7 @@ pub fn build_binary(benchmark: &Benchmark) -> Result<(), Box<dyn Error>> {
 }
 
 /// Prepares a simulation. Loads benchmark to memory.
-pub fn prepare_sim(mem: &mut Memory, benchmark: &Benchmark) -> Result<(), Box<dyn Error>> {
+pub fn prepare_sim(mem: &mut Memory, benchmark: &Benchmark) -> Result<(), Error> {
     use std::fs::read;
     let path = benchmark.path.join(&benchmark.binary);
     let data = read(&path)?;
@@ -71,7 +72,7 @@ pub fn prepare_sim(mem: &mut Memory, benchmark: &Benchmark) -> Result<(), Box<dy
 fn run_benchmark<'a>(
     benchmark: &'a Benchmark,
     config: &'a SimulationConfig,
-) -> Result<RunResult, Box<dyn Error>> {
+) -> Result<RunResult, Error> {
     let mut pipeline = config.build_config();
     prepare_sim(pipeline.memory_module_mut().memory_mut(), benchmark)?;
 
@@ -119,7 +120,73 @@ fn finished_status(text: &str) -> StyledContent<String> {
     format!("{text:>STATUS_WIDTH$}").green().bold()
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn run<'a: 'static>(
+    n: usize,
+    configurations: Vec<(usize, Arc<Benchmark>, Arc<SimulationConfig>)>,
+) -> Result<Vec<RunResult>, Error> {
+    let (bench_width, conf_width) = configurations
+        .iter()
+        .map(|(_, b, c)| (b.name.len(), c.name.len()))
+        .reduce(|acc, e| (acc.0.max(e.0), acc.1.max(e.1)))
+        .unwrap();
+
+    let mappings: HashMap<usize, (Arc<Benchmark>, Arc<SimulationConfig>)> = configurations
+        .iter()
+        .map(|(i, bench, conf)| (*i, (bench.clone(), conf.clone())))
+        .collect();
+
+    // Run each combination of benchmark and configuration.
+    //
+    // There is still an issue where benchmarks will go out of bounds of the console,
+    // but that is not of significant concern at the moment.
+    let helper = BenchmarkHelper::new(configurations, n)?;
+    let mut running = HashSet::new();
+
+    while let Some(state) = helper.next() {
+        match state {
+            bench::State::Started(i) => {
+                execute!(stdout(), MoveToPreviousLine(running.len().max(1) as u16))?;
+                running.insert(i);
+
+                for i in running.iter() {
+                    let (bench, conf) = mappings.get(i).unwrap();
+                    print!(
+                        "\n{} {:>bench_width$} {:<conf_width$}",
+                        processing_status("Running"),
+                        bench.name,
+                        conf.name
+                    )
+                }
+            }
+            bench::State::Finished(i) => {
+                let (bench, conf) = mappings.get(&i).unwrap();
+                execute!(stdout(), MoveToPreviousLine(running.len() as u16))?;
+                print!(
+                    "\n{} {:>bench_width$} {:<conf_width$}",
+                    finished_status("Finished"),
+                    bench.name,
+                    conf.name
+                );
+                running.remove(&i);
+
+                for i in running.iter() {
+                    let (bench, conf) = mappings.get(i).unwrap();
+                    print!(
+                        "\n{} {:>bench_width$} {:<conf_width$}",
+                        processing_status("Running"),
+                        bench.name,
+                        conf.name
+                    )
+                }
+            }
+        }
+        stdout().flush()?;
+    }
+
+    helper.join()
+}
+
+fn main() -> Result<(), Error> {
     let cli = Cli::parse();
     let mut config = config::read_configuration(&cli.bench_conf)?;
 
@@ -137,15 +204,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Hide the cursor
     execute!(stdout(), Hide)?;
 
-    // Get the width of the widest field.
-    let bench_name_width = config.benchmark.iter().map(|b| b.name.len()).max().unwrap();
-    let config_name_width = config
-        .configuration
-        .iter()
-        .map(|c| c.name.len())
-        .max()
-        .unwrap();
-
     // Get the path of the configuration file and set the paths
     // of each benchmark correctly before building each binary.
     //
@@ -154,11 +212,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     config
         .benchmark
         .iter_mut()
-        .try_for_each(|b| -> Result<(), Box<dyn Error>> {
+        .try_for_each(|b| -> Result<(), Error> {
             print!(
                 "{} benchmark {}",
                 processing_status("Building"),
-                format!("{:>bench_name_width$}", b.name).italic()
+                b.name.as_str().italic()
             );
             stdout().flush()?;
 
@@ -169,78 +227,36 @@ fn main() -> Result<(), Box<dyn Error>> {
             println!(
                 "{} benchmark {}",
                 finished_status("Built"),
-                format!("{:>bench_name_width$}", b.name).italic()
+                b.name.as_str().italic()
             );
 
             Ok(())
         })?;
 
     // Get every combination of configuration and benchmark.
+    let conf = config
+        .configuration
+        .into_iter()
+        .map(Arc::new)
+        .collect::<Vec<_>>();
     let configurations: Vec<_> = config
         .benchmark
-        .iter()
-        .flat_map(|bench| config.configuration.iter().map(move |conf| (bench, conf)))
+        .into_iter()
+        .flat_map(|bench| {
+            let bench = Arc::new(bench);
+
+            conf.iter().map(move |conf| (bench.clone(), conf.clone()))
+        })
+        .enumerate()
+        .map(|(i, (b, c))| (i, b, c))
         .collect();
 
     // Move to the previous line (as all runs will add a newline before printing text)
-    execute!(stdout(), MoveToPreviousLine(1))?;
     stdout().flush()?;
 
-    // Set the thread count accordingly.
-    if let Some(threads) = cli.threads {
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(threads)
-            .build_global()?;
-    } else {
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(4)
-            .build_global()?;
-    }
+    let n = cli.threads.unwrap_or(4);
 
-    // Count the number of finished runs
-    // This is a mutex to enable multithreaded use
-    let n = Mutex::new(0u16);
-
-    // Run each combination of benchmark and configuration.
-    //
-    // There is still an issue where benchmarks will go out of bounds of the console,
-    // but that is not of significant concern at the moment.
-    let results: Vec<_> = configurations
-        .into_par_iter()
-        .flat_map(|(benchmark, config)| -> Result<RunResult, Box<dyn Error>> {
-            let mut lock = stdout().lock();
-            let mut n_lock = n.lock().unwrap();
-            let i = *n_lock;
-            *n_lock += 1;
-            write!(
-                lock,
-                "\n{} benchmark {} {:<config_name_width$}",
-                processing_status("Running"),
-                format!("{:>bench_name_width$}", benchmark.name).italic(),
-                config.name
-            )?;
-            lock.flush()?;
-            drop((lock, n_lock));
-
-            let run = run_benchmark(benchmark, config)?;
-
-            let mut lock = stdout().lock();
-            let n_lock = n.lock().unwrap();
-            execute!(lock, SavePosition)?;
-            execute!(lock, MoveToPreviousLine(*n_lock - i))?;
-            write!(
-                lock,
-                "\n{} benchmark {} {:<config_name_width$}; took {:.2} seconds",
-                finished_status("Finished"),
-                format!("{:>bench_name_width$}", benchmark.name).italic(),
-                config.name,
-                run.rtc.as_secs_f64(),
-            )?;
-            execute!(lock, RestorePosition)?;
-
-            Ok(run)
-        })
-        .collect();
+    let results = run(n, configurations)?;
 
     println!(
         "\n{} (took {:.2} seconds)",
