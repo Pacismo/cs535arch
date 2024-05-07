@@ -6,10 +6,8 @@ use libmem::{
 };
 use libpipe::{Pipeline, Pipelined, Unpipelined};
 use serde::Deserialize;
-use std::{
-    error::Error,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
+use crate::error::Error;
 
 /// A singular configuration for the benchmark.
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -107,6 +105,7 @@ impl CacheConfig {
     }
 }
 
+/// Represents a benchmark
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct Benchmark {
     /// The name of the benchmark
@@ -131,7 +130,7 @@ pub struct BenchmarkConfig {
 /// Read a configuration from a file.
 ///
 /// Reads the entire contents of the `file` to memory and deserializes it.
-pub fn read_configuration(file: &Path) -> Result<BenchmarkConfig, Box<dyn Error>> {
+pub fn read_configuration(file: &Path) -> Result<BenchmarkConfig, Error> {
     let content = std::fs::read_to_string(file)?;
 
     Ok(toml::from_str(&content)?)
