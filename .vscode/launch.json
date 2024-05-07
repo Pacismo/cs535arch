@@ -245,5 +245,26 @@
             "args": [],
             "cwd": "${workspaceFolder}"
         },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'seis-bench'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=seis-bench",
+                    "--package=seis-bench"
+                ],
+                "filter": {
+                    "name": "seis-bench",
+                    "kind": "bin"
+                }
+            },
+            "args": [
+                "./benchmarks/benchmarks.toml",
+                "test.csv",
+            ],
+            "cwd": "${workspaceFolder}"
+        },
     ]
 }
