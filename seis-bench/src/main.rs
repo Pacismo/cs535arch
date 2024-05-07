@@ -63,6 +63,8 @@ pub fn prepare_sim(mem: &mut Memory, benchmark: &Benchmark) -> Result<(), Box<dy
 }
 
 /// Runs a benchmark with a given configuration.
+///
+/// The `benchmark` passed will be run with a provided `config`.
 fn run_benchmark<'a>(
     benchmark: &'a Benchmark,
     config: &'a SimulationConfig,
@@ -101,10 +103,14 @@ fn run_benchmark<'a>(
 
 const STATUS_WIDTH: usize = 12;
 
+/// Formats the text for the "processing" status. Sets color to cyan and makes
+/// the text boldface. It also right-aligns the text within a `STATUS_WIDTH` field.
 fn processing_status(text: &str) -> StyledContent<String> {
     format!("{text:>STATUS_WIDTH$}").cyan().bold()
 }
 
+/// Formats the text for the "finished" status. Sets color to green and makes
+/// the text boldface. It also right-aligns the text within a `STATUS_WIDTH` field.
 fn finished_status(text: &str) -> StyledContent<String> {
     format!("{text:>STATUS_WIDTH$}").green().bold()
 }
@@ -113,6 +119,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
     let mut config = config::read_configuration(&cli.bench_conf)?;
 
+    // Ensure there is at *least* one benchmark and one configuration.
     if config.benchmark.len() == 0 {
         println!("There are no benchmarks to run.");
         return Ok(());
@@ -123,8 +130,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
+    // Hide the cursor
     execute!(stdout(), Hide)?;
 
+    // Get the width of the widest field.
     let bench_name_width = config.benchmark.iter().map(|b| b.name.len()).max().unwrap();
     let config_name_width = config
         .configuration
@@ -133,6 +142,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         .max()
         .unwrap();
 
+    // Get the path of the configuration file and set the paths
+    // of each benchmark correctly before building each binary.
+    //
+    // This is done in series to prevent output squashing.
     let conf_path = cli.bench_conf.parent().unwrap();
     config
         .benchmark
@@ -158,15 +171,18 @@ fn main() -> Result<(), Box<dyn Error>> {
             Ok(())
         })?;
 
+    // Get every combination of configuration and benchmark.
     let configurations: Vec<_> = config
         .benchmark
         .iter()
         .flat_map(|bench| config.configuration.iter().map(move |conf| (bench, conf)))
         .collect();
 
+    // Move to the previous line (as all runs will add a newline before printing text)
     execute!(stdout(), MoveToPreviousLine(1))?;
     stdout().flush()?;
 
+    // Set the thread count accordingly.
     if let Some(threads) = cli.threads {
         rayon::ThreadPoolBuilder::new()
             .num_threads(threads)
@@ -177,8 +193,14 @@ fn main() -> Result<(), Box<dyn Error>> {
             .build_global()?;
     }
 
+    // Count the number of finished runs
+    // This is a mutex to enable multithreaded use
     let n = Mutex::new(0u16);
 
+    // Run each combination of benchmark and configuration.
+    //
+    // There is still an issue where benchmarks will go out of bounds of the console,
+    // but that is not of significant concern at the moment.
     let results: Vec<_> = configurations
         .into_par_iter()
         .flat_map(|(benchmark, config)| -> Result<RunResult, Box<dyn Error>> {
