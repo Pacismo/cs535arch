@@ -3,6 +3,16 @@
 This repository contains the code necessary to assemble for and emulate the SEIS ISA.
 This follows the specs laid out by UMASS' CS 535: Computer Architecture course.
 
+## Building
+
+You will need to install the Rust toolkit to your system before you can build it. To do so, install [Rustup](https://www.rust-lang.org/tools/install) and install the stable toolchain (`rustup install stable`). From there, you must run `cargo build --release` to build the binaries, and, finally, you can run `cargo run --release --bin [binary-name] -- [binary-args]`.
+
+The following are binaries you can run:
+
+- `seis-asm`, the assembler
+- `seis-sim`, the simulator
+- `seis-bench`, the benchmark automation tool
+
 ## Registers
 
 This instruction set has 16 general-purpose registers and a handful of processor-status registers.
