@@ -1,5 +1,5 @@
 //! Representation of the results of each run
-use std::{fmt::Display, time::Duration};
+use std::{fmt::Display, io::Write, time::Duration};
 
 /// The result of a run consisting of a benchmark and a configuration
 #[derive(Debug, Default, Clone)]
@@ -25,5 +25,11 @@ impl Display for RunResult {
             self.clocks,
             self.rtc.as_secs_f64()
         )
+    }
+}
+
+impl RunResult {
+    pub fn write_headers<W: Write>(w: &mut W) -> std::io::Result<()> {
+        writeln!(w, "benchmark,configuration,clocks,rtc")
     }
 }

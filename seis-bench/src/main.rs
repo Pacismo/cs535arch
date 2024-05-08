@@ -273,7 +273,7 @@ fn main() -> Result<(), Error> {
 
     let mut file = File::create(file)?;
 
-    writeln!(file, "benchmark,configuration,clocks,rtc")?;
+    RunResult::write_headers(&mut file)?;
     results
         .into_iter()
         .try_for_each(|line| writeln!(file, "{}", line))?;
