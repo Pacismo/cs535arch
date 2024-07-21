@@ -12,7 +12,7 @@ use libmem::module::MemoryModule;
 /// Represents a pipelined processor
 #[derive(Debug)]
 pub struct Pipelined {
-    memory_module: Box<dyn MemoryModule>,
+    memory_module: Box<dyn MemoryModule + Send + Sync>,
     registers: Registers,
     locks: Locks,
 
@@ -95,7 +95,7 @@ impl Pipeline for Pipelined {
 
 impl Pipelined {
     /// Creates a new pipelined processor
-    pub fn new(memory_module: Box<dyn MemoryModule>) -> Self {
+    pub fn new(memory_module: Box<dyn MemoryModule + Send + Sync>) -> Self {
         Self {
             memory_module,
             registers: Default::default(),

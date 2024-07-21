@@ -57,8 +57,8 @@ impl Transaction {
 /// Represents a memory module with a single level of cache.
 #[derive(Debug)]
 pub struct SingleLevel {
-    data_cache: Box<dyn Cache>,
-    instruction_cache: Box<dyn Cache>,
+    data_cache: Box<dyn Cache + Send + Sync>,
+    instruction_cache: Box<dyn Cache + Send + Sync>,
     memory: Memory,
 
     read_miss_penalty: usize,
@@ -771,8 +771,8 @@ impl SingleLevel {
     ///
     /// - A misaligned access has a clock penalty of 1 plus another miss penalty (multiple accesses)
     pub fn new(
-        data_cache: Box<dyn Cache>,
-        instruction_cache: Box<dyn Cache>,
+        data_cache: Box<dyn Cache + Send + Sync>,
+        instruction_cache: Box<dyn Cache + Send + Sync>,
         memory: Memory,
         miss_penalty: usize,
         volatile_penalty: usize,

@@ -24,7 +24,7 @@ use Stage::*;
 /// Represents an unpipelined processor
 #[derive(Debug)]
 pub struct Unpipelined {
-    memory_module: Box<dyn MemoryModule>,
+    memory_module: Box<dyn MemoryModule + Send + Sync>,
     registers: Registers,
     locks: Locks,
 
@@ -172,7 +172,7 @@ impl Pipeline for Unpipelined {
 
 impl Unpipelined {
     /// Create a new unpipelined processor
-    pub fn new(memory_module: Box<dyn MemoryModule>) -> Self {
+    pub fn new(memory_module: Box<dyn MemoryModule + Send + Sync>) -> Self {
         Self {
             memory_module,
             registers: Default::default(),
