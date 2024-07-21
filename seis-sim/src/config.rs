@@ -18,7 +18,7 @@ pub enum CacheConfiguration {
 }
 
 impl CacheConfiguration {
-    pub fn into_boxed_cache(self) -> Box<dyn Cache> {
+    pub fn into_boxed_cache(self) -> Box<dyn Cache + Send + Sync> {
         match self {
             CacheConfiguration::Disabled => Box::new(NullCache::new()),
             CacheConfiguration::Associative {

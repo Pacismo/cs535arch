@@ -65,7 +65,7 @@ pub struct CacheModuleConfig {
 
 impl CacheModuleConfig {
     /// Construct a cache out of this configuration
-    pub fn build_config(&self) -> Box<dyn Cache> {
+    pub fn build_config(&self) -> Box<dyn Cache + Send + Sync> {
         if self.ways == 1 {
             Box::new(Associative::new(self.offset_bits, self.set_bits))
         } else {
@@ -89,7 +89,7 @@ pub struct CacheConfig {
 
 impl CacheConfig {
     /// Create the instruction and data caches
-    pub fn build_config(&self) -> (Box<dyn Cache>, Box<dyn Cache>) {
+    pub fn build_config(&self) -> (Box<dyn Cache + Send + Sync>, Box<dyn Cache + Send + Sync>) {
         (
             if let Some(ref conf) = self.instruction {
                 conf.build_config()
