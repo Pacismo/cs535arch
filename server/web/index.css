@@ -1,0 +1,62 @@
+form {
+    width: 100%;
+}
+
+form fieldset {
+    width: 75%;
+    border-radius: 4px;
+}
+
+fieldset.grid {
+    display: grid;
+    grid-template-columns: auto [label] max-content [field] max-content auto;
+}
+
+fieldset.grid label {
+    display: inline-block;
+    grid-column: label;
+    text-align: right;
+    margin-right: 4pt;
+}
+
+fieldset.grid input {
+    display: inline-block;
+    grid-column: field;
+}
+
+fieldset.general-config {
+    font: sans-serif;
+}
+
+fieldset.cache-config div {
+    display: flex;
+}
+
+fieldset.cache-config .cache-entry {
+    display: grid;
+    font: sans-serif;
+    min-width: 4cm;
+}
+
+fieldset.cache-config fieldset.cache-entry.data {
+    grid-column: data;
+}
+
+fieldset.cache-config fieldset.cache-entry.instruction {
+    grid-column: instruction;
+}
+
+fieldset label {
+    min-width: 10%;
+}
+
+form input.submit-button {
+    display: block;
+    font-size: 8pt;
+    margin-top: 4pt;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 8pt;
+    border: 1pt solid black;
+    border-radius: 16pt;
+}

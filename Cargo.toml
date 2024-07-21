@@ -7,5 +7,5 @@ members = [
     "seis-asm",
     "seis-bench",
     "seis-disasm",
-    "seis-sim",
+    "seis-sim", "server",
 ]

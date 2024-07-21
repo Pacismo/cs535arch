@@ -1,0 +1,36 @@
+[package]
+name = "server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+[dependencies.clap]
+version = "^4.5"
+features = ["derive"]
+
+[dependencies.serde]
+version = "^1.0"
+
+[dependencies.serde_json]
+version = "^1.0"
+
+[dependencies.libseis]
+path = "../libseis/"
+
+[dependencies.libmem]
+path = "../libmem/"
+
+[dependencies.libpipe]
+path = "../libpipe/"
+
+[dependencies.tokio]
+version = "^1.38"
+
+[dependencies.rocket]
+version = "^0.5"
+features = ["json"]
+
+[dependencies.uuid]
+version = "^1.10"
+features = ["v4", "fast-rng", "macro-diagnostics"]
