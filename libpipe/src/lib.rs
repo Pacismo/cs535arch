@@ -57,6 +57,7 @@ impl<'a> Serialize for PipelineStages<'a> {
 }
 
 /// The result of clocking the pipeline.
+#[derive(Debug)]
 pub enum ClockResult {
     /// A stall occurred in the pipeline
     ///
