@@ -29,7 +29,7 @@ export async function submit_form() {
 
     let cache = {data, instruction};
 
-    let body = {miss_penalty : miss_penalty, volatile_penalty, pipelining, writethrough, cache, files};
+    let body = {miss_penalty, volatile_penalty, pipelining, writethrough, cache, files};
 
     let response = await fetch(new Request("/simulation", {method : "POST", body : JSON.stringify(body)}));
 
