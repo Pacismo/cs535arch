@@ -75,6 +75,13 @@ pub async fn init(
             )
         })?;
 
+    if files.len() == 0 {
+        return Err((
+            http::Status::BadRequest,
+            RawText("`files` requires at least one entry".into()),
+        ));
+    }
+
     let input: Vec<Input> = files
         .iter()
         .map(|(k, v)| {
