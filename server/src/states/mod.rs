@@ -1,8 +1,12 @@
 mod runtimes;
 
-pub use runtimes::Runtime;
-use std::{collections::HashMap, sync::Arc};
-use tokio::sync::{Mutex, RwLock};
+pub use runtimes::*;
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+    time::Instant,
+};
+use tokio::sync::RwLock;
 use uuid::Uuid;
 
-pub type Runtimes = Arc<RwLock<HashMap<Uuid, Arc<Mutex<Runtime>>>>>;
+pub type Runtimes = Arc<RwLock<HashMap<Uuid, (Arc<RwLock<Runtime>>, Mutex<Instant>)>>>;

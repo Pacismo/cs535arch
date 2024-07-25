@@ -26,18 +26,6 @@ pub enum CacheConfiguration {
 }
 
 impl CacheConfiguration {
-    pub fn new(set_bits: usize, offset_bits: usize, ways: usize) -> Self {
-        if ways == 0 {
-            Self::Disabled
-        } else {
-            Self::Associative {
-                set_bits,
-                offset_bits,
-                ways,
-            }
-        }
-    }
-
     pub fn into_boxed_cache(self) -> Box<dyn Cache + Send + Sync> {
         match self {
             CacheConfiguration::Disabled => Box::new(NullCache::new()),
@@ -158,27 +146,6 @@ pub struct SimulationConfiguration {
 }
 
 impl SimulationConfiguration {
-    pub fn new<'a, I>(
-        miss_penalty: usize,
-        volatile_penalty: usize,
-        writethrough: bool,
-        pipelining: bool,
-        caches: I,
-    ) -> Self
-    where
-        I: IntoIterator<Item = (&'a str, CacheConfiguration)> + 'a,
-    {
-        Self {
-            cache: caches.into_iter().map(|(s, c)| (s.to_owned(), c)).collect(),
-            miss_penalty,
-            volatile_penalty,
-            writethrough,
-            pipelining: pipelining
-                .then(|| PipelineMode::Enabled)
-                .unwrap_or(PipelineMode::Disabled),
-        }
-    }
-
     pub fn into_boxed_pipeline(&self) -> Box<dyn Pipeline + Send + Sync> {
         let data_config = self
             .cache

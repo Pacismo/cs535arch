@@ -1,0 +1,190 @@
+table td {
+    transition: 500ms ease all;
+}
+
+table td.updated {
+    background-color: aquamarine;
+}
+
+h2.label:first-child {
+    margin-top: 0;
+}
+
+table,
+table th,
+table td {
+    border: 1px solid black;
+    border-collapse: separate;
+}
+
+table td,
+table th {
+    text-align: right;
+    padding: 0 .5ch;
+}
+
+table#pipeline_table th,
+table#pipeline_table td {
+    min-width: 10ch;
+    user-select: none;
+}
+
+table {
+    margin: 0 auto;
+}
+
+div:has(>table#register_table) {
+    width: 80%;
+    height: max-content;
+    overflow-x: scroll;
+    scrollbar-width: none;
+    border: 1px solid black;
+    margin: 0 auto;
+    transition: 500ms all ease;
+}
+
+div:has(>table#register_table):hover {
+    scrollbar-width: thin;
+    padding-bottom: 10px;
+}
+
+table#register_table {
+    border: none;
+    font-family: monospace;
+}
+
+div:has(>table#memory_table) {
+    max-width: max-content;
+    height: 5cm;
+    overflow: scroll;
+    scrollbar-width: none;
+    border: 1px solid black;
+    margin: 0 auto;
+    scroll-snap-type: y proximity;
+}
+
+table#memory_table tr {
+    scroll-snap-align: center;
+}
+
+table#memory_table {
+    border: none;
+    font-family: monospace;
+}
+
+table#memory_table tr.header-row th {
+    position: sticky;
+    top: -1px;
+    background-color: white;
+    min-width: 3ch;
+    z-index: 1;
+}
+
+table#memory_table tr:not(.header-row) th {
+    position: sticky;
+    left: -1px;
+    background-color: white;
+}
+
+div:has(>ul.configuration-display) {
+    min-width: 10cm;
+}
+
+ul.configuration-display {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+ul.configuration-display ul {
+    list-style: none;
+}
+
+ul ul {
+    border-left: 1px solid black;
+    margin-left: 4pt;
+    padding-left: 4pt;
+}
+
+div#memoryview_switcher {
+    display: grid;
+    grid-template-columns: auto [prev]1.5cm [label]3cm [next]1.5cm auto;
+    margin: 4px;
+    font-size: medium;
+}
+
+div#memoryview_switcher button {
+    font-size: 12pt;
+    font-family: monospace;
+}
+
+div#memoryview_switcher>button#memoryview_prev {
+    grid-column: prev;
+}
+
+div#memoryview_switcher>p#memview_pageid {
+    display: block;
+    grid-column: label;
+    text-align: center;
+}
+
+div#memoryview_switcher>button#memoryview_next {
+    grid-column: next;
+}
+
+div.form-container {
+    width: 100%;
+}
+
+form#watchlist_form {
+    margin: 12px auto;
+    width: fit-content;
+}
+
+table td:has(>button) {
+    padding: 0;
+    width: fit-content;
+    height: fit-content;
+}
+
+table button {
+    display: block;
+    width: 100%;
+    margin: 0;
+    border: none;
+    cursor: pointer;
+    font-size: medium;
+    font-weight: bold;
+    font-family: sans-serif;
+}
+
+table#watchlist {
+    border: none;
+}
+
+table#watchlist tr th {
+    min-width: 8ch;
+}
+
+table#watchlist tr th:last-child,
+table#watchlist tr th:first-child {
+    user-select: none;
+    margin: 0;
+    border: none;
+    cursor: default;
+    font-size: medium;
+    font-weight: bold;
+    font-family: sans-serif;
+    color: #00000000;
+}
+
+form#watchlist_form label,
+form#watchlist_form input,
+form#watchlist_form select,
+form#watchlist_form option {
+    font-size: 8pt;
+}
+
+form#watchlist_form input.monospace {
+    text-align: right;
+}

@@ -34,3 +34,6 @@ features = ["json"]
 [dependencies.uuid]
 version = "^1.10"
 features = ["v4", "fast-rng", "macro-diagnostics"]
+
+[dependencies.libasm]
+path = "../libasm/"

@@ -1,31 +1,56 @@
-mod config;
+mod read;
 
-use std::{collections::HashMap, str::FromStr, sync::Arc, time::Instant};
+use std::{path::PathBuf, str::FromStr, sync::Arc, time::Instant};
 
 use crate::{
-    config::{CacheConfiguration, SimulationConfiguration},
+    config::SimulationConfiguration,
     states::{Runtime, Runtimes},
+    PAGES,
 };
-use config::InitFormData;
-use libseis::types::Word;
+use libasm::compile;
+use libseis::pages::PAGE_SIZE;
 use rocket::{
-    form::Form, get, http, post, response::content::RawHtml, routes, serde::json::Json, Route,
-    State,
+    get, http, post,
+    response::content::{RawHtml, RawText},
+    routes,
+    serde::json::Json,
+    Route, State,
 };
 use serde_json::Value;
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 use uuid::Uuid;
 
-async fn get_uuid(runtimes: &Runtimes, uuid: Uuid) -> Option<Arc<Mutex<Runtime>>> {
+/// Gets a session corresponding to the `uuid`. If possible, updates the time since last use.
+async fn get_uuid(
+    runtimes: &Runtimes,
+    uuid: Uuid,
+) -> Result<Arc<RwLock<Runtime>>, (http::Status, String)> {
     let lock = runtimes.read().await;
-    lock.get(&uuid).map(|r| r.clone())
+
+    lock.get(&uuid)
+        .map(|(r, i)| {
+            if let Ok(mut lock) = i.try_lock() {
+                *lock = Instant::now();
+            }
+
+            r.clone()
+        })
+        .ok_or((
+            http::Status::NotFound,
+            format!("UUID {uuid} is not an active simulation"),
+        ))
+}
+
+#[inline]
+fn into_uuid(uuid: &str) -> Result<Uuid, (http::Status, String)> {
+    Uuid::from_str(uuid).map_err(|e| (http::Status::BadRequest, e.to_string()))
 }
 
 #[post("/", data = "<config>")]
 pub async fn init(
     runtimes: &State<Runtimes>,
-    config: Form<InitFormData>,
-) -> Result<RawHtml<String>, (http::Status, String)> {
+    config: Json<Value>,
+) -> Result<RawText<String>, (http::Status, String)> {
     let mut uuid = Uuid::new_v4();
 
     let mut lock = runtimes.write().await;
@@ -34,153 +59,100 @@ pub async fn init(
         uuid = Uuid::new_v4();
     }
 
-    let config = SimulationConfiguration::new(
-        config.miss_penalty,
-        config.volatile_penalty,
-        config.writethrough,
-        config.pipelining,
-        [
-            (
-                "data",
-                CacheConfiguration::new(
-                    config.cache_data_set_bits,
-                    config.cache_data_offset_bits,
-                    config.cache_data_ways,
-                ),
-            ),
-            (
-                "instruction",
-                CacheConfiguration::new(
-                    config.cache_instruction_set_bits,
-                    config.cache_instruction_offset_bits,
-                    config.cache_instruction_ways,
-                ),
-            ),
-        ],
+    let filename: PathBuf = PathBuf::from(
+        config
+            .get("asm_file")
+            .ok_or_else(|| {
+                (
+                    http::Status::BadRequest,
+                    "Expected field `asm_file`".to_owned(),
+                )
+            })?
+            .as_str()
+            .ok_or_else(|| {
+                (
+                    http::Status::BadRequest,
+                    "Expected field `asm_file` to be a string".to_owned(),
+                )
+            })?,
     );
 
-    lock.insert(uuid, Runtime::new(uuid, config));
+    let file_content: String = config
+        .get("asm_data")
+        .ok_or_else(|| {
+            (
+                http::Status::BadRequest,
+                "Expected field `asm_data`".to_owned(),
+            )
+        })?
+        .as_str()
+        .ok_or_else(|| {
+            (
+                http::Status::BadRequest,
+                "Expected field `asm_data` to be a string".to_owned(),
+            )
+        })?
+        .to_owned();
+
+    let config = SimulationConfiguration::from_json(&config)
+        .map_err(|e| (http::Status::BadRequest, e.to_string()))?;
+
+    let bin = compile(&file_content, &filename).map_err(|e| {
+        (
+            http::Status::InternalServerError,
+            format!("Error while compiling {}: {e}", filename.display()),
+        )
+    })?;
+
+    lock.insert(uuid, Runtime::new(uuid, config, bin));
 
     println!("Created a new configuration");
 
-    Ok(RawHtml(format!(include_str!("response.html"), uuid = uuid)))
+    Ok(RawText(uuid.to_string()))
 }
 
 #[get("/<uuid>")]
 pub async fn dashboard(
     runtimes: &State<Runtimes>,
     uuid: &str,
+) -> Result<RawHtml<String>, (http::Status, String)> {
+    let uuid = into_uuid(uuid)?;
+
+    get_uuid(runtimes, uuid).await?;
+
+    Ok(RawHtml(format!(
+        include_str!("application.html"),
+        uuid = uuid,
+        pages = PAGES,
+        page_size = PAGE_SIZE,
+    )))
+}
+
+#[post("/<uuid>/clock", data = "<count>")]
+pub async fn clock(
+    runtimes: &State<Runtimes>,
+    uuid: &str,
+    count: Json<usize>,
 ) -> Result<String, (http::Status, String)> {
-    let uuid = Uuid::from_str(uuid).map_err(|e| (http::Status::BadRequest, e.to_string()))?;
+    let uuid = into_uuid(uuid)?;
 
-    let runtime_arc = get_uuid(runtimes, uuid).await.ok_or((
-        http::Status::BadRequest,
-        format!("UUID {uuid} is not an active simulation"),
-    ))?;
-    let mut runtime = runtime_arc.lock().await;
-    runtime.last_used = Instant::now();
+    let runtime_arc = get_uuid(runtimes, uuid).await?;
+    let mut runtime = runtime_arc.write().await;
 
-    Ok(format!(
-        "{uuid}: {:#}\n{:#?}",
-        runtime.config.to_json(),
-        runtime
-    ))
-}
-
-#[get("/<uuid>/watchlist")]
-pub async fn read_watchlist(
-    runtimes: &State<Runtimes>,
-    uuid: &str,
-) -> Result<Json<HashMap<u32, String>>, (http::Status, String)> {
-    let uuid = Uuid::from_str(uuid).map_err(|e| (http::Status::BadRequest, e.to_string()))?;
-
-    let runtime_arc = get_uuid(runtimes, uuid)
-        .await
-        .ok_or((
-            http::Status::NotFound,
-            "The provided UUID does not correspond to an active simulation".into(),
-        ))?
-        .clone();
-    let mut runtime = runtime_arc.lock().await;
-    runtime.last_used = Instant::now();
-
-    Ok(Json(runtime.read_watchlist()))
-}
-
-#[get("/<uuid>/registers")]
-pub async fn read_registers(
-    runtimes: &State<Runtimes>,
-    uuid: &str,
-) -> Result<Json<Value>, (http::Status, String)> {
-    let uuid = Uuid::from_str(uuid).map_err(|e| (http::Status::BadRequest, e.to_string()))?;
-
-    let runtime_arc = get_uuid(runtimes, uuid)
-        .await
-        .ok_or((
-            http::Status::NotFound,
-            "The provided UUID does not correspond to an active simulation".into(),
-        ))?
-        .clone();
-    let mut runtime = runtime_arc.lock().await;
-    runtime.last_used = Instant::now();
-
-    Ok(Json(runtime.read_regs()))
-}
-
-#[get("/<uuid>/memory/<address>/<type>")]
-pub async fn read_address(
-    runtimes: &State<Runtimes>,
-    uuid: &str,
-    address: Word,
-    r#type: &str,
-) -> Result<String, (http::Status, String)> {
-    let uuid = Uuid::from_str(uuid).map_err(|e| (http::Status::BadRequest, e.to_string()))?;
-
-    let runtime_arc = get_uuid(runtimes, uuid)
-        .await
-        .ok_or((
-            http::Status::NotFound,
-            "The provided UUID does not correspond to an active simulation".into(),
-        ))?
-        .clone();
-    let mut runtime = runtime_arc.lock().await;
-    runtime.last_used = Instant::now();
-
-    match r#type.to_lowercase().as_str() {
-        "byte" => Ok(runtime
-            .state
-            .memory_module()
-            .memory()
-            .read_byte(address)
-            .to_string()),
-        "short" => Ok(runtime
-            .state
-            .memory_module()
-            .memory()
-            .read_short(address)
-            .to_string()),
-        "word" => Ok(runtime
-            .state
-            .memory_module()
-            .memory()
-            .read_word(address)
-            .to_string()),
-        "float" => Ok(
-            f32::from_bits(runtime.state.memory_module().memory().read_word(address)).to_string(),
-        ),
-        t => Err((
-            http::Status::BadRequest,
-            format!("\"{t}\" is not a valid type"),
-        )),
-    }
+    Ok(format!("{:#?}", runtime.state.clock(*count)))
 }
 
 pub fn exports() -> Vec<Route> {
     routes![
         init,
-        read_address,
         dashboard,
-        read_watchlist,
-        read_registers
+        clock,
+        read::read_page,
+        read::read_address,
+        read::read_watchlist,
+        read::set_watchlist,
+        read::read_registers,
+        read::read_configuration,
+        read::read_pipeline_state,
     ]
 }

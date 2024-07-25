@@ -1,9 +1,17 @@
-form {
+div.form-container {
+    display: grid;
+
+    grid-template-columns: auto [main] 50% auto;
+
+    width: 100%;
+}
+
+div.form-container>form {
+    grid-column: main;
     width: 100%;
 }
 
 form fieldset {
-    width: 75%;
     border-radius: 4px;
 }
 
@@ -24,25 +32,26 @@ fieldset.grid input {
     grid-column: field;
 }
 
-fieldset.general-config {
-    font: sans-serif;
-}
-
-fieldset.cache-config div {
-    display: flex;
-}
-
-fieldset.cache-config .cache-entry {
+fieldset.cache-config {
     display: grid;
-    font: sans-serif;
-    min-width: 4cm;
+    grid-template-columns: auto [data] max-content [instruction] max-content auto;
 }
 
-fieldset.cache-config fieldset.cache-entry.data {
+fieldset.cache-config div.cache-entry {
+    display: inline-block;
+    grid-row: 2;
+}
+
+fieldset.cache-config div.label {
+    grid-row: 1;
+    grid-column: 1/-1;
+}
+
+fieldset.cache-config div.cache-entry.data {
     grid-column: data;
 }
 
-fieldset.cache-config fieldset.cache-entry.instruction {
+fieldset.cache-config div.cache-entry.instruction {
     grid-column: instruction;
 }
 

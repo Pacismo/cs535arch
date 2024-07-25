@@ -25,10 +25,15 @@ async fn gc(runtimes: Runtimes) {
         let now = Instant::now();
 
         // Get a list of UUIDs for expired sessions (time since last usage MUST not exceed `LIFETIME`)
+        // First, try to write-lock the runtime to check if there are any active connections to it. Ignore sessions with active connections.
+        // Then, check how long the sessions were running for. Finally, store those UUIDs in a list to iterate through and remove sessions from.
         let expired: Vec<Uuid> = lock
             .values()
-            .flat_map(|v| v.try_lock().ok())
-            .filter_map(|v| (v.last_used + LIFETIME < now).then_some(v.uuid))
+            .flat_map(|(v, i)| v.try_write().ok().map(|v| (v, i)))
+            .filter_map(|(v, i)| match i.lock() {
+                Ok(last_used) if *last_used + LIFETIME > now => None,
+                _ => Some(v.uuid),
+            })
             .collect();
 
         let count = expired.len();
