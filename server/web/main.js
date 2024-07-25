@@ -1,4 +1,6 @@
-async function submit_form() {
+import {popup} from "./common.js"
+
+export async function submit_form() {
     const miss_penalty = Number.parseInt(document.getElementById("conf_mem_misspenalty").value);
     const volatile_penalty = Number.parseInt(document.getElementById("conf_mem_volatilepenalty").value);
     const pipelining = document.getElementById("conf_mem_pipeliningenabled").value === "on";
@@ -12,8 +14,10 @@ async function submit_form() {
     /** @type {HTMLInputElement} */
     const asm = document.getElementById("asm_file");
 
-    let asm_file = asm.files[0].name;
-    let asm_data = await asm.files[0].text();
+    let files = {};
+
+    for (let i = 0; i < asm.files.length; ++i)
+        files[asm.files[i].name] = await asm.files[i].text();
 
     let data = data_ways !== 0
                    ? {set_bits : data_set_bits, offset_bits : data_offset_bits, ways : data_ways, mode : "associative"}
@@ -25,12 +29,25 @@ async function submit_form() {
 
     let cache = {data, instruction};
 
-    let body = {miss_penalty : miss_penalty, volatile_penalty, pipelining, writethrough, cache, asm_data, asm_file};
+    let body = {miss_penalty : miss_penalty, volatile_penalty, pipelining, writethrough, cache, files};
 
     let response = await fetch(new Request("/simulation", {method : "POST", body : JSON.stringify(body)}));
 
-    if (!response.ok)
-        throw `HTTP status: ${response.status} ${await response.blob().then(r => r.text())}`;
+    if (!response.ok) {
+        popup(`Error ${response.status}`, async container => {
+            container.classList = 'error-message';
+
+            (await response.blob().then(r => r.text())).split(/\n|\r\n/).forEach(l => {
+                let p = document.createElement('code');
+                p.classList = 'monospace';
+                p.style = "margin-top: 0; margin-bottom: 0; display: block; white-space: pre;";
+                container.appendChild(p);
+                p.textContent = l;
+            });
+        });
+
+        return;
+    }
 
     let uuid = await response.blob().then(r => r.text());
 

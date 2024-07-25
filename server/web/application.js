@@ -72,48 +72,20 @@ export const pipeline = {
         /** @type {string} */
         let stage_name = stage[0].toUpperCase() + stage.substring(1);
         if (this[stage].state !== null)
-            popup((container, close) => {
-                let title = document.createElement('h2');
-                container.appendChild(title);
-                title.textContent = `Current State for Stage ${stage_name}`;
-                title.style = 'margin: 0;';
-                container.appendChild(document.createElement('hr'));
-
+            popup(`Current State for Stage ${stage_name}`, container => {
                 let list = document.createElement('ul');
                 list.classList = 'configuration-display'
                 container.appendChild(list);
 
                 Object.entries(this[stage].state).forEach(put_into(list));
-
-                container.appendChild(document.createElement('hr'));
-
-                let exit_button = document.createElement('button');
-                container.appendChild(exit_button);
-                exit_button.onclick = () => close();
-                exit_button.textContent = 'Close';
-                exit_button.classList = 'close-button';
             });
         else
-            popup((container, close) => {
-                let title = document.createElement('h2');
-                container.appendChild(title);
-                title.textContent = `Current State for Stage ${stage_name}`;
-                title.style = 'margin: 0;';
-                container.appendChild(document.createElement('hr'));
-
+            popup(`Current State for Stage ${stage_name}`, container => {
                 let list = document.createElement('ul');
                 list.classList = 'configuration-display'
                 container.appendChild(list);
 
                 Object.entries({state : 'idle'}).forEach(put_into(list));
-
-                container.appendChild(document.createElement('hr'));
-
-                let exit_button = document.createElement('button');
-                container.appendChild(exit_button);
-                exit_button.onclick = () => close();
-                exit_button.textContent = 'Close';
-                exit_button.classList = 'close-button';
             });
     },
 }
@@ -461,24 +433,12 @@ export async function show_config() {
     /** @type {Promise<object>} */
     let values = r.blob().then(b => b.text()).then(JSON.parse);
 
-    popup(async (container, close) => {
-        let title = document.createElement('h2');
-        container.appendChild(title);
-        title.textContent = 'Configuration';
-        title.style = 'margin: 0;';
-        container.appendChild(document.createElement('hr'));
-
+    popup('Configuration', async container => {
         let list = document.createElement('ul');
         list.classList = 'configuration-display'
         container.appendChild(list);
 
         container.appendChild(document.createElement('hr'));
-
-        let exit_button = document.createElement('button');
-        container.appendChild(exit_button);
-        exit_button.onclick = () => close();
-        exit_button.textContent = 'Close';
-        exit_button.classList = 'close-button';
 
         Object.entries(await values).forEach(put_into(list));
     });

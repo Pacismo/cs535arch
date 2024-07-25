@@ -1,13 +1,13 @@
 mod read;
 
-use std::{path::PathBuf, str::FromStr, sync::Arc, time::Instant};
+use std::{str::FromStr, sync::Arc, time::Instant};
 
 use crate::{
     config::SimulationConfiguration,
     states::{Runtime, Runtimes},
     PAGES,
 };
-use libasm::compile;
+use libasm::{compile, Input};
 use libseis::pages::PAGE_SIZE;
 use rocket::{
     get, http, post,
@@ -50,7 +50,7 @@ fn into_uuid(uuid: &str) -> Result<Uuid, (http::Status, String)> {
 pub async fn init(
     runtimes: &State<Runtimes>,
     config: Json<Value>,
-) -> Result<RawText<String>, (http::Status, String)> {
+) -> Result<RawText<String>, (http::Status, RawText<String>)> {
     let mut uuid = Uuid::new_v4();
 
     let mut lock = runtimes.write().await;
@@ -59,50 +59,42 @@ pub async fn init(
         uuid = Uuid::new_v4();
     }
 
-    let filename: PathBuf = PathBuf::from(
-        config
-            .get("asm_file")
-            .ok_or_else(|| {
-                (
-                    http::Status::BadRequest,
-                    "Expected field `asm_file`".to_owned(),
-                )
-            })?
-            .as_str()
-            .ok_or_else(|| {
-                (
-                    http::Status::BadRequest,
-                    "Expected field `asm_file` to be a string".to_owned(),
-                )
-            })?,
-    );
+    let files = config
+        .get("files")
+        .ok_or_else(|| {
+            (
+                http::Status::BadRequest,
+                RawText("Expected key `files`".to_owned()),
+            )
+        })?
+        .as_object()
+        .ok_or_else(|| {
+            (
+                http::Status::BadRequest,
+                RawText("Expected key `files` to be a dictionary".into()),
+            )
+        })?;
 
-    let file_content: String = config
-        .get("asm_data")
-        .ok_or_else(|| {
-            (
-                http::Status::BadRequest,
-                "Expected field `asm_data`".to_owned(),
-            )
-        })?
-        .as_str()
-        .ok_or_else(|| {
-            (
-                http::Status::BadRequest,
-                "Expected field `asm_data` to be a string".to_owned(),
-            )
-        })?
-        .to_owned();
+    let input: Vec<Input> = files
+        .iter()
+        .map(|(k, v)| {
+            Ok(libasm::Input {
+                path: &k,
+                data: v.as_str().ok_or_else(|| {
+                    (
+                        http::Status::BadRequest,
+                        RawText(format!("Expected value for {k} to be a string")),
+                    )
+                })?,
+            })
+        })
+        .collect::<Result<Vec<Input>, (http::Status, RawText<String>)>>()?;
 
     let config = SimulationConfiguration::from_json(&config)
-        .map_err(|e| (http::Status::BadRequest, e.to_string()))?;
+        .map_err(|e| (http::Status::BadRequest, RawText(e.to_string())))?;
 
-    let bin = compile(&file_content, &filename).map_err(|e| {
-        (
-            http::Status::InternalServerError,
-            format!("Error while compiling {}: {e}", filename.display()),
-        )
-    })?;
+    let bin =
+        compile(input).map_err(|e| (http::Status::InternalServerError, RawText(e.to_string())))?;
 
     lock.insert(uuid, Runtime::new(uuid, config, bin));
 

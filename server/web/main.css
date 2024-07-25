@@ -97,6 +97,12 @@ div.popup>div {
     border-radius: 4px;
 }
 
+div.popup>div div.error-message {
+    max-width: 16cm;
+    overflow-x: scroll;
+    padding: 10px 0 16px 0;
+}
+
 div.popup button.close-button {
     display: block;
     margin: 4px 0 0 auto;

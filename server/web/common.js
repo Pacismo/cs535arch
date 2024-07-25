@@ -1,8 +1,8 @@
 /**
- * @param {(container: HTMLElement, close: () => void) => void} populator A callback that populates the `container`
+ * @param {(title: string, container: HTMLElement) => void} populator A callback that populates the `container`
  *     with HTML objects
  */
-export function popup(populator) {
+export function popup(title, populator) {
     let body = document.getElementsByTagName("body").item(0);
 
     /** @type {HTMLDivElement} */
@@ -14,7 +14,24 @@ export function popup(populator) {
     let container = document.createElement("div");
     popup.appendChild(container);
 
-    populator(container, () => body.removeChild(popup));
+    let pop_title = document.createElement('h2');
+    pop_title.textContent = title;
+    container.appendChild(pop_title);
+    pop_title.style = 'margin: 0;';
+    container.appendChild(document.createElement('hr'));
+
+    let message = document.createElement('div');
+    container.appendChild(message);
+
+    container.appendChild(document.createElement('hr'));
+
+    let exit_button = document.createElement('button');
+    container.appendChild(exit_button);
+    exit_button.onclick = () => body.removeChild(popup);
+    exit_button.textContent = 'Close';
+    exit_button.classList = 'close-button';
+
+    populator(message);
 }
 
 /** @type {(container: HTMLElement) => (pair: [string, any]) => void} */

@@ -5,7 +5,10 @@
     <title>SEIS Simulation Web Frontend</title>
     <link rel="stylesheet" href="/main.css" />
     <link rel="stylesheet" href="/index.css" />
-    <script src="main.js"></script>
+    <script type="module">
+        import * as main from "/main.js";
+        window.main = main;
+    </script>
 </head>
 
 <body>
@@ -21,9 +24,9 @@
                 <fieldset class="grid">
                     <legend>Memory</legend>
                     <label for="conf_mem_misspenalty">Miss penalty:</label>
-                    <input type="number" id="conf_mem_misspenalty" name="miss_penalty" value="10" required><br />
+                    <input type="number" id="conf_mem_misspenalty" name="miss_penalty" value="100" required><br />
                     <label for="conf_mem_volatilepenalty">Volatile penalty:</label>
-                    <input type="number" id="conf_mem_volatilepenalty" name="volatile_penalty" value="100"
+                    <input type="number" id="conf_mem_volatilepenalty" name="volatile_penalty" value="10"
                         required><br />
                     <label for="conf_mem_pipeliningenabled">Enable pipelining</label>
                     <input type="checkbox" id="conf_mem_pipeliningenabled" name="pipelining"><br />
@@ -65,8 +68,9 @@
                     </div>
                 </fieldset>
                 <label for="asm_file">Upload Assembly Source<br /></label>
-                <input type="file" id="asm_file" name="asm_file" accept=".asm,.txt" required>
-                <input class="submit-button" id="conf_submit" type="button" value="Create Simulation!" onclick="submit_form()">
+                <input type="file" id="asm_file" name="asm_file" accept=".asm,.txt" required multiple>
+                <input class="submit-button" id="conf_submit" type="button" value="Create Simulation!"
+                    onclick="main.submit_form()">
             </form>
         </div>
     </main>
