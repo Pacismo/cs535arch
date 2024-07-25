@@ -853,24 +853,29 @@ fn tokenize_line(line: Pair<'_, Rule>, span: Span) -> Result<Option<LineType>, E
 /// First pass: tokenize the input.
 ///
 /// This makes it easier to parse the data.
-pub fn tokenize<T: AsRef<Path>>(path: T) -> Result<Lines, Error> {
+pub fn tokenize_file<T: AsRef<Path>>(path: T) -> Result<Lines, Error> {
     let path = path.as_ref();
     let mut file = BufReader::new(File::open(path).map_err(|e| Error::new(path, e.into()))?);
     let mut content = String::new();
 
     file.read_to_string(&mut content)
         .map_err(|e| Error::new(path, e.into()))?;
+
+    tokenize(&content, path)
+}
+
+pub fn tokenize(data: &str, filename: &Path) -> Result<Lines, Error> {
     let parsed =
-        AsmParser::parse(Rule::program, &content).map_err(|e| Error::new(path, e.into()))?;
+        AsmParser::parse(Rule::program, data).map_err(|e| Error::new(filename, e.into()))?;
 
     let mut lines = Lines::new();
 
     for (line, number) in parsed.zip(1..) {
-        match tokenize_line(line, Span::new(path, number)) {
+        match tokenize_line(line, Span::new(filename, number)) {
             Ok(Some(result)) => lines.push_back(result),
             Ok(None) => break,
 
-            Err(e) => return Err(Error::new(path, e)),
+            Err(e) => return Err(Error::new(filename, e)),
         }
     }
 

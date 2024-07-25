@@ -6,18 +6,9 @@ authors = ["Francisco Santana"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[dependencies.libseis]
-path = "../libseis/"
+[dependencies.libasm]
+path = "../libasm/"
 
 [dependencies.clap]
 version = "4.5.2"
 features = ["derive"]
-
-[dependencies.pest]
-version = "2.7.7"
-
-[dependencies.pest_derive]
-version = "2.7.7"
-
-[dependencies.rand]
-version = "0.8.5"

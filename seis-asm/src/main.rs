@@ -1,12 +1,8 @@
 mod cli;
-mod linker;
-mod parse;
-#[cfg(test)]
-mod test;
 
 use clap::Parser;
-use linker::link_symbols;
-use parse::{tokenize, Error, Lines};
+use libasm::linker::link_symbols;
+use libasm::parse::{tokenize_file, Error, Lines};
 use std::fs::File;
 
 fn main() {
@@ -16,7 +12,7 @@ fn main() {
     let lines = match cli
         .files
         .iter()
-        .map(tokenize)
+        .map(tokenize_file)
         .collect::<Result<Vec<Lines>, Error>>()
     {
         Ok(value) => value

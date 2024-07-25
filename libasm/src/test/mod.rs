@@ -1,6 +1,6 @@
 use crate::{
     linker::link_symbols,
-    parse::{tokenize, ImmediateLoadOp, Instruction as InstructionToken, IntBinaryOp, LineType},
+    parse::{tokenize_file, ImmediateLoadOp, Instruction as InstructionToken, IntBinaryOp, LineType},
 };
 use libseis::{
     instruction_set::{
@@ -62,7 +62,7 @@ main:
 
     let file = Path::new("basic.asm");
     File::create(file)?.write_all(BASIC_CODE.as_bytes())?;
-    let tokens = tokenize(file)?;
+    let tokens = tokenize_file(file)?;
     let mut token_iter = tokens.iter();
 
     let token = token_iter.next().expect("Could not get first token");

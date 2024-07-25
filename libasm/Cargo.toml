@@ -1,0 +1,18 @@
+[package]
+name = "libasm"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+[dependencies.libseis]
+path = "../libseis/"
+
+[dependencies.pest]
+version = "2.7.7"
+
+[dependencies.pest_derive]
+version = "2.7.7"
+
+[dependencies.rand]
+version = "0.8.5"
