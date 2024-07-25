@@ -15,17 +15,11 @@ fn main() {
         .map(tokenize_file)
         .collect::<Result<Vec<Lines>, Error>>()
     {
-        Ok(value) => value
-            .into_iter()
-            .reduce(|mut l, r| {
-                l.extend(r.into_iter());
-                l
-            })
-            .unwrap(),
+        Ok(value) => value,
         Err(e) => panic!("{e}"),
     };
 
-    let linked = link_symbols(lines).expect("Failed to link code");
+    let linked = link_symbols(lines.into()).expect("Failed to link code");
 
     linked
         .write(File::create(output).expect("Could not open output file"))
