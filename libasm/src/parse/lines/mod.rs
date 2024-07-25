@@ -43,8 +43,26 @@ impl Display for Span {
 #[derive(Debug)]
 pub struct Lines(pub(super) LinkedList<LineType>);
 
+impl<I: IntoIterator<Item = Lines>> From<I> for Lines {
+    fn from(value: I) -> Self {
+        Self::from_iter(value)
+    }
+}
+
+impl FromIterator<Lines> for Lines {
+    fn from_iter<T: IntoIterator<Item = Lines>>(iter: T) -> Self {
+        Self(iter.into_iter().flatten().collect())
+    }
+}
+
+impl FromIterator<LineType> for Lines {
+    fn from_iter<T: IntoIterator<Item = LineType>>(iter: T) -> Self {
+        Self(iter.into_iter().collect())
+    }
+}
+
 impl IntoIterator for Lines {
-    type Item = <LinkedList<LineType> as IntoIterator>::Item;
+    type Item = LineType;
     type IntoIter = <LinkedList<LineType> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {

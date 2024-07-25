@@ -177,11 +177,11 @@ impl Display for ErrorSource {
                     AsmRule::randatablock => "randomized data block".into(),
                 });
 
-                write!(f, "{renamed}")
+                renamed.fmt(f)
             }
-            ErrorSource::IO(io) => write!(f, "{io}"),
-            ErrorSource::FloatParse(p) => write!(f, "{p}"),
-            ErrorSource::IntParse(i) => write!(f, "{i}"),
+            ErrorSource::IO(io) => io.fmt(f),
+            ErrorSource::FloatParse(p) => p.fmt(f),
+            ErrorSource::IntParse(i) => i.fmt(f),
         }
     }
 }
