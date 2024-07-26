@@ -41,11 +41,16 @@
                     <th title="Click to show details." onclick="app.pipeline.show_details('writeback')">Writeback</th>
                 </tr>
                 <tr>
-                    <td title="Click to show details." id="fetch_state" onclick="app.pipeline.show_details('fetch')"></td>
-                    <td title="Click to show details." id="decode_state" onclick="app.pipeline.show_details('decode')"></td>
-                    <td title="Click to show details." id="execute_state" onclick="app.pipeline.show_details('execute')"></td>
-                    <td title="Click to show details." id="memory_state" onclick="app.pipeline.show_details('memory')"></td>
-                    <td title="Click to show details." id="writeback_state" onclick="app.pipeline.show_details('writeback')"></td>
+                    <td title="Click to show details." id="fetch_state" onclick="app.pipeline.show_details('fetch')">
+                    </td>
+                    <td title="Click to show details." id="decode_state" onclick="app.pipeline.show_details('decode')">
+                    </td>
+                    <td title="Click to show details." id="execute_state"
+                        onclick="app.pipeline.show_details('execute')"></td>
+                    <td title="Click to show details." id="memory_state" onclick="app.pipeline.show_details('memory')">
+                    </td>
+                    <td title="Click to show details." id="writeback_state"
+                        onclick="app.pipeline.show_details('writeback')"></td>
                 </tr>
             </table>
         </div>
@@ -145,8 +150,19 @@
             </table>
         </div>
 
+        <div id="cache_view">
+            <h2 class="label">Cache <select id="cacheview_selector" name="cacheview_selector" class="h2-select"
+                    onchange="app.cache.update(true)"></select></h2>
+
+            <div id="cacheview_content"></div>
+        </div>
+
         <div id="memory_view">
-            <h2 class="label">Memory</h2>
+            <h2 class="label">Memory <select id="memoryview_selector" name="memoryview_selector" class="h2-select"
+                    onchange="app.memory.switch_mode();">
+                    <option value="data" selected>Data</option>
+                    <option value="disassembly">Disassembly</option>
+                </select></h2>
 
             <div id="memoryview_switcher">
                 <button id="memoryview_prev" onclick="app.memory.prev_page()">←</button>

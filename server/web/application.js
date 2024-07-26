@@ -305,6 +305,8 @@ const VIEW_PAGES = PAGE_SIZE / MEMORY_CELLS * PAGE_COUNT;
 export const memory = {
     /** @type {HTMLTableElement} */
     table : document.getElementById('memory_table'),
+    /** @type {HTMLSelectElement} */
+    selector : document.getElementById('memoryview_selector'),
     /** @type {number} */
     page_id : 0,
     /** @type {HTMLButtonElement} */
@@ -340,9 +342,11 @@ export const memory = {
 
     /** @type {() => void} */
     update : async function() {
+        let disasm = this.selector.value === 'disassembly';
         let params = new URLSearchParams({hash : this.last_hash})
 
-        let r = await fetch(make_request(`page/${memory.page_id}?${params}`));
+        let r =
+            await fetch(make_request(disasm ? `page/${memory.page_id}?${params}&disasm` : `page/${memory.page_id}?${params}`));
 
         if (!r.ok)
             throw new Error(`Response: ${r.status}`);
@@ -359,11 +363,15 @@ export const memory = {
             memory.table.rows[i + 1].cells[0].textContent =
                 (memory.page_id * MEMORY_CELLS + i * MEMORY_COLUMNS).toString(16).toUpperCase().padStart(8, '0');
 
-        for (let i = 0; i < MEMORY_CELLS; ++i) {
-            let row = ((i / MEMORY_COLUMNS) | 0) + 1;
-            let col = i % MEMORY_COLUMNS + 1;
+        const cell_count = disasm ? MEMORY_CELLS / 4 : MEMORY_CELLS;
+        const col_count = disasm ? MEMORY_COLUMNS / 4 : MEMORY_COLUMNS;
+        const i_inc = disasm ? 4 : 1;
+
+        for (let i = 0; i < cell_count; ++i) {
+            let row = ((i / col_count) | 0) + 1;
+            let col = i % col_count + 1;
             let cell = memory.table.rows[row].cells[col];
-            let address = (memory.page_id * MEMORY_CELLS + i);
+            let address = (memory.page_id * MEMORY_CELLS + i * i_inc);
             if (values !== null) {
                 let new_value = values.data[i].toString(16).toUpperCase().padStart(2, '0');
                 if (cell.textContent !== new_value && !new_page)
@@ -372,7 +380,7 @@ export const memory = {
                     cell.classList = '';
                 cell.textContent = new_value;
             } else if (new_page) {
-                cell.textContent = '00';
+                cell.textContent = disasm ? '' : '00';
                 cell.classList = '';
             }
             cell.title = `Address: ${address.toString(16).toUpperCase().padStart(8, '0')}\nDecimal Address: ${address}`;
@@ -383,12 +391,13 @@ export const memory = {
 
     /**
      * Populates a table with cells
-     * @param {HTMLTableElement} table
-     * @param {number} columns
-     * @param {number} cells
-     * @param {(i: number) => string} headers
      */
     populate : function() {
+        let is_disasm = this.selector.value === 'disassembly';
+
+        while (this.table.firstChild !== null)
+            this.table.removeChild(this.table.lastChild);
+
         /** @type {HTMLTableRowElement} */
         let header_row = document.createElement('tr');
         header_row.classList = 'header-row';
@@ -407,22 +416,191 @@ export const memory = {
             let address = document.createElement('th');
             row.appendChild(address);
 
-            for (let j = 0; j < MEMORY_COLUMNS && i * MEMORY_COLUMNS + j < MEMORY_CELLS; ++j) {
-                let cell = document.createElement('td');
-                row.appendChild(cell);
-            }
+            if (is_disasm)
+                for (let j = 0; j < MEMORY_COLUMNS && i * MEMORY_COLUMNS + j < MEMORY_CELLS; j += 4) {
+                    let cell = document.createElement('td');
+                    cell.colSpan = 4;
+                    row.appendChild(cell);
+                }
+            else
+                for (let j = 0; j < MEMORY_COLUMNS && i * MEMORY_COLUMNS + j < MEMORY_CELLS; ++j) {
+                    let cell = document.createElement('td');
+                    row.appendChild(cell);
+                }
         }
+    },
+
+    /** @type {() => void} */
+    switch_mode : function() {
+        this.populate();
+        this.last_hash = null;
+        this.update();
+    }
+};
+
+export const cache = {
+    /** @type {HTMLSelectElement} */
+    selector : document.getElementById('cacheview_selector'),
+    /** @type {HTMLDivElement} */
+    content : document.getElementById('cacheview_content'),
+    /**
+     * @type {{[name: string]: {mode: "associative", set_bits: number, offset_bits: number, ways: number} | {mode:
+     *     "disabled"}}}
+     */
+    configurations : {},
+    /** @type {[name: string]: HTMLTableElement|HTMLParagraphElement} */
+    tables : {},
+    /** @type {() => void} */
+    initialize : async function() {
+        let r = await fetch(make_request(`cache/names`));
+
+        if (!r.ok)
+            throw new Error(`Response: ${r.status}`);
+
+        /**
+         * @type {{[name: string]: {mode: "associative", set_bits: number, offset_bits: number, ways: number} | {mode:
+         *     "disabled"}}}
+         */
+        let values = await r.blob().then(b => b.text()).then(JSON.parse);
+
+        /**
+         *
+         * @param {string} name
+         * @param {{mode: "associative", set_bits: number, offset_bits: number, ways: number} | {mode:
+         *     "disabled"}} config
+         */
+        let make_table = (name, config) => {
+            if (config.mode === 'disabled') {
+                let p = document.createElement('p');
+                p.textContent = 'No data';
+                this.tables[name] = p;
+            } else {
+                let table = document.createElement('table');
+                let headers = document.createElement('tr');
+                ['Set', 'Way', 'Base Address', 'Dirty']
+                    .map(n => {
+                        let h = document.createElement('th');
+                        h.textContent = n;
+                        return h;
+                    })
+                    .forEach(c => headers.appendChild(c));
+                let wide_header = document.createElement('th');
+                wide_header.textContent = 'Values';
+                wide_header.colSpan = Math.pow(2, config.offset_bits);
+                headers.appendChild(wide_header);
+
+                let rows = [ headers ];
+
+                for (let set = 0; set < Math.pow(2, config.set_bits); ++set) {
+                    let first_row = document.createElement('tr');
+                    let first_row_cells = [
+                        document.createElement('th'),
+                        document.createElement('th'),
+                        document.createElement('th'),
+                        document.createElement('th'),
+                    ];
+                    first_row_cells[0].textContent = `${set}`;
+                    first_row_cells[0].rowSpan = config.ways;
+                    first_row_cells[1].textContent = "0";
+
+                    for (let offset = 0; offset < Math.pow(2, config.offset_bits); ++offset)
+                        first_row_cells.push(document.createElement('td'));
+
+                    first_row_cells.forEach(c => c.classList = 'monospace');
+
+                    first_row_cells.forEach(c => first_row.appendChild(c));
+                    rows.push(first_row);
+
+                    for (let way = 1; way < config.ways; ++way) {
+                        let row = document.createElement('tr');
+                        let cells = [
+                            document.createElement('th'),
+                            document.createElement('th'),
+                            document.createElement('th'),
+                        ];
+                        cells[0].textContent = `${way}`;
+
+                        for (let offset = 0; offset < Math.pow(2, config.offset_bits); ++offset)
+                            cells.push(document.createElement('td'));
+
+                        cells.forEach(c => c.classList = 'monospace');
+
+                        cells.forEach(c => row.appendChild(c));
+                        rows.push(row);
+                    }
+                }
+
+                rows.forEach(r => table.appendChild(r));
+                this.tables[name] = table;
+            }
+        };
+
+        Object.entries(values).forEach(v => {
+            let opt = document.createElement('option');
+            opt.textContent = v[0][0].toUpperCase() + v[0].substring(1);
+            opt.value = v[0];
+
+            this.selector.appendChild(opt);
+
+            this.configurations[v[0]] = v[1];
+            make_table(v[0], v[1]);
+        });
+
+        await this.update(true);
+    },
+    /** @type {(swap: boolean) => void} */
+    update : async function(swap) {
+        let cache = this.selector.value;
+
+        let r = await fetch(make_request(`cache/read/${cache}`));
+
+        if (!r.ok)
+            throw new Error(`Response: ${r.status}`);
+
+        /** @type {({base_address: number, dirty: boolean, data: number[]}|null)[]} */
+        let values = await r.blob().then(b => b.text().then(JSON.parse));
+        /** @type {HTMLTableElement} */
+        let table = this.tables[cache];
+        let config = this.configurations[cache];
+
+        if (swap) {
+            this.content.childNodes.forEach(c => c.remove());
+            this.content.append(table);
+        }
+
+        if (config.mode.toLowerCase() === 'associative')
+            values.forEach((r, i) => {
+                let tr = table.rows[i + 1];
+                const col_offset = (i % config.ways === 0) ? 1 : 0;
+
+                let ba = tr.cells[col_offset + 1];
+                let db = tr.cells[col_offset + 2];
+
+                if (r === null) {
+                    ba.textContent = '';
+                    db.textContent = '';
+                } else {
+                    ba.textContent = r.base_address.toString(16).toUpperCase().padStart(8, '0');
+                    db.textContent = r.dirty;
+                }
+                if (r === null)
+                    for (let i = 3 + col_offset; i < tr.cells.length; ++i)
+                        tr.cells[i].textContent = '';
+                else
+                    for (let i = 0; i < r.data.length; ++i)
+                        tr.cells[i + col_offset + 3].textContent =
+                            r.data[i].toString(16).toUpperCase().padStart(2, '0');
+            });
     }
 };
 
 memory.populate();
 
-Promise.allSettled([
-    pipeline.update(),
-    registers.update(),
-    watchlist.get_entries(),
-    memory.update(),
-]);
+pipeline.update();
+registers.update();
+watchlist.get_entries();
+memory.update();
+cache.initialize();
 
 export async function show_config() {
     let r = await fetch(make_request(`configuration`));
@@ -455,7 +633,7 @@ export async function next_tick() {
 
     console.log(await r.blob().then(b => b.text()));
 
-    let tasks = [ registers.update(), watchlist.update(), memory.update(), pipeline.update() ];
+    let tasks = [ registers.update(), watchlist.update(), memory.update(), pipeline.update(), cache.update(false) ];
 
     await Promise.allSettled(tasks);
     clock_button.onclick = next_tick;

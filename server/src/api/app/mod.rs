@@ -147,11 +147,14 @@ pub fn exports() -> Vec<Route> {
         dashboard,
         clock,
         read::read_page,
+        read::read_page_disasm,
         read::read_address,
         read::read_watchlist,
         read::set_watchlist,
         read::read_registers,
         read::read_configuration,
         read::read_pipeline_state,
+        read::read_cache_names,
+        read::read_cache,
     ]
 }
