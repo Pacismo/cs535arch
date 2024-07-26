@@ -705,7 +705,7 @@ impl MemoryModule for SingleLevel {
         &mut self.memory
     }
 
-    fn caches<'a>(&'a self) -> HashMap<&'static str, &'a dyn Cache> {
+    fn caches(&self) -> HashMap<&'static str, &dyn Cache> {
         [
             ("data", self.data_cache.as_ref() as &dyn Cache),
             ("instruction", self.instruction_cache.as_ref() as &dyn Cache),
@@ -713,7 +713,7 @@ impl MemoryModule for SingleLevel {
         .into()
     }
 
-    fn caches_mut<'a>(&'a mut self) -> HashMap<&'static str, &'a mut dyn Cache> {
+    fn caches_mut(&mut self) -> HashMap<&'static str, &mut dyn Cache> {
         [
             ("data", self.data_cache.as_mut() as &mut dyn Cache),
             (
