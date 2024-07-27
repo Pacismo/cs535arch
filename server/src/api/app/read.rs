@@ -285,10 +285,8 @@ pub async fn read_cache(
         runtime
             .state
             .memory_module()
-            .cache_state()
-            .iter()
-            .find(|c| c.name == name.to_lowercase())
-            .map(|c| serde_json::to_value(&c.lines).unwrap())
+            .get_cache(name.to_lowercase().as_str())
+            .map(|c| serde_json::to_value(&c.get_lines()).unwrap())
             .ok_or_else(|| (http::Status::NotFound, format!("Cache {name} not found")))?,
     ))
 }
