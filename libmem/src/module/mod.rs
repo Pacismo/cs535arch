@@ -116,7 +116,7 @@ pub trait MemoryModule: Debug {
     fn caches(&self) -> HashMap<&str, &dyn Cache>;
 
     /// Gets a hashmap containing mutable references to the caches in the memory module
-    fn caches_mut(& mut self) -> HashMap<& str, & mut dyn Cache>;
+    fn caches_mut(&mut self) -> HashMap<&str, &mut dyn Cache>;
 
     /// Writes the cache back to memory. Returns [`Status::Idle`] on success.
     fn immediate_writeback(&mut self) -> Status;
@@ -124,7 +124,7 @@ pub trait MemoryModule: Debug {
     /// Get the state of the cache structures
     ///
     /// Provides the names of the caches as well
-    fn cache_state<'a>(&'a self) -> Vec<CacheData> {
+    fn cache_state(&self) -> Vec<CacheData> {
         self.caches()
             .into_iter()
             .map(|(name, cache)| CacheData {
@@ -134,8 +134,23 @@ pub trait MemoryModule: Debug {
             .collect()
     }
 
+    /// Get the names of the caches in this module
+    fn get_cache_names(&self) -> Vec<&str> {
+        self.caches().into_keys().collect()
+    }
+
+    /// Gets a reference to a cache by name
+    fn get_cache(&self, name: &str) -> Option<&dyn Cache> {
+        self.caches().remove(name)
+    }
+
+    /// Gets a mutable reference to a cache by name
+    fn get_cache_mut(&mut self, name: &str) -> Option<&mut dyn Cache> {
+        self.caches_mut().remove(name)
+    }
+
     /// Gets a reference to the data cache (L1)
-    fn data_cache<'a>(&'a self) -> &'a dyn Cache;
+    fn data_cache(&self) -> &dyn Cache;
 
     /// Flush the contents of cache into memory
     fn flush_cache(&mut self) -> Status;
