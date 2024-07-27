@@ -88,6 +88,7 @@ pub struct Runtime {
 
     pub state: Box<dyn Pipeline + Send + Sync>,
     pub clocks: usize,
+    pub clock_req: usize,
 
     pub config: SimulationConfiguration,
 }
@@ -118,6 +119,7 @@ impl Runtime {
 
                 state,
                 clocks: 0,
+                clock_req: 1,
 
                 config,
             })),
@@ -154,5 +156,69 @@ impl Runtime {
         }
 
         value.into()
+    }
+
+    #[inline]
+    pub fn is_done(&self) -> bool {
+        self.clock_req == 0
+    }
+
+    /// Clocks the simulation once.
+    ///
+    /// Returns true if the simulation is finished.
+    pub fn clock(&mut self) -> bool {
+        if !self.is_done() {
+            self.clocks += 1;
+            self.clock_req = match self.state.clock(1) {
+                libpipe::ClockResult::Stall(clk) => clk,
+                libpipe::ClockResult::Flow => 1,
+                libpipe::ClockResult::Dry => 0,
+            };
+
+            self.is_done()
+        } else {
+            true
+        }
+    }
+
+    /// Steps the simulation ahead one step (a step is defined as a movement in the pipeline).
+    ///
+    /// Returns true if the simulation is finished.
+    pub fn step(&mut self) -> bool {
+        if !self.is_done() {
+            self.clocks += self.clock_req;
+            self.clock_req = match self.state.clock(self.clock_req) {
+                libpipe::ClockResult::Stall(clk) => clk,
+                libpipe::ClockResult::Flow => 1,
+                libpipe::ClockResult::Dry => 0,
+            };
+
+            self.is_done()
+        } else {
+            true
+        }
+    }
+
+    /// Ticks the simulation `clocks` times.
+    ///
+    /// Returns true if the simulation is finished.
+    pub fn run_for(&mut self, mut clocks: usize) -> bool {
+        while clocks > 0 && !self.is_done() {
+            let next = clocks.min(self.clock_req);
+            clocks -= next;
+            self.clocks += next;
+            self.clock_req = match self.state.clock(next) {
+                libpipe::ClockResult::Stall(clk) => clk,
+                libpipe::ClockResult::Flow => 1,
+                libpipe::ClockResult::Dry => 0,
+            };
+        }
+
+        self.is_done()
+    }
+
+    /// Runs the simulation until it is done
+    pub fn run_to_end(&mut self) {
+        while !self.step() {}
     }
 }

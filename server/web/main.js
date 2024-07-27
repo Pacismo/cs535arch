@@ -1,23 +1,46 @@
 import {popup} from "./common.js"
 
-export async function submit_form() {
-    const miss_penalty = Number.parseInt(document.getElementById("conf_mem_misspenalty").value);
-    const volatile_penalty = Number.parseInt(document.getElementById("conf_mem_volatilepenalty").value);
-    const pipelining = document.getElementById("conf_mem_pipeliningenabled").value === "on";
-    const writethrough = document.getElementById("conf_mem_writethrough").value === "on";
-    const data_set_bits = Number.parseInt(document.getElementById("conf_cache_data_setbits").value);
-    const data_offset_bits = Number.parseInt(document.getElementById("conf_cache_data_offsetbits").value);
-    const data_ways = Number.parseInt(document.getElementById("conf_cache_data_ways").value);
-    const inst_set_bits = Number.parseInt(document.getElementById("conf_cache_instruction_setbits").value);
-    const inst_offset_bits = Number.parseInt(document.getElementById("conf_cache_instruction_offsetbits").value);
-    const inst_ways = Number.parseInt(document.getElementById("conf_cache_instruction_ways").value);
+const conf = {
     /** @type {HTMLInputElement} */
-    const asm = document.getElementById("asm_file");
+    miss_penalty : document.getElementById("conf_mem_misspenalty"),
+    /** @type {HTMLInputElement} */
+    volatile_penalty : document.getElementById("conf_mem_volatilepenalty"),
+    /** @type {HTMLInputElement} */
+    pipelining : document.getElementById("conf_mem_pipeliningenabled"),
+    /** @type {HTMLInputElement} */
+    writethrough : document.getElementById("conf_mem_writethrough"),
+    /** @type {HTMLInputElement} */
+    cache_data_setbits : document.getElementById("conf_cache_data_setbits"),
+    /** @type {HTMLInputElement} */
+    cache_data_offsetbits : document.getElementById("conf_cache_data_offsetbits"),
+    /** @type {HTMLInputElement} */
+    cache_data_ways : document.getElementById("conf_cache_data_ways"),
+    /** @type {HTMLInputElement} */
+    cache_instruction_setbits : document.getElementById("conf_cache_instruction_setbits"),
+    /** @type {HTMLInputElement} */
+    cache_instruction_offsetbits : document.getElementById("conf_cache_instruction_offsetbits"),
+    /** @type {HTMLInputElement} */
+    cache_instruction_ways : document.getElementById("conf_cache_instruction_ways"),
+    /** @type {HTMLInputElement} */
+    asm : document.getElementById("asm_file"),
+};
+
+export async function submit_form() {
+    const miss_penalty = Number.parseInt(conf.miss_penalty.value);
+    const volatile_penalty = Number.parseInt(conf.volatile_penalty.value);
+    const pipelining = conf.pipelining.checked;
+    const writethrough = conf.writethrough.checked;
+    const data_set_bits = Number.parseInt(conf.cache_data_setbits.value);
+    const data_offset_bits = Number.parseInt(conf.cache_data_offsetbits.value);
+    const data_ways = Number.parseInt(conf.cache_data_ways.value);
+    const inst_set_bits = Number.parseInt(conf.cache_instruction_setbits.value);
+    const inst_offset_bits = Number.parseInt(conf.cache_instruction_offsetbits.value);
+    const inst_ways = Number.parseInt(conf.cache_instruction_ways.value);
 
     let files = {};
 
-    for (let i = 0; i < asm.files.length; ++i)
-        files[asm.files[i].name] = await asm.files[i].text();
+    for (let i = 0; i < conf.asm.files.length; ++i)
+        files[conf.asm.files[i].name] = await conf.asm.files[i].text();
 
     let data = data_ways !== 0
                    ? {set_bits : data_set_bits, offset_bits : data_offset_bits, ways : data_ways, mode : "associative"}

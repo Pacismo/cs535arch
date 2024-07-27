@@ -131,14 +131,43 @@ pub async fn dashboard(
 pub async fn clock(
     runtimes: &State<Runtimes>,
     uuid: &str,
-    count: Json<usize>,
-) -> Result<String, (http::Status, String)> {
+    count: Option<Json<usize>>,
+) -> Result<Json<bool>, (http::Status, String)> {
     let uuid = into_uuid(uuid)?;
 
     let runtime_arc = get_uuid(runtimes, uuid).await?;
     let mut runtime = runtime_arc.write().await;
 
-    Ok(format!("{:#?}", runtime.state.clock(*count)))
+    match count {
+        Some(Json(0)) => Ok(Json(runtime.is_done())),
+        Some(Json(1)) | None => Ok(Json(runtime.clock())),
+        Some(Json(count)) => Ok(Json(runtime.run_for(count))),
+    }
+}
+
+#[post("/<uuid>/step")]
+pub async fn step(
+    runtimes: &State<Runtimes>,
+    uuid: &str,
+) -> Result<Json<bool>, (http::Status, String)> {
+    let uuid = into_uuid(uuid)?;
+
+    let runtime_arc = get_uuid(runtimes, uuid).await?;
+    let mut runtime = runtime_arc.write().await;
+
+    Ok(Json(runtime.step()))
+}
+
+#[post("/<uuid>/run")]
+pub async fn run(runtimes: &State<Runtimes>, uuid: &str) -> Result<String, (http::Status, String)> {
+    let uuid = into_uuid(uuid)?;
+
+    let runtime_arc = get_uuid(runtimes, uuid).await?;
+    let mut runtime = runtime_arc.write().await;
+
+    runtime.run_to_end();
+
+    Ok("Finished".into())
 }
 
 pub fn exports() -> Vec<Route> {
@@ -146,6 +175,8 @@ pub fn exports() -> Vec<Route> {
         init,
         dashboard,
         clock,
+        step,
+        run,
         read::read_page,
         read::read_page_disasm,
         read::read_address,

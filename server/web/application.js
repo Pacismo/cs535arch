@@ -345,8 +345,8 @@ export const memory = {
         let disasm = this.selector.value === 'disassembly';
         let params = new URLSearchParams({hash : this.last_hash})
 
-        let r =
-            await fetch(make_request(disasm ? `page/${memory.page_id}?${params}&disasm` : `page/${memory.page_id}?${params}`));
+        let r = await fetch(
+            make_request(disasm ? `page/${memory.page_id}?${params}&disasm` : `page/${memory.page_id}?${params}`));
 
         if (!r.ok)
             throw new Error(`Response: ${r.status}`);
@@ -623,10 +623,25 @@ export async function show_config() {
 }
 
 const clock_button = document.getElementById("clock_button");
+const step_button = document.getElementById("step_button");
+const run_button = document.getElementById("run_button");
 
-export async function next_tick() {
+function disable_header_buttons() {
     clock_button.onclick = null;
-    let r = await fetch(make_request('clock', 'POST', '1'));
+    step_button.onclick = null;
+    run_button.onclick = null;
+}
+
+function enable_header_buttons() {
+    clock_button.onclick = clock;
+    step_button.onclick = step;
+    run_button.onclick = run;
+}
+
+export async function clock() {
+    disable_header_buttons();
+
+    let r = await fetch(make_request('clock', 'POST'));
 
     if (!r.ok)
         throw new Error(`Response: ${r.status} ${r.statusText}`);
@@ -636,5 +651,40 @@ export async function next_tick() {
     let tasks = [ registers.update(), watchlist.update(), memory.update(), pipeline.update(), cache.update(false) ];
 
     await Promise.allSettled(tasks);
-    clock_button.onclick = next_tick;
+
+    enable_header_buttons();
+}
+
+export async function step() {
+    disable_header_buttons();
+
+    let r = await fetch(make_request('step', 'POST'));
+
+    if (!r.ok)
+        throw new Error(`Response: ${r.status} ${r.statusText}`);
+
+    console.log(await r.blob().then(b => b.text()));
+
+    let tasks = [ registers.update(), watchlist.update(), memory.update(), pipeline.update(), cache.update(false) ];
+
+    await Promise.allSettled(tasks);
+
+    enable_header_buttons();
+}
+
+export async function run() {
+    disable_header_buttons();
+
+    let r = await fetch(make_request('run', 'POST'));
+
+    if (!r.ok)
+        throw new Error(`Response: ${r.status} ${r.statusText}`);
+
+    console.log(await r.blob().then(b => b.text()));
+
+    let tasks = [ registers.update(), watchlist.update(), memory.update(), pipeline.update(), cache.update(false) ];
+
+    await Promise.allSettled(tasks);
+
+    enable_header_buttons();
 }
