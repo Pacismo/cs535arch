@@ -121,7 +121,7 @@ impl Memory {
 
                 if let Some(page) = &self.pages[page] {
                     let mut bytes = [0; 2];
-                    bytes.copy_from_slice(&page[byte..]);
+                    bytes.copy_from_slice(&page[byte..byte + 2]);
                     Short::from_be_bytes(bytes)
                 } else {
                     0
