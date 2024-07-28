@@ -284,5 +284,11 @@
             "args": [],
             "cwd": "${workspaceFolder}/server"
         },
+        {
+            "type": "firefox",
+            "request": "launch",
+            "name": "Open Website in FireFox",
+            "file": "${workspaceFolder}/web/index.html",
+        }
     ]
 }
