@@ -1,11 +1,14 @@
 [workspace]
 resolver = "2"
-members = [ "libasm",
+members = [
+    "libasm",
     "libmem",
     "libpipe",
     "libseis",
     "seis-asm",
     "seis-bench",
     "seis-disasm",
-    "seis-sim", "server",
+    "seis-sim",
+    "server",
+    "webapp",
 ]
