@@ -46,6 +46,7 @@ type Indexed = [Word; COUNT];
 
 /// Represents the registers of the processor.
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub union Registers {
     by_name: Named,
     by_id: Indexed,
