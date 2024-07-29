@@ -21,6 +21,14 @@ use std::{
 };
 use wasm_bindgen::prelude::*;
 
+static ATTRIBUTION: &str =
+    r#"SEIS Simulation Interface for JavaScript by Francisco Santana (https://franciscosp.com/)"#;
+
+#[wasm_bindgen]
+pub fn about() -> String {
+    ATTRIBUTION.to_owned()
+}
+
 fn to_object<'a>(value: &impl Serialize) -> Result<JsValue, <&'a JsSer as Serializer>::Error> {
     value.serialize(&JsSer::json_compatible())
 }
