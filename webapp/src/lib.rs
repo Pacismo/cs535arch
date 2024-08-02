@@ -82,7 +82,7 @@ pub struct SimulationState {
 #[wasm_bindgen]
 impl SimulationState {
     #[wasm_bindgen(constructor)]
-    pub fn new(config: &SimulationConfiguration, asm: Vec<u8>) -> Result<SimulationState, JsError> {
+    pub fn new(config: SimulationConfiguration, asm: Vec<u8>) -> Result<SimulationState, JsError> {
         let mut state = config.into_boxed_pipeline();
 
         if asm.len() > PAGES * libseis::pages::PAGE_SIZE {
@@ -145,6 +145,20 @@ impl SimulationState {
 
     pub fn run(&mut self) {
         while !self.step() {}
+    }
+
+    pub fn run_for(&mut self, mut steps: usize) -> bool {
+        loop {
+            steps -= 1;
+
+            if steps == 0 {
+                break self.is_done();
+            }
+
+            if self.step() {
+                break true;
+            }
+        }
     }
 
     /// Reads a value from an address
