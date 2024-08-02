@@ -62,6 +62,41 @@ fn main() -> Result<(), Box<dyn Error>> {
                 interface::Tui.run(pipeline, config)?;
             }
         }
+        Cli::Simulate {
+            image_file,
+            configuration,
+            clock_only,
+        } => {
+            let (mut pipeline, _) = prepare_config(into_toml(configuration)?, image_file)?;
+
+            let mut clocks = 0;
+            let mut clocks_required = 1;
+
+            let start = std::time::Instant::now();
+            if clock_only {
+                loop {
+                    clocks += 1;
+                    match pipeline.clock(1) {
+                        libpipe::ClockResult::Stall(_) => (),
+                        libpipe::ClockResult::Flow => (),
+                        libpipe::ClockResult::Dry => break,
+                    }
+                }
+            } else {
+                loop {
+                    clocks += clocks_required;
+                    match pipeline.clock(clocks_required) {
+                        libpipe::ClockResult::Stall(n) => clocks_required = n,
+                        libpipe::ClockResult::Flow => clocks_required = 1,
+                        libpipe::ClockResult::Dry => break,
+                    }
+                }
+            }
+            let end = std::time::Instant::now();
+
+            println!("Total clocks: {clocks}");
+            println!("Total time: {} seconds", (end - start).as_secs_f64());
+        }
         Cli::PrintExampleConfiguration { output_file } => {
             let example = SimulationConfiguration {
                 cache: [

@@ -43,4 +43,16 @@ pub enum Cli {
         #[arg(value_hint = FilePath)]
         output_file: Option<PathBuf>,
     },
+
+    Simulate {
+        /// The binary image file to be used for the simulation
+        #[arg(value_hint = FilePath)]
+        image_file: PathBuf,
+
+        #[command(flatten)]
+        configuration: Configuration,
+
+        #[clap(short, long)]
+        clock_only: bool
+    },
 }
