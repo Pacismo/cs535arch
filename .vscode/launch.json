@@ -289,6 +289,46 @@
             "request": "launch",
             "name": "Open Website in FireFox",
             "file": "${workspaceFolder}/web/index.html",
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'seis-sim' in simulate mode",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=seis-sim"
+                ],
+                "filter": {
+                    "kind": "bin"
+                }
+            },
+            "args": [
+                "simulate",
+                "./benchmarks/matrix/matrix.bin",
+                "./benchmarks/matrix/matrix.toml"
+            ],
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'seis-sim' in clocks-only simulate mode",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=seis-sim",
+                    "--package=seis-sim"
+                ],
+                "filter": {
+                    "kind": "bin"
+                }
+            },
+            "args": [
+                "simulate",
+                "./benchmarks/matrix/matrix.bin",
+                "./benchmarks/matrix/matrix.toml",
+                "-c"
+            ],
         }
     ]
 }
