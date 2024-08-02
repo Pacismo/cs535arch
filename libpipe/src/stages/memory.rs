@@ -1013,14 +1013,14 @@ impl PipelineStage for Memory {
         if self.state.is_halted() {
             Status::Dry
         } else {
-            let (clocks, rix) = match input {
-                Status::Stall(clocks) => (clocks, 0),
-                Status::Flow(input) => match input {
+            let (clocks, bubbles) = match input {
+                Status::Stall(clocks) => (clocks, true),
+                Status::Flow(input, b) => match input {
                     ExecuteResult::Nop => {
                         self.state = Ready {
                             result: MemoryResult::Nop,
                         };
-                        (1, 0)
+                        (1, b)
                     }
                     ExecuteResult::Subroutine {
                         address,
@@ -1035,13 +1035,13 @@ impl PipelineStage for Memory {
                             bp,
                             clocks: 1,
                         };
-                        (1, 0)
+                        (1, b)
                     }
                     ExecuteResult::JumpTo { address } => {
                         self.state = Ready {
                             result: MemoryResult::Jump { address },
                         };
-                        (1, 0)
+                        (1, b)
                     }
                     ExecuteResult::Return { link, bp } => {
                         self.state = RetPrep {
@@ -1049,7 +1049,7 @@ impl PipelineStage for Memory {
                             link,
                             clocks: 1,
                         };
-                        (1, 0)
+                        (1, b)
                     }
                     ExecuteResult::WriteReg {
                         destination,
@@ -1071,7 +1071,7 @@ impl PipelineStage for Memory {
                                 inf,
                             },
                         };
-                        (1, 0)
+                        (1, b)
                     }
                     ExecuteResult::WriteStatus {
                         zf,
@@ -1089,7 +1089,7 @@ impl PipelineStage for Memory {
                                 inf,
                             },
                         };
-                        (1, 0)
+                        (1, b)
                     }
                     ExecuteResult::WriteMemByte {
                         address,
@@ -1104,7 +1104,7 @@ impl PipelineStage for Memory {
                             },
                             clocks: 1,
                         };
-                        (1, 0)
+                        (1, b)
                     }
                     ExecuteResult::WriteMemShort {
                         address,
@@ -1119,7 +1119,7 @@ impl PipelineStage for Memory {
                             },
                             clocks: 1,
                         };
-                        (1, 0)
+                        (1, b)
                     }
                     ExecuteResult::WriteMemWord {
                         address,
@@ -1134,7 +1134,7 @@ impl PipelineStage for Memory {
                             },
                             clocks: 1,
                         };
-                        (1, 0)
+                        (1, b)
                     }
                     ExecuteResult::ReadMemByte {
                         address,
@@ -1146,7 +1146,7 @@ impl PipelineStage for Memory {
                             destination,
                             clocks: 1,
                         };
-                        (1, 0)
+                        (1, b)
                     }
                     ExecuteResult::ReadMemShort {
                         address,
@@ -1158,7 +1158,7 @@ impl PipelineStage for Memory {
                             destination,
                             clocks: 1,
                         };
-                        (1, 0)
+                        (1, b)
                     }
                     ExecuteResult::ReadMemWord {
                         address,
@@ -1170,7 +1170,7 @@ impl PipelineStage for Memory {
                             destination,
                             clocks: 1,
                         };
-                        (1, 0)
+                        (1, b)
                     }
                     ExecuteResult::ReadRegStack { register, sp } => {
                         self.state = Popping {
@@ -1178,7 +1178,7 @@ impl PipelineStage for Memory {
                             sp,
                             clocks: 1,
                         };
-                        (1, 0)
+                        (1, b)
                     }
                     ExecuteResult::WriteRegStack { value, sp } => {
                         self.state = Pushing {
@@ -1186,45 +1186,45 @@ impl PipelineStage for Memory {
                             sp,
                             clocks: 1,
                         };
-                        (1, 0)
+                        (1, b)
                     }
                     ExecuteResult::Squash { regs } => {
                         self.state = Ready {
                             result: MemoryResult::Squashed { wregs: regs },
                         };
-                        (1, 0)
+                        (1, b)
                     }
                     ExecuteResult::Ignore { regs } => {
                         self.state = Ready {
                             result: MemoryResult::Ignore { wregs: regs },
                         };
-                        (1, 0)
+                        (1, b)
                     }
                     ExecuteResult::Halt => {
                         self.state = Halting(1);
-                        (1, 0)
+                        (1, b)
                     }
                     ExecuteResult::PopStack { sp } => {
                         self.state = DummyPop { sp, clocks: 1 };
-                        (1, 0)
+                        (1, b)
                     }
                 },
-                Status::Ready(r) => (1, r),
-                Status::Squashed => (1, 0),
-                Status::Dry => (1, 0),
+                Status::Ready(n, b) => (n, b),
+                Status::Squashed(clocks) => (clocks, true),
+                Status::Dry => (1, true),
             };
 
             match take(&mut self.forward) {
-                Some(result) => Status::Flow(result),
-                None if self.state.is_waiting() && rix == 3 => {
-                    Status::Stall(self.state.wait_time())
+                Some(result) => Status::Flow(result, bubbles),
+                None if self.state.is_waiting() && bubbles => {
+                    Status::Stall(clocks.max(self.state.wait_time()))
                 }
                 None if self.state.is_waiting() => {
                     Status::Stall(clocks.min(self.state.wait_time()))
                 }
-                None if self.state.is_squashed() => Status::Squashed,
+                None if self.state.is_squashed() => Status::Squashed(clocks),
                 None if self.state.is_idle() => Status::Stall(clocks),
-                None => Status::Ready(rix + 1),
+                None => Status::Ready(clocks, bubbles),
             }
         }
     }

@@ -50,15 +50,15 @@ impl Pipeline for Unpipelined {
                     self.memory_module.as_mut(),
                 );
 
-                match self.fetch.forward(Status::Ready(0)) {
+                match self.fetch.forward(Status::Ready(1, false)) {
                     Status::Stall(k) => ClockResult::Stall(k),
-                    Status::Flow(r) => {
+                    Status::Flow(r, _) => {
                         self.stage = Decode;
-                        self.decode.forward(Status::Flow(r));
+                        self.decode.forward(Status::Flow(r, false));
                         ClockResult::Flow
                     }
-                    Status::Ready(_) => ClockResult::Stall(1),
-                    Status::Squashed => ClockResult::Stall(1),
+                    Status::Ready(_, _) => ClockResult::Stall(1),
+                    Status::Squashed(n) => ClockResult::Stall(n),
                     Status::Dry => ClockResult::Dry,
                 }
             }
@@ -70,15 +70,15 @@ impl Pipeline for Unpipelined {
                     self.memory_module.as_mut(),
                 );
 
-                match self.decode.forward(Status::Ready(0)) {
+                match self.decode.forward(Status::Ready(1, false)) {
                     Status::Stall(k) => ClockResult::Stall(k),
-                    Status::Flow(r) => {
+                    Status::Flow(r, _) => {
                         self.stage = Execute;
-                        self.execute.forward(Status::Flow(r));
+                        self.execute.forward(Status::Flow(r, false));
                         ClockResult::Flow
                     }
-                    Status::Ready(_) => ClockResult::Stall(1),
-                    Status::Squashed => ClockResult::Stall(1),
+                    Status::Ready(_, _) => ClockResult::Stall(1),
+                    Status::Squashed(n) => ClockResult::Stall(n),
                     Status::Dry => ClockResult::Dry,
                 }
             }
@@ -90,15 +90,15 @@ impl Pipeline for Unpipelined {
                     self.memory_module.as_mut(),
                 );
 
-                match self.execute.forward(Status::Ready(0)) {
+                match self.execute.forward(Status::Ready(1, false)) {
                     Status::Stall(k) => ClockResult::Stall(k),
-                    Status::Flow(r) => {
+                    Status::Flow(r, _) => {
                         self.stage = Memory;
-                        self.memory.forward(Status::Flow(r));
+                        self.memory.forward(Status::Flow(r, false));
                         ClockResult::Flow
                     }
-                    Status::Ready(_) => ClockResult::Stall(1),
-                    Status::Squashed => ClockResult::Stall(1),
+                    Status::Ready(_, _) => ClockResult::Stall(1),
+                    Status::Squashed(n) => ClockResult::Stall(n),
                     Status::Dry => ClockResult::Dry,
                 }
             }
@@ -110,15 +110,15 @@ impl Pipeline for Unpipelined {
                     self.memory_module.as_mut(),
                 );
 
-                match self.memory.forward(Status::Ready(0)) {
+                match self.memory.forward(Status::Ready(1, false)) {
                     Status::Stall(k) => ClockResult::Stall(k),
-                    Status::Flow(r) => {
+                    Status::Flow(r, _) => {
                         self.stage = Writeback;
-                        self.writeback.forward(Status::Flow(r));
+                        self.writeback.forward(Status::Flow(r, false));
                         ClockResult::Flow
                     }
-                    Status::Ready(_) => ClockResult::Stall(1),
-                    Status::Squashed => ClockResult::Stall(1),
+                    Status::Ready(_, _) => ClockResult::Stall(1),
+                    Status::Squashed(n) => ClockResult::Stall(n),
                     Status::Dry => ClockResult::Dry,
                 }
             }
@@ -132,11 +132,11 @@ impl Pipeline for Unpipelined {
 
                 self.stage = Fetch;
 
-                match self.writeback.forward(Status::Ready(0)) {
+                match self.writeback.forward(Status::Ready(1, false)) {
                     Status::Stall(k) => ClockResult::Stall(k),
-                    Status::Flow(()) => ClockResult::Flow,
-                    Status::Ready(_) => ClockResult::Stall(1),
-                    Status::Squashed => ClockResult::Stall(1),
+                    Status::Flow((), _) => ClockResult::Flow,
+                    Status::Ready(_, _) => ClockResult::Stall(1),
+                    Status::Squashed(n) => ClockResult::Stall(n),
                     Status::Dry => ClockResult::Dry,
                 }
             }

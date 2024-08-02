@@ -3,7 +3,11 @@
 use super::{memory::MemoryResult, PipelineStage};
 use crate::{Clock, Locks, Registers, Status};
 use libmem::module::MemoryModule;
-use libseis::{pages::PAGE_SIZE, registers::{BP, EPS, INF, LP, NAN, OF, PC, SP, ZF}, types::Word};
+use libseis::{
+    pages::PAGE_SIZE,
+    registers::{BP, EPS, INF, LP, NAN, OF, PC, SP, ZF},
+    types::Word,
+};
 use serde::Serialize;
 use std::mem::take;
 
@@ -16,7 +20,8 @@ pub struct Writeback {
 impl Serialize for Writeback {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: serde::Serializer {
+        S: serde::Serializer,
+    {
         self.job.serialize(serializer)
     }
 }
@@ -138,11 +143,7 @@ impl PipelineStage for Writeback {
 
                     locks[PC] -= 1;
                 }
-                MemoryResult::Return {
-                    address,
-                    bp,
-                    sp,
-                } => {
+                MemoryResult::Return { address, bp, sp } => {
                     registers[PC] = address;
                     registers[BP] = bp;
                     registers[SP] = sp;
@@ -165,12 +166,12 @@ impl PipelineStage for Writeback {
     fn forward(&mut self, input: Status<Self::Prev>) -> Status<Self::Next> {
         match input {
             Status::Stall(clocks) => Status::Stall(clocks),
-            Status::Flow(input) => {
+            Status::Flow(input, b) => {
                 self.job = Some(input);
-                Status::Flow(())
+                Status::Flow((), b)
             }
-            Status::Ready(_) => Status::Stall(1),
-            Status::Squashed => Status::Squashed,
+            Status::Ready(n, _) => Status::Stall(n),
+            Status::Squashed(n) => Status::Squashed(n),
             Status::Dry => Status::Dry,
         }
     }

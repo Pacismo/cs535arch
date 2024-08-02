@@ -237,24 +237,25 @@ impl PipelineStage for Decode {
         if self.state.is_halted() {
             Status::Dry
         } else {
-            let (clocks, rix) = match input {
-                Status::Flow(FetchResult::Ready { word, pc }) => {
+            let (clocks, bubbles) = match input {
+                Status::Flow(FetchResult::Ready { word, pc }, b) => {
                     self.state = Decoding { word, pc };
-                    (1, 0)
+                    (1, b)
                 }
-                Status::Flow(FetchResult::Squashed) => {
+                Status::Flow(FetchResult::Squashed, b) => {
                     self.state = PrevSquash;
-                    (1, 0)
+                    (1, b)
                 }
-                Status::Stall(clocks) => (clocks, 0),
-                Status::Ready(r) => (1, r),
-                _ => (1, 0),
+                Status::Stall(clocks) => (clocks, true),
+                Status::Ready(n, b) => (n, b),
+                Status::Squashed(n) => (n, true),
+                Status::Dry => (1, true),
             };
 
             match take(&mut self.forward) {
-                Some(v) => Status::Flow(v),
-                None if self.state.is_ready() => Status::Ready(rix + 1),
-                None if self.state.is_squashed() => Status::Squashed,
+                Some(v) => Status::Flow(v, bubbles),
+                None if self.state.is_ready() => Status::Ready(clocks, bubbles),
+                None if self.state.is_squashed() => Status::Squashed(clocks),
                 None if self.state.is_idle() => Status::Stall(clocks),
                 None => Status::Stall(1),
             }
@@ -332,10 +333,13 @@ mod test {
         // Forward a NOP word
 
         assert!(matches!(
-            decode.forward(Status::Flow(FetchResult::Ready {
-                word: 0x0000_0000,
-                pc: 0
-            })),
+            decode.forward(Status::Flow(
+                FetchResult::Ready {
+                    word: 0x0000_0000,
+                    pc: 0
+                },
+                false
+            )),
             Status::Stall(1)
         ));
 
@@ -372,12 +376,12 @@ mod test {
         // Forward the value and make sure it is what we expect
 
         assert!(matches!(
-            decode.forward(Status::Flow(FetchResult::Ready { word: 0x0000_0000, pc: 0 })),
+            decode.forward(Status::Flow(FetchResult::Ready { word: 0x0000_0000, pc: 0 }, false)),
             Status::Flow(DecodeResult::Forward {
                 instruction: Instruction::Control(ControlOp::Nop), // Nop
                 regvals, // No register values
                 reglocks: RegisterFlags(0) // No register locks
-            }) if regvals.len() == 0
+            }, _) if regvals.len() == 0
         ));
     }
 

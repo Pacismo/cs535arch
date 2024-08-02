@@ -172,18 +172,18 @@ pub enum Status<T: Debug = ()> {
     /// to clear the shortest stall
     Stall(usize),
     /// The pipeline has completed a job and is forwarding a new job
-    Flow(T),
+    Flow(T, bool),
     /// The stage is ready, but waiting
-    Ready(usize),
+    Ready(usize, bool),
     /// The pipeline squashed an instruction
-    Squashed,
+    Squashed(usize),
     /// There are no new jobs
     Dry,
 }
 
 impl<T: Debug + Default> Default for Status<T> {
     fn default() -> Self {
-        Self::Ready(0)
+        Self::Ready(0, false)
     }
 }
 
@@ -207,12 +207,12 @@ impl<T: Debug> Status<T> {
 
     /// Returns true if the status is [`ready`](Status::Ready)
     pub fn is_ready(&self) -> bool {
-        matches!(self, Self::Ready(_))
+        matches!(self, Self::Ready(..))
     }
 
     /// Returns true if the status is [`squashed`](Status::Squashed)
     pub fn is_squashed(&self) -> bool {
-        matches!(self, Self::Squashed)
+        matches!(self, Self::Squashed(..))
     }
 
     /// Returns true if the status is [`dry`](Status::Dry)

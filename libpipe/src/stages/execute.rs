@@ -420,13 +420,16 @@ impl PipelineStage for Execute {
         if self.state.is_halted() && self.forward.is_none() {
             Status::Dry
         } else {
-            let (clocks, rix) = match input {
-                Status::Stall(clocks) => (clocks, 0),
-                Status::Flow(DecodeResult::Forward {
-                    instruction,
-                    regvals,
-                    reglocks,
-                }) => {
+            let (clocks, bubbles) = match input {
+                Status::Stall(clocks) => (clocks, true),
+                Status::Flow(
+                    DecodeResult::Forward {
+                        instruction,
+                        regvals,
+                        reglocks,
+                    },
+                    b,
+                ) => {
                     let clocks = instruction.clock_requirement();
                     self.state = State::Executing {
                         instruction,
@@ -434,30 +437,30 @@ impl PipelineStage for Execute {
                         rvals: regvals,
                         clocks,
                     };
-                    (clocks, 0)
+                    (clocks, b)
                 }
-                Status::Flow(DecodeResult::Squashed) => {
+                Status::Flow(DecodeResult::Squashed, b) => {
                     self.state = Squashed {
                         wregs: Default::default(),
                     };
-                    (1, 0)
+                    (1, b)
                 }
-                Status::Ready(r) => (1, r),
-                Status::Squashed => (1, 0),
+                Status::Ready(r, b) => (r, b),
+                Status::Squashed(n) => (n, true),
                 Status::Dry => unreachable!(),
             };
 
             match take(&mut self.forward) {
-                Some(xr) => Status::Flow(xr),
-                None if self.state.is_waiting() && rix == 2 => {
-                    Status::Stall(self.state.wait_time())
+                Some(xr) => Status::Flow(xr, bubbles),
+                None if self.state.is_waiting() && bubbles => {
+                    Status::Stall(clocks.max(self.state.wait_time()))
                 }
                 None if self.state.is_waiting() => {
                     Status::Stall(clocks.min(self.state.wait_time()))
                 }
-                None if self.state.is_squashed() => Status::Squashed,
+                None if self.state.is_squashed() => Status::Squashed(clocks),
                 None if self.state.is_idle() => Status::Stall(clocks),
-                None => Status::Ready(rix + 1),
+                None => Status::Ready(clocks, bubbles),
             }
         }
     }

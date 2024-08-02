@@ -226,12 +226,12 @@ impl PipelineStage for Fetch {
         match self.forward {
             Some(instruction) => {
                 self.forward = None;
-                Status::Flow(instruction)
+                Status::Flow(instruction, false)
             }
             None if self.state.is_waiting() => Status::Stall(self.state.clocks()),
-            None if self.state.is_squashed() => Status::Squashed,
+            None if self.state.is_squashed() => Status::Squashed(1),
             None if self.state.is_halted() => Status::Dry,
-            None => Status::Ready(1),
+            None => Status::Ready(1, false),
         }
     }
 
@@ -326,7 +326,7 @@ mod test {
                 state = fetch.forward(Status::default());
                 assert!(matches!(
                     state,
-                    Status::Flow(FetchResult::Ready { word, .. }) if word == v[0]
+                    Status::Flow(FetchResult::Ready { word, .. }, _) if word == v[0]
                 ));
 
                 mem.clock(1);
@@ -340,7 +340,7 @@ mod test {
                 state = fetch.forward(Status::default());
                 assert!(matches!(
                     state,
-                    Status::Flow(FetchResult::Ready { word ,.. }) if word == v[1]
+                    Status::Flow(FetchResult::Ready { word ,.. }, _) if word == v[1]
                 ))
             })
     }
@@ -370,6 +370,6 @@ mod test {
         assert!(matches!(result, Clock::Squash(1)));
         assert!(fetch.forward.is_none());
         assert!(matches!(fetch.state, State::Squashed { .. }));
-        assert!(matches!(state, Status::Squashed));
+        assert!(matches!(state, Status::Squashed(_)));
     }
 }

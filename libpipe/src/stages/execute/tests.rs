@@ -60,7 +60,7 @@ fn clock_basic() {
             instruction: Instruction::Control(ControlOp::Nop),
             regvals: RegMap::default(),
             reglocks: RegisterFlags::default()
-        })),
+        }, false)),
         Status::Stall(1)
     ));
 }
