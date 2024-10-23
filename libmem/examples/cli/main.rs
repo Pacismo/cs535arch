@@ -110,39 +110,39 @@ fn process_input(
                         _ => unreachable!(),
                     };
                 }
+                (Sign::Unsigned, Type::Short) => {
+                    match module.read_short(address) {
+                        Ok(value) => {
+                            println!(
+                                "[{address:#010X} ({sign} {ty})] {} (cache hit)",
+                                value as Short,
+                            )
+                        }
+                        Err(Status::Busy(clocks)) if manual => {
+                            println!(
+                                "Memory subsystem requires {clocks} {} to complete an operation",
+                                if clocks == 1 { "clock" } else { "clocks" }
+                            )
+                        }
+                        Err(Status::Busy(clocks)) => {
+                            module.clock(clocks);
+                            *total_clocks += clocks;
+
+                            let value = module.read_short(address).unwrap();
+                            println!(
+                                "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
+                                value as Short,
+                                if clocks == 1 { "clock" } else { "clocks" }
+                            )
+                        }
+                        _ => unreachable!(),
+                    };
+                }
                 (Sign::Signed, Type::Short) => {
                     match module.read_short(address) {
                         Ok(value) => {
                             println!(
                                 "[{address:#010X} ({sign} {ty})] {} (cache hit)",
-                                value as Short,
-                            )
-                        }
-                        Err(Status::Busy(clocks)) if manual => {
-                            println!(
-                                "Memory subsystem requires {clocks} {} to complete an operation",
-                                if clocks == 1 { "clock" } else { "clocks" }
-                            )
-                        }
-                        Err(Status::Busy(clocks)) => {
-                            module.clock(clocks);
-                            *total_clocks += clocks;
-
-                            let value = module.read_short(address).unwrap();
-                            println!(
-                                "[{address:#010X} ({sign} {ty})] {} (took {clocks} {})",
-                                value as Short,
-                                if clocks == 1 { "clock" } else { "clocks" }
-                            )
-                        }
-                        _ => unreachable!(),
-                    };
-                }
-                (Sign::Signed, Type::Word) => {
-                    match module.read_short(address) {
-                        Ok(value) => {
-                            println!(
-                                "[{address:#010X} ({sign} {ty})] {} (cache hit)",
                                 value as SShort,
                             )
                         }
@@ -166,7 +166,7 @@ fn process_input(
                         _ => unreachable!(),
                     };
                 }
-                (Sign::Unsigned, Type::Short) => {
+                (Sign::Unsigned, Type::Word) => {
                     match module.read_word(address) {
                         Ok(value) => {
                             println!(
@@ -194,7 +194,7 @@ fn process_input(
                         _ => unreachable!(),
                     };
                 }
-                (Sign::Unsigned, Type::Word) => {
+                (Sign::Signed, Type::Word) => {
                     match module.read_word(address) {
                         Ok(value) => {
                             println!(
