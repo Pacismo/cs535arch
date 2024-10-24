@@ -28,8 +28,6 @@ pub struct SimulatorConfig {
 }
 
 /// Configure the simulation runtime.
-///
-/// The simulation runtime
 #[derive(Debug, Parser)]
 #[clap(author, version, about, long_about)]
 pub enum Cli {
